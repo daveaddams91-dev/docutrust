@@ -1,5 +1,6 @@
+from __future__ import annotations
 import requests
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 from .crypto import canonicalize_json, sha256_hex, MerkleTree
 
 class DocuTrustClient:

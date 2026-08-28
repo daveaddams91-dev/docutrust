@@ -1,7 +1,8 @@
+from __future__ import annotations
 import hashlib
 import json
 import os
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Tuple, Optional, Union
 
 def canonicalize_json(obj: Any) -> str:
     """RFC 8785 JSON Canonicalization Scheme."""
@@ -14,14 +15,14 @@ def canonicalize_json(obj: Any) -> str:
         return '{' + ','.join(f'{json.dumps(k)}:{canonicalize_json(obj[k])}' for k in sorted_keys) + '}'
     return json.dumps(obj)
 
-def sha256_hex(data: str | bytes) -> str:
+def sha256_hex(data: Union[str, bytes]) -> str:
     if isinstance(data, str):
         data = data.encode('utf-8')
     return hashlib.sha256(data).hexdigest()
 
 class MerkleTree:
     """Merkle Tree with Domain Separation (0x00 for leaves, 0x01 for interior nodes)."""
-    def __init__(self, leaves: List[str]):
+    def __init__(self, leaves: List[Union[str, bytes]]):
         if not leaves:
             raise ValueError("Leaves cannot be empty")
         self.leaves = [
@@ -81,7 +82,7 @@ class MerkleTree:
         }
 
     @staticmethod
-    def verify_proof(raw_leaf_data: Optional[str], proof: Dict[str, Any], expected_root: Optional[str] = None) -> bool:
+    def verify_proof(raw_leaf_data: Optional[Union[str, bytes]], proof: Dict[str, Any], expected_root: Optional[str] = None) -> bool:
         root = expected_root or proof["rootHash"]
         if raw_leaf_data is not None:
             buf = raw_leaf_data.encode('utf-8') if isinstance(raw_leaf_data, str) else raw_leaf_data
