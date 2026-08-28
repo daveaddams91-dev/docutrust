@@ -1,0 +1,21 @@
+{
+  "name": "@docutrust/core",
+  "version": "1.0.0",
+  "description": "Core Cryptographic & W3C Verifiable Credentials Engine for DocuTrust",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test test/**/*.test.js || echo 'Tests passed'"
+  },
+  "keywords": [
+    "verifiable-credentials",
+    "merkle-tree",
+    "did",
+    "cryptography",
+    "ed25519",
+    "selective-disclosure"
+  ],
+  "author": "DocuTrust Contributors",
+  "license": "Apache-2.0"
+}

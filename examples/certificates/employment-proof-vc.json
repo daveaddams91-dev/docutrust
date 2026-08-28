@@ -1,0 +1,33 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/credentials/v2",
+    "https://w3id.org/security/suites/ed25519-2020/v1"
+  ],
+  "id": "urn:uuid:1b2c3d4e-5f6a-7b8c-9d0e-1f2a3b4c5d6e",
+  "type": [
+    "VerifiableCredential",
+    "EmploymentCredential"
+  ],
+  "issuer": {
+    "id": "did:web:anthropic.com",
+    "name": "Anthropic AI Corp",
+    "url": "https://anthropic.com"
+  },
+  "validFrom": "2026-08-10T12:00:00Z",
+  "credentialSubject": {
+    "id": "did:key:z6Mks7v2...",
+    "name": "Sophia Chen",
+    "role": "Principal Distributed Systems Architect",
+    "department": "Infrastructure & Security",
+    "employmentStatus": "Full-Time Active",
+    "startDate": "2023-01-15"
+  },
+  "proof": {
+    "type": "Ed25519Signature2020",
+    "created": "2026-08-10T12:00:00Z",
+    "verificationMethod": "did:web:anthropic.com#keys-1",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "0x1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d",
+    "jcsCanonicalHash": "0x5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b"
+  }
+}

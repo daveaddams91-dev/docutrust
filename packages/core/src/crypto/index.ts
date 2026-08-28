@@ -1,0 +1,200 @@
+import * as crypto from 'crypto';
+
+/**
+ * JCS (JSON Canonicalization Scheme - RFC 8785)
+ * Ensures deterministic string representation of JSON objects before signing.
+ */
+export function canonicalizeJson(obj: any): string {
+  if (obj === null || typeof obj !== 'object') {
+    return JSON.stringify(obj);
+  }
+  if (Array.isArray(obj)) {
+    return '[' + obj.map(canonicalizeJson).join(',') + ']';
+  }
+  const keys = Object.keys(obj).sort();
+  const pairs = keys.map(k => `${JSON.stringify(k)}:${canonicalizeJson(obj[k])}`);
+  return '{' + pairs.join(',') + '}';
+}
+
+/**
+ * SHA-256 Hash of string or Buffer, returned as hex.
+ */
+export function sha256Hex(data: string | Buffer): string {
+  return crypto.createHash('sha256').update(data).digest('hex');
+}
+
+/**
+ * SHA-256 Hash of string or Buffer, returned as Buffer.
+ */
+export function sha256Buffer(data: string | Buffer): Buffer {
+  return crypto.createHash('sha256').update(data).digest();
+}
+
+/**
+ * Generates a random cryptographic salt/nonce (hex string).
+ */
+export function generateSalt(byteLength: number = 16): string {
+  return crypto.randomBytes(byteLength).toString('hex');
+}
+
+/**
+ * Keypair interface representing an Ed25519 identity.
+ */
+export interface KeyPair {
+  publicKeyHex: string;
+  privateKeyHex: string;
+  publicKeyPem: string;
+  privateKeyPem: string;
+  did: string;
+  keyId: string;
+}
+
+/**
+ * Base58 alphabet (Bitcoin style)
+ */
+const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+
+export function encodeBase58(buffer: Buffer): string {
+  const digits = [0];
+  for (let i = 0; i < buffer.length; i++) {
+    for (let j = 0; j < digits.length; j++) digits[j] <<= 8;
+    digits[0] += buffer[i];
+    let carry = 0;
+    for (let j = 0; j < digits.length; j++) {
+      digits[j] += carry;
+      carry = (digits[j] / 58) | 0;
+      digits[j] %= 58;
+    }
+    while (carry) {
+      digits.push(carry % 58);
+      carry = (carry / 58) | 0;
+    }
+  }
+  for (let i = 0; i < buffer.length && buffer[i] === 0; i++) digits.push(0);
+  return digits.reverse().map(digit => BASE58_ALPHABET[digit]).join('');
+}
+
+export function decodeBase58(str: string): Buffer {
+  const bytes = [0];
+  for (let i = 0; i < str.length; i++) {
+    const c = str[i];
+    const val = BASE58_ALPHABET.indexOf(c);
+    if (val === -1) throw new Error(`Invalid Base58 character: ${c}`);
+    for (let j = 0; j < bytes.length; j++) bytes[j] *= 58;
+    bytes[0] += val;
+    let carry = 0;
+    for (let j = 0; j < bytes.length; j++) {
+      bytes[j] += carry;
+      carry = bytes[j] >> 8;
+      bytes[j] &= 0xff;
+    }
+    while (carry) {
+      bytes.push(carry & 0xff);
+      carry >>= 8;
+    }
+  }
+  for (let i = 0; i < str.length && str[i] === '1'; i++) bytes.push(0);
+  return Buffer.from(bytes.reverse());
+}
+
+/**
+ * Generate an Ed25519 KeyPair with standard W3C did:key representation.
+ * Ed25519 multicodec prefix is 0xed01 (0xed, 0x01).
+ * In multibase base58btc, it starts with 'z6M...'.
+ */
+export function generateKeyPair(): KeyPair {
+  const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
+
+  const pubDer = publicKey.export({ type: 'spki', format: 'der' });
+  const privDer = privateKey.export({ type: 'pkcs8', format: 'der' });
+
+  // Standard raw 32-byte Ed25519 public key is the last 32 bytes of the SPKI DER encoding
+  const rawPubKey = pubDer.subarray(pubDer.length - 32);
+  const rawPrivKey = privDer.subarray(privDer.length - 32);
+
+  const publicKeyHex = rawPubKey.toString('hex');
+  const privateKeyHex = rawPrivKey.toString('hex');
+
+  // Prefix raw pubkey with 0xed, 0x01 (multicodec for ed25519-pub)
+  const multicodecKey = Buffer.concat([Buffer.from([0xed, 0x01]), rawPubKey]);
+  const did = `did:key:z${encodeBase58(multicodecKey)}`;
+  const keyId = `${did}#${did.replace('did:key:', '')}`;
+
+  const publicKeyPem = publicKey.export({ type: 'spki', format: 'pem' }).toString();
+  const privateKeyPem = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+
+  return {
+    publicKeyHex,
+    privateKeyHex,
+    publicKeyPem,
+    privateKeyPem,
+    did,
+    keyId
+  };
+}
+
+/**
+ * Sign data with an Ed25519 private key.
+ * Accepts either PEM private key, 32-byte hex private key, or KeyPair.
+ */
+export function signData(data: string | Buffer, privateKey: string | KeyPair): string {
+  const payloadBuffer = typeof data === 'string' ? Buffer.from(data, 'utf-8') : data;
+  
+  let keyObject: crypto.KeyObject;
+  if (typeof privateKey === 'object' && 'privateKeyPem' in privateKey) {
+    keyObject = crypto.createPrivateKey(privateKey.privateKeyPem);
+  } else if (typeof privateKey === 'string' && privateKey.includes('BEGIN PRIVATE KEY')) {
+    keyObject = crypto.createPrivateKey(privateKey);
+  } else if (typeof privateKey === 'string' && /^[0-9a-fA-F]{64}$/.test(privateKey)) {
+    // 32-byte raw Ed25519 seed -> construct PKCS8 DER
+    // PKCS8 header for Ed25519: 302e020100300506032b657004220420 + 32-byte seed
+    const pkcs8Header = Buffer.from('302e020100300506032b657004220420', 'hex');
+    const fullDer = Buffer.concat([pkcs8Header, Buffer.from(privateKey, 'hex')]);
+    keyObject = crypto.createPrivateKey({ key: fullDer, format: 'der', type: 'pkcs8' });
+  } else {
+    throw new Error('Invalid private key format. Expected KeyPair, PEM string, or 64-char hex string.');
+  }
+
+  const signature = crypto.sign(null, payloadBuffer, keyObject);
+  return signature.toString('hex');
+}
+
+/**
+ * Verify Ed25519 signature over data.
+ */
+export function verifySignature(
+  data: string | Buffer,
+  signatureHex: string,
+  publicKey: string | KeyPair
+): boolean {
+  try {
+    const payloadBuffer = typeof data === 'string' ? Buffer.from(data, 'utf-8') : data;
+    const signatureBuffer = Buffer.from(signatureHex, 'hex');
+
+    let keyObject: crypto.KeyObject;
+    if (typeof publicKey === 'object' && 'publicKeyPem' in publicKey) {
+      keyObject = crypto.createPublicKey(publicKey.publicKeyPem);
+    } else if (typeof publicKey === 'string' && publicKey.includes('BEGIN PUBLIC KEY')) {
+      keyObject = crypto.createPublicKey(publicKey);
+    } else if (typeof publicKey === 'string' && publicKey.startsWith('did:key:z')) {
+      const multibase = publicKey.replace('did:key:z', '').split('#')[0];
+      const decoded = decodeBase58(multibase);
+      // Remove multicodec prefix 0xed, 0x01
+      const rawPub = decoded.subarray(2);
+      // SPKI header for Ed25519: 302a300506032b6570032100 + 32-byte key
+      const spkiHeader = Buffer.from('302a300506032b6570032100', 'hex');
+      const fullDer = Buffer.concat([spkiHeader, rawPub]);
+      keyObject = crypto.createPublicKey({ key: fullDer, format: 'der', type: 'spki' });
+    } else if (typeof publicKey === 'string' && /^[0-9a-fA-F]{64}$/.test(publicKey)) {
+      const spkiHeader = Buffer.from('302a300506032b6570032100', 'hex');
+      const fullDer = Buffer.concat([spkiHeader, Buffer.from(publicKey, 'hex')]);
+      keyObject = crypto.createPublicKey({ key: fullDer, format: 'der', type: 'spki' });
+    } else {
+      throw new Error('Invalid public key format.');
+    }
+
+    return crypto.verify(null, payloadBuffer, keyObject, signatureBuffer);
+  } catch (err) {
+    return false;
+  }
+}

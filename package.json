@@ -1,0 +1,31 @@
+{
+  "name": "docutrust-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The Open-Source Sovereign Trust Stack for Verifiable Digital Credentials & Cryptographic Ledger Anchoring",
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "sdks/typescript"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces"
+  },
+  "keywords": [
+    "verifiable-credentials",
+    "decentralized-identity",
+    "did",
+    "w3c-vc",
+    "cryptography",
+    "merkle-tree",
+    "zero-knowledge",
+    "selective-disclosure",
+    "digital-certificates",
+    "trust-stack",
+    "open-source"
+  ],
+  "author": "DocuTrust Open Source Contributors",
+  "license": "Apache-2.0"
+}

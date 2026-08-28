@@ -1,0 +1,16 @@
+{
+  "name": "@docutrust/api",
+  "version": "1.0.0",
+  "description": "High-Performance REST API for DocuTrust Sovereign Verifiable Credentials",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5"
+  },
+  "author": "DocuTrust Contributors",
+  "license": "Apache-2.0"
+}
