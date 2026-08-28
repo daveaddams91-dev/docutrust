@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import Navbar from './components/Navbar.jsx';
 import HeroSection from './components/HeroSection.jsx';
 import IssuerStudio from './components/IssuerStudio.jsx';
+import CertificateDesigner from './components/CertificateDesigner.jsx';
+import LiveScanner from './components/LiveScanner.jsx';
+import EnterpriseDashboard from './components/EnterpriseDashboard.jsx';
 import VerificationPortal from './components/VerificationPortal.jsx';
 import SelectiveDisclosureStudio from './components/SelectiveDisclosureStudio.jsx';
 import ProtocolSimulator from './components/ProtocolSimulator.jsx';
@@ -25,6 +28,9 @@ export default function App() {
       <main className="flex-1">
         {activeTab === 'hero' && <HeroSection setActiveTab={setActiveTab} />}
         {activeTab === 'issuer' && <IssuerStudio onInspectCredential={handleInspectCredential} />}
+        {activeTab === 'designer' && <CertificateDesigner />}
+        {activeTab === 'scanner' && <LiveScanner onVerificationSuccess={handleInspectCredential} />}
+        {activeTab === 'dashboard' && <EnterpriseDashboard />}
         {activeTab === 'verify' && <VerificationPortal initialCredential={selectedCredentialForVerify} />}
         {activeTab === 'privacy' && <SelectiveDisclosureStudio />}
         {activeTab === 'simulator' && <ProtocolSimulator />}

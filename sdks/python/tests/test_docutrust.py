@@ -5,6 +5,7 @@ import os
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from docutrust.crypto import canonicalize_json, sha256_hex, MerkleTree
+from docutrust.pqc import generate_pqc_hybrid_keys
 
 class TestDocuTrustPython(unittest.TestCase):
     def test_canonicalize_json(self):
@@ -22,6 +23,12 @@ class TestDocuTrustPython(unittest.TestCase):
             proof = tree.get_proof(i)
             self.assertTrue(MerkleTree.verify_proof(leaf, proof, root))
             self.assertFalse(MerkleTree.verify_proof(leaf + "_tampered", proof, root))
+
+    def test_pqc_generation(self):
+        keys = generate_pqc_hybrid_keys()
+        self.assertIn("pqcPublicKeyHex", keys)
+        self.assertEqual(len(keys["pqcPublicKeyHex"]), 64)
+        self.assertEqual(keys["algorithm"], "ML-DSA-65-Ed25519-Hybrid")
 
 if __name__ == '__main__':
     unittest.main()

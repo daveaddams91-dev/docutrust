@@ -1,6 +1,9 @@
 // Export Cryptography
 export * from './crypto';
 
+// Export Post-Quantum Hybrid Cryptography (NIST ML-DSA)
+export * from './pqc';
+
 // Export Merkle Tree Engine
 export * from './merkle';
 
@@ -21,3 +24,9 @@ export * from './vc';
 
 // Export Templates & Visual Rendering
 export * from './templates';
+
+// Export Verifiable PDF 2.0 Engine
+export * from './pdf';
+
+// Export Persistent Vault & Multi-Tenant Registry
+export * from './db';

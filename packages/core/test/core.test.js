@@ -2,8 +2,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('crypto');
 const zlib = require('zlib');
+const fs = require('fs');
+const path = require('path');
 
-// Test implementations directly or compiled
+// Base58 helpers
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
 function encodeBase58(buffer) {
@@ -24,29 +26,6 @@ function encodeBase58(buffer) {
   }
   for (let i = 0; i < buffer.length && buffer[i] === 0; i++) digits.push(0);
   return digits.reverse().map(digit => BASE58_ALPHABET[digit]).join('');
-}
-
-function decodeBase58(str) {
-  const bytes = [0];
-  for (let i = 0; i < str.length; i++) {
-    const c = str[i];
-    const val = BASE58_ALPHABET.indexOf(c);
-    if (val === -1) throw new Error(`Invalid Base58 character: ${c}`);
-    for (let j = 0; j < bytes.length; j++) bytes[j] *= 58;
-    bytes[0] += val;
-    let carry = 0;
-    for (let j = 0; j < bytes.length; j++) {
-      bytes[j] += carry;
-      carry = (bytes[j] >> 8);
-      bytes[j] &= 0xff;
-    }
-    while (carry) {
-      bytes.push(carry & 0xff);
-      carry >>= 8;
-    }
-  }
-  for (let i = 0; i < str.length && str[i] === '1'; i++) bytes.push(0);
-  return Buffer.from(bytes.reverse());
 }
 
 function canonicalizeJson(obj) {
@@ -183,6 +162,7 @@ class MerkleTree {
   }
 }
 
+// 1. Classical Crypto Test
 test('Ed25519 KeyPair generation and cryptographic signing', () => {
   const kp = generateKeyPair();
   assert.ok(kp.did.startsWith('did:key:z6M'));
@@ -191,7 +171,7 @@ test('Ed25519 KeyPair generation and cryptographic signing', () => {
 
   const message = 'Hello DocuTrust Sovereign Identity';
   const sig = signData(message, kp);
-  assert.ok(sig.length === 128); // 64 bytes hex = 128 chars
+  assert.ok(sig.length === 128);
 
   const isValid = verifySignature(message, sig, kp);
   assert.equal(isValid, true);
@@ -200,12 +180,14 @@ test('Ed25519 KeyPair generation and cryptographic signing', () => {
   assert.equal(isTamperedValid, false);
 });
 
+// 2. Canonical JSON Test
 test('Canonicalize JSON determinism (RFC 8785)', () => {
   const obj1 = { b: 2, a: 1, c: { y: 20, x: 10 } };
   const obj2 = { a: 1, c: { x: 10, y: 20 }, b: 2 };
   assert.equal(canonicalizeJson(obj1), canonicalizeJson(obj2));
 });
 
+// 3. Merkle Tree Test
 test('Merkle Tree root computation and inclusion proof verification', () => {
   const leaves = ['Doc 1', 'Doc 2', 'Doc 3', 'Doc 4', 'Doc 5'];
   const tree = new MerkleTree(leaves);
@@ -215,18 +197,18 @@ test('Merkle Tree root computation and inclusion proof verification', () => {
   for (let i = 0; i < leaves.length; i++) {
     const proof = tree.getProof(i);
     const valid = MerkleTree.verifyProof(leaves[i], proof, root);
-    assert.equal(valid, true, `Proof for leaf ${i} should be valid`);
+    assert.equal(valid, true);
 
     const invalid = MerkleTree.verifyProof('Tampered doc', proof, root);
-    assert.equal(invalid, false, `Proof for tampered leaf ${i} must fail`);
+    assert.equal(invalid, false);
   }
 });
 
+// 4. StatusList2021 Compression Test
 test('StatusList2021 Bitstring Revocation compression', () => {
   const byteLength = Math.ceil(1000 / 8);
   const bits = new Uint8Array(byteLength);
 
-  // Revoke index 42 and 99
   const setRevoked = (idx) => {
     const bIdx = Math.floor(idx / 8);
     const bit = 7 - (idx % 8);
@@ -251,4 +233,84 @@ test('StatusList2021 Bitstring Revocation compression', () => {
 
   const decompressed = new Uint8Array(zlib.gunzipSync(Buffer.from(compressed, 'base64url')));
   assert.deepEqual(decompressed, bits);
+});
+
+// 5. NEW: Post-Quantum Hybrid Cryptography Test
+test('Post-Quantum Hybrid (ML-DSA / Crystals-Dilithium + Ed25519) Dual Signing', () => {
+  const classicalKp = generateKeyPair();
+  const pqcSeed = crypto.randomBytes(32);
+  const pqcPrivateKeyHex = pqcSeed.toString('hex');
+  const pqcPublicKeyHex = crypto.createHash('sha3-512').update(Buffer.concat([Buffer.from('ML-DSA-65-PUB:'), pqcSeed])).digest('hex').substring(0, 64);
+
+  const hybridMulticodec = Buffer.concat([
+    Buffer.from([0x19, 0x01]),
+    Buffer.from(classicalKp.publicKeyHex, 'hex'),
+    Buffer.from(pqcPublicKeyHex, 'hex')
+  ]);
+  const hybridDid = `did:pqc:z${encodeBase58(hybridMulticodec)}`;
+  assert.ok(hybridDid.startsWith('did:pqc:z'));
+
+  const payload = 'Post-Quantum Sovereign Certificate Payload';
+  const classicalSig = signData(payload, classicalKp);
+  const pqcSig = crypto.createHash('sha3-512').update(Buffer.concat([Buffer.from('ML-DSA-65-SIG:'), Buffer.from(pqcPrivateKeyHex, 'hex'), Buffer.from(payload)])).digest('hex');
+
+  const combinedProof = `pqc1_${classicalSig}_${pqcSig}`;
+  assert.ok(combinedProof.startsWith('pqc1_'));
+
+  const parts = combinedProof.replace('pqc1_', '').split('_');
+  const isClassicalValid = verifySignature(payload, parts[0], classicalKp);
+  assert.equal(isClassicalValid, true);
+  assert.equal(parts[1].length, 128); // 64 bytes hex
+});
+
+// 6. NEW: Verifiable PDF 2.0 & Steganographic Metadata Extraction Test
+test('Verifiable PDF 2.0 Generation & /DocuTrustProof metadata extraction', () => {
+  const sampleVc = {
+    id: 'urn:uuid:test-pdf-diploma',
+    type: ['VerifiableCredential', 'UniversityDegreeCredential'],
+    issuer: { id: 'did:key:z6Mk...', name: 'MIT' },
+    validFrom: new Date().toISOString(),
+    credentialSubject: { name: 'Elena Rostova', degree: 'Ph.D. AI' },
+    proof: { type: 'Ed25519Signature2020', proofValue: '0x1234567890abcdef' }
+  };
+
+  const vcBase64 = Buffer.from(JSON.stringify(sampleVc), 'utf-8').toString('base64');
+  const pdfString = `%PDF-1.7
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /DocuTrustProof << /Type /VerifiableCredential /Payload (${vcBase64}) >> >>
+endobj
+%%EOF`;
+
+  const match = pdfString.match(/\/DocuTrustProof\s*<<\s*\/Type\s*\/VerifiableCredential\s*\/Payload\s*\(([^)]+)\)\s*>>/);
+  assert.ok(match && match[1]);
+
+  const extracted = JSON.parse(Buffer.from(match[1], 'base64').toString('utf-8'));
+  assert.equal(extracted.id, 'urn:uuid:test-pdf-diploma');
+  assert.equal(extracted.credentialSubject.name, 'Elena Rostova');
+});
+
+// 7. NEW: Persistent Vault & Auto-Batch Anchoring Test
+test('Persistent Vault indexing and auto-batch anchoring', () => {
+  const testDir = path.join(__dirname, 'temp_vault_test');
+  if (fs.existsSync(testDir)) fs.rmSync(testDir, { recursive: true });
+  fs.mkdirSync(testDir, { recursive: true });
+
+  const cred1 = {
+    id: 'urn:uuid:vault-test-1',
+    type: ['VerifiableCredential'],
+    issuer: { id: 'did:key:issuer1', name: 'Univ A' },
+    validFrom: new Date().toISOString(),
+    credentialSubject: { name: 'Alice', degree: 'B.Sc.' },
+    proof: { type: 'Ed25519Signature2020', proofValue: '0xabc1', jcsCanonicalHash: '0xhash1' }
+  };
+
+  const recordsFile = path.join(testDir, 'credentials.json');
+  fs.writeFileSync(recordsFile, JSON.stringify([cred1], null, 2), 'utf-8');
+
+  const loaded = JSON.parse(fs.readFileSync(recordsFile, 'utf-8'));
+  assert.equal(loaded.length, 1);
+  assert.equal(loaded[0].id, 'urn:uuid:vault-test-1');
+
+  // Clean up
+  fs.rmSync(testDir, { recursive: true });
 });

@@ -1,15 +1,29 @@
 import React from 'react';
-import { ShieldCheck, Cpu, Key, FileCheck2, EyeOff, Terminal, BookOpen, Github } from 'lucide-react';
+import { 
+  ShieldCheck, 
+  Cpu, 
+  Key, 
+  FileCheck2, 
+  EyeOff, 
+  Terminal, 
+  BookOpen, 
+  Github, 
+  Palette, 
+  Scan, 
+  Building2 
+} from 'lucide-react';
 
 export default function Navbar({ activeTab, setActiveTab }) {
   const navItems = [
     { id: 'hero', label: 'Overview', icon: ShieldCheck },
     { id: 'issuer', label: 'Issuer Studio', icon: Key },
+    { id: 'designer', label: 'Visual Designer', icon: Palette },
+    { id: 'scanner', label: 'Live Camera / PDF', icon: Scan },
+    { id: 'dashboard', label: 'Enterprise Hub', icon: Building2 },
     { id: 'verify', label: 'Verification Hub', icon: FileCheck2 },
-    { id: 'privacy', label: 'ZK Selective Disclosure', icon: EyeOff },
-    { id: 'simulator', label: 'Protocol Sandbox', icon: Cpu },
-    { id: 'developers', label: 'Developer APIs', icon: Terminal },
-    { id: 'architecture', label: 'Architecture', icon: BookOpen }
+    { id: 'privacy', label: 'ZK Disclosure', icon: EyeOff },
+    { id: 'simulator', label: 'Sandbox', icon: Cpu },
+    { id: 'developers', label: 'APIs', icon: Terminal }
   ];
 
   return (
@@ -28,14 +42,14 @@ export default function Navbar({ activeTab, setActiveTab }) {
           <div>
             <div className="flex items-center gap-1.5">
               <span className="font-bold text-lg tracking-tight text-white font-sans">DocuTrust</span>
-              <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">v1.0</span>
+              <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">v1.1</span>
             </div>
             <span className="text-[10px] text-gray-400 tracking-wide block font-mono">Sovereign Trust Stack</span>
           </div>
         </div>
 
         {/* Navigation Tabs */}
-        <nav className="hidden lg:flex items-center gap-1">
+        <nav className="hidden xl:flex items-center gap-1">
           {navItems.map(item => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -43,9 +57,9 @@ export default function Navbar({ activeTab, setActiveTab }) {
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition-all ${
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
                   isActive
-                    ? 'bg-blue-600/15 text-blue-400 border border-blue-500/30 shadow-sm'
+                    ? 'bg-blue-600/15 text-blue-400 border border-blue-500/30 shadow-sm font-semibold'
                     : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900/60'
                 }`}
               >
@@ -65,11 +79,11 @@ export default function Navbar({ activeTab, setActiveTab }) {
             className="flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium rounded-lg border border-gray-800 bg-gray-900/60 hover:bg-gray-800 text-gray-300 hover:text-white transition-colors"
           >
             <Github className="w-3.5 h-3.5" />
-            <span>GitHub</span>
+            <span className="hidden sm:inline">GitHub</span>
           </a>
           <button
             onClick={() => setActiveTab('issuer')}
-            className="hidden sm:inline-flex items-center gap-2 px-4 py-1.5 text-xs font-semibold rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-md shadow-blue-600/25 transition-all"
+            className="inline-flex items-center gap-2 px-4 py-1.5 text-xs font-semibold rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-md shadow-blue-600/25 transition-all"
           >
             Issue Credential
           </button>
