@@ -1,6 +1,12 @@
 // Export Cryptography
 export * from './crypto';
 
+// Export Security Hardening (Constant-Time, Anti-Replay, Prototype Pollution Defense, Shannon Entropy)
+export * from './security';
+
+// Export Multi-Signature Threshold Scheme (M-of-N)
+export * from './multisig';
+
 // Export Post-Quantum Hybrid Cryptography (NIST ML-DSA)
 export * from './pqc';
 

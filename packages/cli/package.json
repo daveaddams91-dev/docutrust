@@ -1,15 +1,13 @@
 {
   "name": "@docutrust/cli",
-  "version": "1.0.0",
-  "description": "Command-line toolkit for issuing, verifying, and anchoring W3C Verifiable Credentials",
+  "version": "1.2.0",
+  "description": "DocuTrust CLI for Sovereign Verifiable Credentials and Ledger Anchoring",
   "bin": {
     "docutrust": "./bin/docutrust.js"
   },
-  "main": "bin/docutrust.js",
   "scripts": {
     "start": "node bin/docutrust.js"
   },
   "dependencies": {},
-  "author": "DocuTrust Contributors",
   "license": "Apache-2.0"
 }

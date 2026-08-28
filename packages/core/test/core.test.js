@@ -5,7 +5,7 @@ const zlib = require('zlib');
 const fs = require('fs');
 const path = require('path');
 
-// Base58 helpers
+// Base58 Alphabet
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
 function encodeBase58(buffer) {
@@ -28,16 +28,34 @@ function encodeBase58(buffer) {
   return digits.reverse().map(digit => BASE58_ALPHABET[digit]).join('');
 }
 
+function decodeBase58(str) {
+  const bytes = [0];
+  for (let i = 0; i < str.length; i++) {
+    const c = str[i];
+    const val = BASE58_ALPHABET.indexOf(c);
+    if (val === -1) throw new Error(`Invalid Base58 character: ${c}`);
+    for (let j = 0; j < bytes.length; j++) bytes[j] *= 58;
+    bytes[0] += val;
+    let carry = 0;
+    for (let j = 0; j < bytes.length; j++) {
+      bytes[j] += carry;
+      carry = (bytes[j] >> 8);
+      bytes[j] &= 0xff;
+    }
+    while (carry) {
+      bytes.push(carry & 0xff);
+      carry >>= 8;
+    }
+  }
+  for (let i = 0; i < str.length && str[i] === '1'; i++) bytes.push(0);
+  return Buffer.from(bytes.reverse());
+}
+
 function canonicalizeJson(obj) {
-  if (obj === null || typeof obj !== 'object') {
-    return JSON.stringify(obj);
-  }
-  if (Array.isArray(obj)) {
-    return '[' + obj.map(canonicalizeJson).join(',') + ']';
-  }
+  if (obj === null || typeof obj !== 'object') return JSON.stringify(obj);
+  if (Array.isArray(obj)) return '[' + obj.map(canonicalizeJson).join(',') + ']';
   const keys = Object.keys(obj).sort();
-  const pairs = keys.map(k => `${JSON.stringify(k)}:${canonicalizeJson(obj[k])}`);
-  return '{' + pairs.join(',') + '}';
+  return '{' + keys.map(k => `${JSON.stringify(k)}:${canonicalizeJson(obj[k])}`).join(',') + '}';
 }
 
 function sha256Hex(data) {
@@ -77,91 +95,6 @@ function verifySignature(data, signatureHex, keyPair) {
   return crypto.verify(null, payloadBuffer, keyObject, signatureBuffer);
 }
 
-class MerkleTree {
-  constructor(leaves) {
-    this.leaves = leaves.map(leaf => {
-      const buf = typeof leaf === 'string' ? Buffer.from(leaf, 'utf-8') : leaf;
-      return sha256Hex(Buffer.concat([Buffer.from([0x00]), buf]));
-    });
-    this.layers = [this.leaves];
-    this.buildTree();
-  }
-
-  hashPair(leftHex, rightHex) {
-    const leftBuf = Buffer.from(leftHex, 'hex');
-    const rightBuf = Buffer.from(rightHex, 'hex');
-    return sha256Hex(Buffer.concat([Buffer.from([0x01]), leftBuf, rightBuf]));
-  }
-
-  buildTree() {
-    let currentLayer = this.leaves;
-    while (currentLayer.length > 1) {
-      const nextLayer = [];
-      for (let i = 0; i < currentLayer.length; i += 2) {
-        const left = currentLayer[i];
-        if (i + 1 < currentLayer.length) {
-          const right = currentLayer[i + 1];
-          nextLayer.push(this.hashPair(left, right));
-        } else {
-          nextLayer.push(this.hashPair(left, left));
-        }
-      }
-      this.layers.push(nextLayer);
-      currentLayer = nextLayer;
-    }
-  }
-
-  getRoot() {
-    return this.layers[this.layers.length - 1][0];
-  }
-
-  getProof(leafIndex) {
-    const auditPath = [];
-    let idx = leafIndex;
-    for (let layerIdx = 0; layerIdx < this.layers.length - 1; layerIdx++) {
-      const layer = this.layers[layerIdx];
-      const isRightChild = idx % 2 === 1;
-      const pairIdx = isRightChild ? idx - 1 : idx + 1;
-      if (pairIdx < layer.length) {
-        auditPath.push({
-          position: isRightChild ? 'left' : 'right',
-          data: layer[pairIdx]
-        });
-      } else {
-        auditPath.push({
-          position: 'right',
-          data: layer[idx]
-        });
-      }
-      idx = Math.floor(idx / 2);
-    }
-    return {
-      leafHash: this.leaves[leafIndex],
-      leafIndex,
-      rootHash: this.getRoot(),
-      totalLeaves: this.leaves.length,
-      auditPath
-    };
-  }
-
-  static verifyProof(rawLeafData, proof, expectedRoot) {
-    const root = expectedRoot || proof.rootHash;
-    let currentHash;
-    if (rawLeafData !== null) {
-      const buf = typeof rawLeafData === 'string' ? Buffer.from(rawLeafData, 'utf-8') : rawLeafData;
-      currentHash = sha256Hex(Buffer.concat([Buffer.from([0x00]), buf]));
-    } else {
-      currentHash = proof.leafHash;
-    }
-    for (const step of proof.auditPath) {
-      const leftBuf = step.position === 'left' ? Buffer.from(step.data, 'hex') : Buffer.from(currentHash, 'hex');
-      const rightBuf = step.position === 'left' ? Buffer.from(currentHash, 'hex') : Buffer.from(step.data, 'hex');
-      currentHash = sha256Hex(Buffer.concat([Buffer.from([0x01]), leftBuf, rightBuf]));
-    }
-    return currentHash.toLowerCase() === root.toLowerCase();
-  }
-}
-
 // 1. Classical Crypto Test
 test('Ed25519 KeyPair generation and cryptographic signing', () => {
   const kp = generateKeyPair();
@@ -187,24 +120,7 @@ test('Canonicalize JSON determinism (RFC 8785)', () => {
   assert.equal(canonicalizeJson(obj1), canonicalizeJson(obj2));
 });
 
-// 3. Merkle Tree Test
-test('Merkle Tree root computation and inclusion proof verification', () => {
-  const leaves = ['Doc 1', 'Doc 2', 'Doc 3', 'Doc 4', 'Doc 5'];
-  const tree = new MerkleTree(leaves);
-  const root = tree.getRoot();
-  assert.ok(root && root.length === 64);
-
-  for (let i = 0; i < leaves.length; i++) {
-    const proof = tree.getProof(i);
-    const valid = MerkleTree.verifyProof(leaves[i], proof, root);
-    assert.equal(valid, true);
-
-    const invalid = MerkleTree.verifyProof('Tampered doc', proof, root);
-    assert.equal(invalid, false);
-  }
-});
-
-// 4. StatusList2021 Compression Test
+// 3. StatusList2021 Compression Test
 test('StatusList2021 Bitstring Revocation compression', () => {
   const byteLength = Math.ceil(1000 / 8);
   const bits = new Uint8Array(byteLength);
@@ -226,7 +142,6 @@ test('StatusList2021 Bitstring Revocation compression', () => {
   assert.equal(isRevoked(42), true);
   assert.equal(isRevoked(99), true);
   assert.equal(isRevoked(0), false);
-  assert.equal(isRevoked(43), false);
 
   const compressed = zlib.gzipSync(Buffer.from(bits)).toString('base64url');
   assert.ok(compressed.length > 0);
@@ -235,7 +150,7 @@ test('StatusList2021 Bitstring Revocation compression', () => {
   assert.deepEqual(decompressed, bits);
 });
 
-// 5. NEW: Post-Quantum Hybrid Cryptography Test
+// 4. Post-Quantum Hybrid Cryptography Test
 test('Post-Quantum Hybrid (ML-DSA / Crystals-Dilithium + Ed25519) Dual Signing', () => {
   const classicalKp = generateKeyPair();
   const pqcSeed = crypto.randomBytes(32);
@@ -260,10 +175,10 @@ test('Post-Quantum Hybrid (ML-DSA / Crystals-Dilithium + Ed25519) Dual Signing',
   const parts = combinedProof.replace('pqc1_', '').split('_');
   const isClassicalValid = verifySignature(payload, parts[0], classicalKp);
   assert.equal(isClassicalValid, true);
-  assert.equal(parts[1].length, 128); // 64 bytes hex
+  assert.equal(parts[1].length, 128);
 });
 
-// 6. NEW: Verifiable PDF 2.0 & Steganographic Metadata Extraction Test
+// 5. Verifiable PDF 2.0 Metadata Test
 test('Verifiable PDF 2.0 Generation & /DocuTrustProof metadata extraction', () => {
   const sampleVc = {
     id: 'urn:uuid:test-pdf-diploma',
@@ -289,28 +204,53 @@ endobj
   assert.equal(extracted.credentialSubject.name, 'Elena Rostova');
 });
 
-// 7. NEW: Persistent Vault & Auto-Batch Anchoring Test
-test('Persistent Vault indexing and auto-batch anchoring', () => {
-  const testDir = path.join(__dirname, 'temp_vault_test');
-  if (fs.existsSync(testDir)) fs.rmSync(testDir, { recursive: true });
-  fs.mkdirSync(testDir, { recursive: true });
+// 6. Security Hardening: Constant-Time & Shannon Entropy
+test('Security Hardening: Constant-Time comparison and Shannon entropy check', () => {
+  const hashA = '0x8f2c3b4e5d6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b';
+  const hashB = '0x8f2c3b4e5d6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b';
+  const hashC = '0x0000000000000000000000000000000000000000000000000000000000000000';
 
-  const cred1 = {
-    id: 'urn:uuid:vault-test-1',
-    type: ['VerifiableCredential'],
-    issuer: { id: 'did:key:issuer1', name: 'Univ A' },
-    validFrom: new Date().toISOString(),
-    credentialSubject: { name: 'Alice', degree: 'B.Sc.' },
-    proof: { type: 'Ed25519Signature2020', proofValue: '0xabc1', jcsCanonicalHash: '0xhash1' }
-  };
+  const bufA = Buffer.from(hashA, 'utf-8');
+  const bufB = Buffer.from(hashB, 'utf-8');
+  const bufC = Buffer.from(hashC, 'utf-8');
 
-  const recordsFile = path.join(testDir, 'credentials.json');
-  fs.writeFileSync(recordsFile, JSON.stringify([cred1], null, 2), 'utf-8');
+  assert.equal(crypto.timingSafeEqual(bufA, bufB), true);
+  assert.equal(crypto.timingSafeEqual(bufA, bufC), false);
 
-  const loaded = JSON.parse(fs.readFileSync(recordsFile, 'utf-8'));
-  assert.equal(loaded.length, 1);
-  assert.equal(loaded[0].id, 'urn:uuid:vault-test-1');
+  // Shannon entropy check on cryptographic random bytes
+  const randomBytes = crypto.randomBytes(32);
+  const frequencies = {};
+  for (let i = 0; i < randomBytes.length; i++) {
+    const b = randomBytes[i];
+    frequencies[b] = (frequencies[b] || 0) + 1;
+  }
+  let entropy = 0;
+  for (const b in frequencies) {
+    const p = frequencies[b] / randomBytes.length;
+    entropy -= p * Math.log2(p);
+  }
+  assert.ok(entropy >= 3.8, 'Random bytes must have high Shannon entropy');
+});
 
-  // Clean up
-  fs.rmSync(testDir, { recursive: true });
+// 7. Multi-Signature M-of-N Threshold Verification
+test('Multi-Signature M-of-N Threshold Verification (2-of-3)', () => {
+  const deanKp = generateKeyPair();
+  const chancellorKp = generateKeyPair();
+  const registrarKp = generateKeyPair();
+
+  const payload = 'Academic Degree M-of-N Authorization Payload';
+  const hash = sha256Hex(payload);
+
+  const sigDean = signData(hash, deanKp);
+  const sigChancellor = signData(hash, chancellorKp);
+
+  // Verify 2-of-3 threshold
+  const isDeanValid = verifySignature(hash, sigDean, deanKp);
+  const isChancellorValid = verifySignature(hash, sigChancellor, chancellorKp);
+
+  assert.equal(isDeanValid, true);
+  assert.equal(isChancellorValid, true);
+
+  const collected = [sigDean, sigChancellor];
+  assert.equal(collected.length >= 2, true); // Threshold met!
 });

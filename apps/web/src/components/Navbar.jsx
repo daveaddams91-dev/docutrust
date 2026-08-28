@@ -10,7 +10,8 @@ import {
   Github, 
   Palette, 
   Scan, 
-  Building2 
+  Building2,
+  Users
 } from 'lucide-react';
 
 export default function Navbar({ activeTab, setActiveTab }) {
@@ -18,6 +19,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
     { id: 'hero', label: 'Overview', icon: ShieldCheck },
     { id: 'issuer', label: 'Issuer Studio', icon: Key },
     { id: 'designer', label: 'Visual Designer', icon: Palette },
+    { id: 'multisig', label: 'Multi-Sig (M-of-N)', icon: Users },
     { id: 'scanner', label: 'Live Camera / PDF', icon: Scan },
     { id: 'dashboard', label: 'Enterprise Hub', icon: Building2 },
     { id: 'verify', label: 'Verification Hub', icon: FileCheck2 },
@@ -42,7 +44,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
           <div>
             <div className="flex items-center gap-1.5">
               <span className="font-bold text-lg tracking-tight text-white font-sans">DocuTrust</span>
-              <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">v1.1</span>
+              <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">v1.2</span>
             </div>
             <span className="text-[10px] text-gray-400 tracking-wide block font-mono">Sovereign Trust Stack</span>
           </div>
@@ -57,7 +59,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-all ${
                   isActive
                     ? 'bg-blue-600/15 text-blue-400 border border-blue-500/30 shadow-sm font-semibold'
                     : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900/60'
