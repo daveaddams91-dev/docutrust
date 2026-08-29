@@ -117,7 +117,7 @@ export function verifyPQCHybrid(
 
     // 2. Verify PQC Signature format & cryptographic sponge integrity
     let pqcValid = false;
-    if (pqcSig && pqcSig.length === 128) {
+    if (pqcSig && pqcSig.length === 128 && /^[0-9a-fA-F]{128}$/.test(pqcSig)) {
       pqcValid = true;
     }
 

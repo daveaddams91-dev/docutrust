@@ -41,6 +41,11 @@ class TestDocuTrustPython(unittest.TestCase):
 
         proof = mmr.get_proof(1)
         self.assertTrue(MerkleMountainRange.verify_proof(proof))
+
+        # Tampered proof should fail
+        tampered_proof = dict(proof)
+        tampered_proof["elementHash"] = tampered_proof["elementHash"][:-2] + "ff"
+        self.assertFalse(MerkleMountainRange.verify_proof(tampered_proof))
     def test_bbs_signatures_and_zk_proofs(self):
         kp = generate_bbs_keypair(5)
         self.assertTrue(kp["did"].startswith("did:bbs:z"))
@@ -211,6 +216,46 @@ class TestDocuTrustPython(unittest.TestCase):
         client = DocuTrustClient()
         res = client.create_pop_challenge()
         self.assertTrue(res["success"])
+
+    @patch('requests.Session.post')
+    def test_client_extended_features(self, mock_post):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"success": True}
+        mock_resp.raise_for_status.return_value = None
+        mock_post.return_value = mock_resp
+
+        client = DocuTrustClient()
+        self.assertTrue(client.shamir_split("secret")["success"])
+        self.assertTrue(client.shamir_combine([{"index": 1}])["success"])
+        self.assertTrue(client.issue_sd_jwt({"gpa": 3.9})["success"])
+        self.assertTrue(client.verify_sd_jwt("token")["success"])
+        self.assertTrue(client.verify_trust_issuer("did:key:123", "Degree")["success"])
+        self.assertTrue(client.create_bloom_filter(["id1"])["success"])
+        self.assertTrue(client.check_bloom_filter({}, "id1")["success"])
+        self.assertTrue(client.bbs_generate_keys()["success"])
+        self.assertTrue(client.bbs_issue(["msg1"])["success"])
+        self.assertTrue(client.bbs_derive_proof({}, ["msg1"], [0])["success"])
+        self.assertTrue(client.bbs_verify_proof({})["success"])
+        self.assertTrue(client.issue_timestamp_token("data")["success"])
+        self.assertTrue(client.verify_timestamp_token({})["success"])
+        self.assertTrue(client.didcomm_pack({}, "pub", "did")["success"])
+        self.assertTrue(client.didcomm_unpack({}, {})["success"])
+        self.assertTrue(client.mmr_append("leaf")["success"])
+        self.assertTrue(client.mmr_get_proof(0)["success"])
+        self.assertTrue(client.mmr_verify_proof({})["success"])
+        self.assertTrue(client.auto_anchor_vault()["success"])
+
+    @patch('requests.Session.get')
+    def test_client_get_endpoints(self, mock_get):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"success": True}
+        mock_resp.raise_for_status.return_value = None
+        mock_get.return_value = mock_resp
+
+        client = DocuTrustClient()
+        self.assertTrue(client.mmr_get_peaks()["success"])
+        self.assertTrue(client.get_hashchain()["success"])
+        self.assertTrue(client.get_vault_metrics()["success"])
 
 if __name__ == '__main__':
     unittest.main()

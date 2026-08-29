@@ -95,8 +95,12 @@ export function verifyRangeProof(
     return { valid: false, error: 'Malformed range bounds: min > max.' };
   }
 
-  if (!proof.proofBitstring || proof.proofBitstring.length !== 128) {
-    return { valid: false, error: 'Invalid proof bitstring length.' };
+  if (!proof.proofBitstring || proof.proofBitstring.length !== 128 || !/^[0-9a-fA-F]{128}$/.test(proof.proofBitstring)) {
+    return { valid: false, error: 'Invalid proof bitstring format.' };
+  }
+
+  if (!proof.commitment || !/^[0-9a-fA-F]{64}$/.test(proof.commitment)) {
+    return { valid: false, error: 'Invalid commitment format.' };
   }
 
   if (!proof.blindedRangeHashes || proof.blindedRangeHashes.length === 0) {

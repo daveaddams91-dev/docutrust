@@ -1,5 +1,89 @@
 # 📝 DocuTrust Changelog & Release Notes
 
+## [v1.7.1] - Cryptographic Hardening, Injection Defense & Sibling Path Audit - 2026-08-29
+
+### 🛡️ Cryptographic & Protocol Hardening
+- **`@docutrust/core/pqc` (`packages/core/src/pqc/index.ts`)**:
+  - Hardened `verifyPQCHybrid` to enforce strict 128-hex character format verification on the post-quantum signature component, preventing malformed or truncated signature bypass attempts.
+- **`@docutrust/core/zk-predicates` (`packages/core/src/zk-predicates/index.ts` & `sdks/python/docutrust/zk_predicates.py`)**:
+  - Hardened `verifyRangeProof` with strict regex validation for 128-hex proof bitstrings and 64-hex SHA-256 hidden commitments.
+- **`@docutrust/core/sd-jwt` (`packages/core/src/sd-jwt/index.ts`)**:
+  - Upgraded disclosure parsing in `verifySDJWTPresentation` to filter disclosures based on non-JWT token structure (`p.split('.').length !== 3`), correctly separating disclosure tokens from optional Key Binding JWTs regardless of prefix format.
+- **`@docutrust/core/mmr` (`packages/core/src/mmr/index.ts` & `sdks/python/docutrust/mmr.py`)**:
+  - Implemented complete sub-tree Merkle audit paths (`siblings`) in `MerkleMountainRange.getProof()` from the element index up to its sub-tree peak.
+  - Upgraded `MerkleMountainRange.verifyProof()` to verify that the element hash folds through the sibling path into one of the peak hashes, and that peak hashes bag up into the bagged peak root. Tampered element hashes or corrupted proofs are rejected deterministically.
+
+---
+
+### 🔒 Template & PDF Injection Defenses
+- **`@docutrust/core/templates` (`packages/core/src/templates/index.ts`)**:
+  - Added `escapeXml` sanitization for all interpolated certificate fields (`recipientName`, `title`, `institutionName`, `issueDate`, `certId`, `signatureHash`), completely eliminating SVG XML injection and XSS vectors.
+- **`@docutrust/core/pdf` (`packages/core/src/pdf/index.ts`)**:
+  - Added `escapePdfText` escaping for PDF text syntax (`\`, `(`, `)`), preventing PDF operator corruption and stream escapes.
+  - Dynamically computed stream `/Length` byte count for ISO 32000-1 specification compliance.
+
+---
+
+### 💻 CLI & Documentation Enhancements
+- **`@docutrust/cli` (`packages/cli/bin/docutrust.js`)**:
+  - Comprehensive overhaul of `docutrust help` menu documenting all 22+ CLI commands across Core, Privacy/Zero-Knowledge, Post-Quantum/KEM, Federation, and Streaming MMR ledgers.
+- **Automated Verification**:
+  - Added new security & tamper rejection test suites across Node.js and Python (`core.test.js`, `test_docutrust.py`). All 70+ monorepo tests and 23 Python tests pass with 100% success.
+
+---
+
+## [v1.7.0] - Official TypeScript SDK, Python SDK Modernization, Security Hardening & Full Parity - 2026-08-29
+
+### 🚀 Official TypeScript / JavaScript Client SDK (`@docutrust/sdk`)
+- **`@docutrust/sdk` (`sdks/typescript`)**:
+  - Implemented the official `@docutrust/sdk` package with complete TypeScript typings (`dist/index.d.ts`) and Node.js / browser runtime support.
+  - Implemented `DocuTrustClient` supporting 100% of the DocuTrust REST API v1.1+ endpoints:
+    - Single & Batch W3C Verifiable Credentials issuance and verification.
+    - Zero-Knowledge Range Predicates and RFC 6962 Selective Disclosure.
+    - Post-Quantum ML-DSA hybrid dual signing and ML-KEM-768 key encapsulation.
+    - BBS+ pairing-friendly signatures and unlinkable multi-message ZK proofs.
+    - IETF SD-JWT issuance and verification with salted disclosures.
+    - Shamir's K-of-N Secret Sharing (distributed key management).
+    - Decentralized Trust Registry accreditation checks.
+    - Space-efficient cryptographic Revocation Bloom Filters.
+    - RFC 3161 TSA Oracle timestamp tokens and multi-oracle quorums.
+    - DIDComm v2 authenticated end-to-end encrypted messaging.
+    - Merkle Mountain Range (MMR) streaming append and peak proofs.
+    - AES-256-GCM authenticated envelope vault encryption.
+  - Seamlessly re-exports `@docutrust/core` cryptographic primitives so developers can combine remote API calls and local zero-trust operations with a single dependency.
+  - Integrated into root npm workspaces with automated build (`tsc`) and unit test suite (`sdks/typescript/test/sdk.test.js`).
+
+---
+
+### 🐍 Python SDK Modernization & Full Parity (`sdks/python`)
+- **`sdks/python/docutrust/client.py`**:
+  - Added 20+ methods to `DocuTrustClient` bringing 100% feature parity with the backend API (`shamir_split`, `shamir_combine`, `issue_sd_jwt`, `verify_sd_jwt`, `verify_trust_issuer`, `create_bloom_filter`, `check_bloom_filter`, `bbs_generate_keys`, `bbs_issue`, `bbs_derive_proof`, `bbs_verify_proof`, `issue_timestamp_token`, `verify_timestamp_token`, `didcomm_pack`, `didcomm_unpack`, `mmr_append`, `mmr_get_peaks`, `mmr_get_proof`, `mmr_verify_proof`, `get_hashchain`, `get_vault_metrics`, `auto_anchor_vault`, `verify_pop_presentation`).
+- **`sdks/python/docutrust/bbs.py` & `sdks/python/docutrust/oracle.py`**:
+  - Modernized timestamp generation to timezone-aware UTC (`datetime.now(datetime.timezone.utc)`), eliminating Python 3.12+ deprecation warnings.
+- **`sdks/python/tests/test_docutrust.py`**:
+  - Expanded unit test coverage to 23 automated tests verifying all new client methods and cryptographic features.
+
+---
+
+### 🔒 API Server Refactoring & Security Hardening (`@docutrust/api`)
+- **`apps/api/src/server.js`**:
+  - Streamlined server implementation by directly importing core cryptographic helpers (`encodeBase58`, `decodeBase58`, `canonicalizeJson`, `sha256Hex`, `generateKeyPair`, `generatePQCKeyPair`, `signData`, `verifySignature`, `MerkleTree`) from `@docutrust/core`, eliminating redundant duplicate logic.
+  - Added request body size limit protection (10MB max payload guard) to prevent memory exhaustion and DoS attacks.
+  - All 23 API test suites pass with 100% coverage.
+
+---
+
+### 🧪 Comprehensive Test Suite Verification
+- Validated clean builds and test passes across all packages and workspaces:
+  - `@docutrust/core`: 25 tests passing
+  - `@docutrust/cli`: 17 tests passing
+  - `@docutrust/api`: 23 tests passing
+  - `@docutrust/sdk`: 4 tests passing
+  - `sdks/python`: 23 tests passing
+  - `@docutrust/web`: Clean production Vite build
+
+---
+
 ## [v1.6.0] - DIDComm v2 Encrypted Messaging, Peer Federation & Merkle Mountain Ranges - 2026-08-29
 
 ### 💬 DIDComm v2 Authenticated Encrypted Messaging

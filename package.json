@@ -5,7 +5,8 @@
   "description": "The Open-Source Sovereign Trust Stack for Verifiable Digital Credentials, Post-Quantum Cryptography & Multi-Sig Governance",
   "workspaces": [
     "packages/*",
-    "apps/*"
+    "apps/*",
+    "sdks/typescript"
   ],
   "scripts": {
     "dev": "npm run dev --workspaces",

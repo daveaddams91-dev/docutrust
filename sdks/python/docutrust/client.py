@@ -137,3 +137,213 @@ class DocuTrustClient:
         res.raise_for_status()
         return res.json()
 
+    def verify_pop_presentation(self, presentation: Dict[str, Any], expected_audience: Optional[str] = None) -> Dict[str, Any]:
+        """Verifies a Proof-of-Possession presentation."""
+        url = f"{self.api_url}/credentials/pop/verify"
+        payload = {"presentation": presentation}
+        if expected_audience:
+            payload["expectedAudience"] = expected_audience
+        res = self.session.post(url, json=payload)
+        res.raise_for_status()
+        return res.json()
+
+    def shamir_split(self, secret: str, total_shares: int = 5, threshold: int = 3) -> Dict[str, Any]:
+        """Splits a secret into K-of-N Shamir shares."""
+        url = f"{self.api_url}/keys/shamir/split"
+        res = self.session.post(url, json={"secret": secret, "totalShares": total_shares, "threshold": threshold})
+        res.raise_for_status()
+        return res.json()
+
+    def shamir_combine(self, shares: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Reconstructs a secret from Shamir shares."""
+        url = f"{self.api_url}/keys/shamir/combine"
+        res = self.session.post(url, json={"shares": shares})
+        res.raise_for_status()
+        return res.json()
+
+    def issue_sd_jwt(self, claims: Dict[str, Any], subject_did: Optional[str] = None) -> Dict[str, Any]:
+        """Issues an IETF SD-JWT package with salted disclosures."""
+        url = f"{self.api_url}/credentials/sd-jwt/issue"
+        payload = {"claims": claims}
+        if subject_did:
+            payload["subjectDid"] = subject_did
+        res = self.session.post(url, json=payload)
+        res.raise_for_status()
+        return res.json()
+
+    def verify_sd_jwt(self, presentation: str) -> Dict[str, Any]:
+        """Verifies an IETF SD-JWT presentation."""
+        url = f"{self.api_url}/credentials/sd-jwt/verify"
+        res = self.session.post(url, json={"presentation": presentation})
+        res.raise_for_status()
+        return res.json()
+
+    def verify_trust_issuer(self, issuer_did: str, schema_type: str) -> Dict[str, Any]:
+        """Verifies issuer authorization against Decentralized Trust Registry."""
+        url = f"{self.api_url}/trust/verify-issuer"
+        res = self.session.post(url, json={"issuerDid": issuer_did, "schemaType": schema_type})
+        res.raise_for_status()
+        return res.json()
+
+    def create_bloom_filter(self, revoked_ids: List[str], size_bits: int = 8192, hash_count: int = 5) -> Dict[str, Any]:
+        """Creates and signs a revocation Bloom filter."""
+        url = f"{self.api_url}/revocation/bloom/create"
+        res = self.session.post(url, json={"revokedIds": revoked_ids, "sizeBits": size_bits, "hashCount": hash_count})
+        res.raise_for_status()
+        return res.json()
+
+    def check_bloom_filter(self, signed_filter: Dict[str, Any], credential_id: str) -> Dict[str, Any]:
+        """Checks revocation status against a signed Bloom filter."""
+        url = f"{self.api_url}/revocation/bloom/check"
+        res = self.session.post(url, json={"signedFilter": signed_filter, "credentialId": credential_id})
+        res.raise_for_status()
+        return res.json()
+
+    def bbs_generate_keys(self, max_messages: int = 10) -> Dict[str, Any]:
+        """Generates BBS+ keypair with generator commitments."""
+        url = f"{self.api_url}/credentials/bbs/generate-keys"
+        res = self.session.post(url, json={"maxMessages": max_messages})
+        res.raise_for_status()
+        return res.json()
+
+    def bbs_issue(self, messages: List[str], keypair: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Issues BBS+ multi-message signature."""
+        url = f"{self.api_url}/credentials/bbs/issue"
+        payload = {"messages": messages}
+        if keypair:
+            payload["keyPair"] = keypair
+        res = self.session.post(url, json=payload)
+        res.raise_for_status()
+        return res.json()
+
+    def bbs_derive_proof(
+        self,
+        signature: Dict[str, Any],
+        all_messages: List[str],
+        disclosed_indices: List[int],
+        keypair: Optional[Dict[str, Any]] = None,
+        nonce: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Derives unlinkable BBS+ zero-knowledge proof."""
+        url = f"{self.api_url}/credentials/bbs/derive-proof"
+        payload = {
+            "signature": signature,
+            "allMessages": all_messages,
+            "disclosedIndices": disclosed_indices,
+            "keyPair": keypair,
+            "nonce": nonce
+        }
+        res = self.session.post(url, json=payload)
+        res.raise_for_status()
+        return res.json()
+
+    def bbs_verify_proof(self, proof: Dict[str, Any], expected_issuer_did: Optional[str] = None) -> Dict[str, Any]:
+        """Verifies BBS+ zero-knowledge proof."""
+        url = f"{self.api_url}/credentials/bbs/verify-proof"
+        payload = {"proof": proof}
+        if expected_issuer_did:
+            payload["expectedIssuerDid"] = expected_issuer_did
+        res = self.session.post(url, json=payload)
+        res.raise_for_status()
+        return res.json()
+
+    def issue_timestamp_token(self, data: str, nonce: Optional[str] = None) -> Dict[str, Any]:
+        """Issues RFC 3161 cryptographic timestamp token from TSA Oracle."""
+        url = f"{self.api_url}/oracle/timestamp"
+        res = self.session.post(url, json={"data": data, "nonce": nonce})
+        res.raise_for_status()
+        return res.json()
+
+    def verify_timestamp_token(self, token: Dict[str, Any], expected_data: Optional[str] = None) -> Dict[str, Any]:
+        """Verifies RFC 3161 timestamp token integrity."""
+        url = f"{self.api_url}/oracle/verify-timestamp"
+        res = self.session.post(url, json={"token": token, "expectedData": expected_data})
+        res.raise_for_status()
+        return res.json()
+
+    def didcomm_pack(
+        self,
+        message: Dict[str, Any],
+        recipient_public_key_hex: str,
+        recipient_did: str,
+        sender_keypair: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Packs a DIDComm v2 authenticated encrypted envelope."""
+        url = f"{self.api_url}/didcomm/pack"
+        payload = {
+            "message": message,
+            "recipientPublicKeyHex": recipient_public_key_hex,
+            "recipientDid": recipient_did,
+            "senderKeyPair": sender_keypair
+        }
+        res = self.session.post(url, json=payload)
+        res.raise_for_status()
+        return res.json()
+
+    def didcomm_unpack(
+        self,
+        envelope: Dict[str, Any],
+        recipient_keypair: Dict[str, Any],
+        expected_sender_did: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Unpacks and decrypts a DIDComm v2 message envelope."""
+        url = f"{self.api_url}/didcomm/unpack"
+        payload = {
+            "envelope": envelope,
+            "recipientKeyPair": recipient_keypair,
+            "expectedSenderDid": expected_sender_did
+        }
+        res = self.session.post(url, json=payload)
+        res.raise_for_status()
+        return res.json()
+
+    def mmr_append(self, leaf: str) -> Dict[str, Any]:
+        """Appends a leaf to the streaming Merkle Mountain Range ledger."""
+        url = f"{self.api_url}/ledger/mmr/append"
+        res = self.session.post(url, json={"leaf": leaf})
+        res.raise_for_status()
+        return res.json()
+
+    def mmr_get_peaks(self) -> Dict[str, Any]:
+        """Retrieves peaks and bagged root of Merkle Mountain Range."""
+        url = f"{self.api_url}/ledger/mmr"
+        res = self.session.get(url)
+        res.raise_for_status()
+        return res.json()
+
+    def mmr_get_proof(self, element_index: int) -> Dict[str, Any]:
+        """Gets Merkle Mountain Range peak inclusion proof."""
+        url = f"{self.api_url}/ledger/mmr/proof"
+        res = self.session.post(url, json={"elementIndex": element_index})
+        res.raise_for_status()
+        return res.json()
+
+    def mmr_verify_proof(self, proof: Dict[str, Any]) -> Dict[str, Any]:
+        """Verifies Merkle Mountain Range peak inclusion proof."""
+        url = f"{self.api_url}/ledger/mmr/verify"
+        res = self.session.post(url, json={"proof": proof})
+        res.raise_for_status()
+        return res.json()
+
+    def get_hashchain(self) -> Dict[str, Any]:
+        """Retrieves tamper-evident hashchain and verifies audit integrity."""
+        url = f"{self.api_url}/ledger/hashchain"
+        res = self.session.get(url)
+        res.raise_for_status()
+        return res.json()
+
+    def get_vault_metrics(self) -> Dict[str, Any]:
+        """Gets credential vault metrics and telemetry."""
+        url = f"{self.api_url}/vault/metrics"
+        res = self.session.get(url)
+        res.raise_for_status()
+        return res.json()
+
+    def auto_anchor_vault(self) -> Dict[str, Any]:
+        """Triggers batch auto-anchoring worker on unanchored credentials."""
+        url = f"{self.api_url}/vault/auto-anchor"
+        res = self.session.post(url, json={})
+        res.raise_for_status()
+        return res.json()
+
+

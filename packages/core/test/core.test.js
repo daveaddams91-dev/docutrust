@@ -772,9 +772,45 @@ test('25. MMR: Streaming append, binary peak decomposition, and peak proof verif
   const proof = mmr.getProof(2);
   assert.equal(proof.elementIndex, 2);
   assert.equal(proof.size, 5);
+  assert.ok(proof.siblings.length > 0);
 
   const isProofValid = MerkleMountainRange.verifyProof(proof);
   assert.equal(isProofValid, true);
+
+  // Tampered element hash should fail verification
+  const tamperedProof = { ...proof, elementHash: proof.elementHash.slice(0, -2) + 'ff' };
+  assert.equal(MerkleMountainRange.verifyProof(tamperedProof), false);
+});
+
+// 25. Security: XML & PDF Escaping Special Character Hardening
+test('26. Security: SVG XML and PDF String Escaping for Special Characters', () => {
+  const kp = generateKeyPair();
+  const { credential: rawVc } = VerifiableCredentialsEngine.issue({
+    keyPair: kp,
+    issuer: { id: kp.did, name: 'Test Authority & Partners' },
+    credentialSubject: {
+      id: 'did:key:z6MrecipientSpecial',
+      name: 'Alice & Bob <script>alert("xss")</script>',
+      title: 'Ph.D. in Computer Science (AI & ML) \\ "Honors"'
+    },
+    type: ['SpecialCharCredential']
+  });
+
+  // Test SVG Escaping
+  const svg = renderCertificateSvg({ credential: rawVc });
+  assert.ok(svg.includes('Alice &amp; Bob &lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;'));
+  assert.ok(!svg.includes('<script>alert'));
+
+  // Test PDF Escaping
+  const pdfResult = generateVerifiablePdf(rawVc);
+  const pdfStr = pdfResult.pdfBuffer.toString('utf-8');
+  assert.ok(pdfStr.includes('\\(AI & ML\\)'));
+  assert.ok(pdfResult.documentHash.length === 64);
+
+  // Verify PDF extraction still works perfectly with escaped chars
+  const extracted = extractVerifiablePdfProof(pdfResult.pdfBuffer);
+  assert.ok(extracted !== null);
+  assert.equal(extracted.credentialSubject.name, 'Alice & Bob <script>alert("xss")</script>');
 });
 
 

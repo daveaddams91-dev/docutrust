@@ -11,7 +11,7 @@ def issue_timestamp_token(data: Union[str, bytes], oracle_did: str = "did:oracle
     data_bytes = data.encode('utf-8') if isinstance(data, str) else data
     target_hash = hashlib.sha256(data_bytes).hexdigest()
     ts_seconds = int(time.time())
-    ts_iso = datetime.datetime.utcnow().isoformat() + "Z"
+    ts_iso = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
     token_nonce = nonce or os.urandom(16).hex()
 
     token_payload = json.dumps({

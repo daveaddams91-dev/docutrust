@@ -33,7 +33,7 @@ def sign_bbs(messages: List[str], keypair: Dict[str, Any]) -> Dict[str, Any]:
         comm_input = hashlib.sha256(f"{comm_input}:{gen}:{mh}".encode('utf-8')).hexdigest()
 
     import datetime
-    signed_at = datetime.datetime.utcnow().isoformat() + "Z"
+    signed_at = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
     
     header_str = json.dumps({
         "issuerDid": keypair["did"],
@@ -70,7 +70,7 @@ def derive_bbs_proof(
     ).hexdigest()
 
     import datetime
-    ts = datetime.datetime.utcnow().isoformat() + "Z"
+    ts = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
 
     header_str = json.dumps({
         "blindedCommitment": blinded_comm,

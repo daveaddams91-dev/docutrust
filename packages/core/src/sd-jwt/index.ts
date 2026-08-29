@@ -116,7 +116,8 @@ export function verifySDJWTPresentation(
   }
 
   const issuerJwt = parts[0];
-  const disclosureStrings = parts.slice(1).filter(p => p.length > 0 && !p.startsWith('ey')); // Filter empty and holder binding
+  // Disclosures are single base64url strings without periods; optional KB-JWT contains 2 periods (3 parts)
+  const disclosureStrings = parts.slice(1).filter(p => p.length > 0 && p.split('.').length !== 3);
 
   const jwtParts = issuerJwt.split('.');
   if (jwtParts.length !== 3) {

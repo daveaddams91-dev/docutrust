@@ -9,48 +9,39 @@ export interface VerifiablePdfResult {
   credentialId: string;
 }
 
+function escapePdfText(str: string): string {
+  return String(str)
+    .replace(/\\/g, '\\\\')
+    .replace(/\(/g, '\\(')
+    .replace(/\)/g, '\\)');
+}
+
 /**
- * Generates an official, standard-compliant PDF-1.7 document containing
- * visual diploma layout + embedded /DocuTrustProof cryptographic dictionary.
+ * Generates an ISO 32000-1 compliant Verifiable PDF with embedded W3C Verifiable Credential metadata.
  */
 export function generateVerifiablePdf(credential: VerifiableCredential): VerifiablePdfResult {
-  const subject = credential.credentialSubject;
-  const recipientName = subject.name || 'Recipient Name';
-  const degree = subject.title || subject.degree || 'Official Certificate';
-  const issuerName = typeof credential.issuer === 'object' ? credential.issuer.name : 'Authorized Issuing Authority';
-  const issueDate = new Date(credential.validFrom).toLocaleDateString('en-US', {
+  const subject = credential.credentialSubject || {};
+  const rawRecipientName = String(subject.name || subject.recipientName || subject.studentName || 'Recipient Name');
+  const rawDegree = String(subject.title || subject.degree || 'Official Certificate');
+  const rawIssuerName = String((typeof credential.issuer === 'object' ? credential.issuer.name : credential.issuer) || 'Authorized Issuing Authority');
+
+  const recipientName = escapePdfText(rawRecipientName);
+  const degree = escapePdfText(rawDegree);
+  const issuerName = escapePdfText(rawIssuerName);
+
+  const issueDate = escapePdfText(new Date(credential.validFrom || new Date().toISOString()).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric'
-  });
-  const certId = credential.id.replace('urn:uuid:', '');
+  }));
+  const certId = escapePdfText(credential.id.replace('urn:uuid:', ''));
   const signatureHex = credential.proof?.proofValue || '';
 
   // Encode credential JSON as Base64 for clean PDF metadata embedding
   const vcJson = JSON.stringify(credential);
   const vcBase64 = Buffer.from(vcJson, 'utf-8').toString('base64');
 
-  // Minimal valid PDF-1.7 structure with embedded metadata and visual vector layout
-  const pdfBody = `%PDF-1.7
-1 0 obj
-<< /Type /Catalog /Pages 2 0 R /DocuTrustProof << /Type /VerifiableCredential /Payload (${vcBase64}) >> >>
-endobj
-2 0 obj
-<< /Type /Pages /Kids [3 0 R] /Count 1 >>
-endobj
-3 0 obj
-<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>
-endobj
-4 0 obj
-<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
-endobj
-5 0 obj
-<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
-endobj
-6 0 obj
-<< /Length 750 >>
-stream
-BT
+  const streamContent = `BT
 /F1 20 Tf
 100 700 Td
 (${issuerName}) Tj
@@ -78,7 +69,31 @@ BT
 (ED25519 SIGNATURE: ${signatureHex.substring(0, 48)}...) Tj
 0 -30 Td
 (Cryptographically sealed by DocuTrust. Verify at https://docutrust.org/verify) Tj
-ET
+ET`;
+
+  const streamLength = Buffer.byteLength(streamContent, 'utf-8');
+
+  // Minimal valid PDF-1.7 structure with embedded metadata and visual vector layout
+  const pdfBody = `%PDF-1.7
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /DocuTrustProof << /Type /VerifiableCredential /Payload (${vcBase64}) >> >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+6 0 obj
+<< /Length ${streamLength} >>
+stream
+${streamContent}
 endstream
 endobj
 xref

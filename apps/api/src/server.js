@@ -5,6 +5,15 @@ const fs = require('fs');
 const path = require('path');
 
 const {
+  encodeBase58,
+  decodeBase58,
+  canonicalizeJson,
+  sha256Hex,
+  generateKeyPair,
+  signData,
+  verifySignature,
+  generatePQCKeyPair,
+  MerkleTree,
   encryptAESGCM,
   decryptAESGCM,
   proveRange,
@@ -68,246 +77,6 @@ function persistAll() {
     fs.writeFileSync(API_KEYS_FILE, JSON.stringify(apiKeysStore, null, 2), 'utf-8');
     fs.writeFileSync(ANCHORS_FILE, JSON.stringify(anchorsStore, null, 2), 'utf-8');
   } catch (e) {}
-}
-
-// Base58 helpers
-const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-
-function encodeBase58(buffer) {
-  const digits = [0];
-  for (let i = 0; i < buffer.length; i++) {
-    for (let j = 0; j < digits.length; j++) digits[j] <<= 8;
-    digits[0] += buffer[i];
-    let carry = 0;
-    for (let j = 0; j < digits.length; j++) {
-      digits[j] += carry;
-      carry = (digits[j] / 58) | 0;
-      digits[j] %= 58;
-    }
-    while (carry) {
-      digits.push(carry % 58);
-      carry = (carry / 58) | 0;
-    }
-  }
-  for (let i = 0; i < buffer.length && buffer[i] === 0; i++) digits.push(0);
-  return digits.reverse().map(digit => BASE58_ALPHABET[digit]).join('');
-}
-
-function decodeBase58(str) {
-  const bytes = [0];
-  for (let i = 0; i < str.length; i++) {
-    const c = str[i];
-    const val = BASE58_ALPHABET.indexOf(c);
-    if (val === -1) throw new Error(`Invalid Base58 character: ${c}`);
-    for (let j = 0; j < bytes.length; j++) bytes[j] *= 58;
-    bytes[0] += val;
-    let carry = 0;
-    for (let j = 0; j < bytes.length; j++) {
-      bytes[j] += carry;
-      carry = (bytes[j] >> 8);
-      bytes[j] &= 0xff;
-    }
-    while (carry) {
-      bytes.push(carry & 0xff);
-      carry >>= 8;
-    }
-  }
-  for (let i = 0; i < str.length && str[i] === '1'; i++) bytes.push(0);
-  return Buffer.from(bytes.reverse());
-}
-
-function canonicalizeJson(obj) {
-  if (obj === null || typeof obj !== 'object') return JSON.stringify(obj);
-  if (Array.isArray(obj)) return '[' + obj.map(canonicalizeJson).join(',') + ']';
-  const keys = Object.keys(obj).sort();
-  return '{' + keys.map(k => `${JSON.stringify(k)}:${canonicalizeJson(obj[k])}`).join(',') + '}';
-}
-
-function sha256Hex(data) {
-  return crypto.createHash('sha256').update(data).digest('hex');
-}
-
-function generateKeyPair() {
-  const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
-  const pubDer = publicKey.export({ type: 'spki', format: 'der' });
-  const privDer = privateKey.export({ type: 'pkcs8', format: 'der' });
-  const rawPubKey = pubDer.subarray(pubDer.length - 32);
-  const rawPrivKey = privDer.subarray(privDer.length - 32);
-  const multicodecKey = Buffer.concat([Buffer.from([0xed, 0x01]), rawPubKey]);
-  const did = `did:key:z${encodeBase58(multicodecKey)}`;
-  const keyId = `${did}#${did.replace('did:key:', '')}`;
-
-  return {
-    publicKeyHex: rawPubKey.toString('hex'),
-    privateKeyHex: rawPrivKey.toString('hex'),
-    publicKeyPem: publicKey.export({ type: 'spki', format: 'pem' }).toString(),
-    privateKeyPem: privateKey.export({ type: 'pkcs8', format: 'pem' }).toString(),
-    did,
-    keyId
-  };
-}
-
-function generatePQCKeyPair() {
-  const classical = generateKeyPair();
-  const pqcSeed = crypto.randomBytes(32);
-  const pqcPrivateKeyHex = pqcSeed.toString('hex');
-  const pqcPublicKeyHex = crypto.createHash('sha3-512').update(Buffer.concat([Buffer.from('ML-DSA-65-PUB:'), pqcSeed])).digest('hex').substring(0, 64);
-
-  const hybridMulticodec = Buffer.concat([
-    Buffer.from([0x19, 0x01]),
-    Buffer.from(classical.publicKeyHex, 'hex'),
-    Buffer.from(pqcPublicKeyHex, 'hex')
-  ]);
-  const hybridDid = `did:pqc:z${encodeBase58(hybridMulticodec)}`;
-  const hybridKeyId = `${hybridDid}#pqc-hybrid-1`;
-
-  return {
-    classicalKeyPair: classical,
-    pqcPublicKeyHex,
-    pqcPrivateKeyHex,
-    hybridDid,
-    hybridKeyId,
-    algorithm: 'ML-DSA-65-Ed25519-Hybrid'
-  };
-}
-
-function signData(data, privateKey) {
-  const payloadBuffer = typeof data === 'string' ? Buffer.from(data, 'utf-8') : data;
-  let keyObject;
-  if (typeof privateKey === 'object' && privateKey.privateKeyPem) {
-    keyObject = crypto.createPrivateKey(privateKey.privateKeyPem);
-  } else if (typeof privateKey === 'string' && privateKey.includes('BEGIN PRIVATE KEY')) {
-    keyObject = crypto.createPrivateKey(privateKey);
-  } else if (typeof privateKey === 'string' && /^[0-9a-fA-F]{64}$/.test(privateKey)) {
-    const pkcs8Header = Buffer.from('302e020100300506032b657004220420', 'hex');
-    const fullDer = Buffer.concat([pkcs8Header, Buffer.from(privateKey, 'hex')]);
-    keyObject = crypto.createPrivateKey({ key: fullDer, format: 'der', type: 'pkcs8' });
-  } else {
-    throw new Error('Invalid private key format.');
-  }
-  return crypto.sign(null, payloadBuffer, keyObject).toString('hex');
-}
-
-function verifySignature(data, signatureHex, publicKey) {
-  try {
-    const payloadBuffer = typeof data === 'string' ? Buffer.from(data, 'utf-8') : data;
-    const signatureBuffer = Buffer.from(signatureHex, 'hex');
-    let keyObject;
-    if (typeof publicKey === 'object' && publicKey.publicKeyPem) {
-      keyObject = crypto.createPublicKey(publicKey.publicKeyPem);
-    } else if (typeof publicKey === 'string' && publicKey.includes('BEGIN PUBLIC KEY')) {
-      keyObject = crypto.createPublicKey(publicKey);
-    } else if (typeof publicKey === 'string' && publicKey.startsWith('did:key:z')) {
-      const multibase = publicKey.replace('did:key:z', '').split('#')[0];
-      const decoded = decodeBase58(multibase);
-      const rawPub = decoded.subarray(2);
-      const spkiHeader = Buffer.from('302a300506032b6570032100', 'hex');
-      const fullDer = Buffer.concat([spkiHeader, rawPub]);
-      keyObject = crypto.createPublicKey({ key: fullDer, format: 'der', type: 'spki' });
-    } else if (typeof publicKey === 'string' && publicKey.startsWith('did:pqc:z')) {
-      const multibase = publicKey.replace('did:pqc:z', '').split('#')[0];
-      const decoded = decodeBase58(multibase);
-      const rawClassicalPub = decoded.subarray(2, 34);
-      const spkiHeader = Buffer.from('302a300506032b6570032100', 'hex');
-      const fullDer = Buffer.concat([spkiHeader, rawClassicalPub]);
-      keyObject = crypto.createPublicKey({ key: fullDer, format: 'der', type: 'spki' });
-    } else if (typeof publicKey === 'string' && /^[0-9a-fA-F]{64}$/.test(publicKey)) {
-      const spkiHeader = Buffer.from('302a300506032b6570032100', 'hex');
-      const fullDer = Buffer.concat([spkiHeader, Buffer.from(publicKey, 'hex')]);
-      keyObject = crypto.createPublicKey({ key: fullDer, format: 'der', type: 'spki' });
-    } else {
-      return false;
-    }
-    return crypto.verify(null, payloadBuffer, keyObject, signatureBuffer);
-  } catch (e) {
-    return false;
-  }
-}
-
-// Merkle Tree implementation
-class MerkleTree {
-  constructor(leaves) {
-    this.leaves = leaves.map(leaf => {
-      const buf = typeof leaf === 'string' ? Buffer.from(leaf, 'utf-8') : leaf;
-      return sha256Hex(Buffer.concat([Buffer.from([0x00]), buf]));
-    });
-    this.layers = [this.leaves];
-    this.buildTree();
-  }
-
-  hashPair(leftHex, rightHex) {
-    const leftBuf = Buffer.from(leftHex, 'hex');
-    const rightBuf = Buffer.from(rightHex, 'hex');
-    return sha256Hex(Buffer.concat([Buffer.from([0x01]), leftBuf, rightBuf]));
-  }
-
-  buildTree() {
-    let currentLayer = this.leaves;
-    while (currentLayer.length > 1) {
-      const nextLayer = [];
-      for (let i = 0; i < currentLayer.length; i += 2) {
-        const left = currentLayer[i];
-        if (i + 1 < currentLayer.length) {
-          const right = currentLayer[i + 1];
-          nextLayer.push(this.hashPair(left, right));
-        } else {
-          nextLayer.push(this.hashPair(left, left));
-        }
-      }
-      this.layers.push(nextLayer);
-      currentLayer = nextLayer;
-    }
-  }
-
-  getRoot() {
-    return this.layers[this.layers.length - 1][0];
-  }
-
-  getProof(leafIndex) {
-    const auditPath = [];
-    let idx = leafIndex;
-    for (let layerIdx = 0; layerIdx < this.layers.length - 1; layerIdx++) {
-      const layer = this.layers[layerIdx];
-      const isRightChild = idx % 2 === 1;
-      const pairIdx = isRightChild ? idx - 1 : idx + 1;
-      if (pairIdx < layer.length) {
-        auditPath.push({
-          position: isRightChild ? 'left' : 'right',
-          data: layer[pairIdx]
-        });
-      } else {
-        auditPath.push({
-          position: 'right',
-          data: layer[idx]
-        });
-      }
-      idx = Math.floor(idx / 2);
-    }
-    return {
-      leafHash: this.leaves[leafIndex],
-      leafIndex,
-      rootHash: this.getRoot(),
-      totalLeaves: this.leaves.length,
-      auditPath
-    };
-  }
-
-  static verifyProof(rawLeafData, proof, expectedRoot) {
-    const root = expectedRoot || proof.rootHash;
-    let currentHash;
-    if (rawLeafData !== null) {
-      const buf = typeof rawLeafData === 'string' ? Buffer.from(rawLeafData, 'utf-8') : rawLeafData;
-      currentHash = sha256Hex(Buffer.concat([Buffer.from([0x00]), buf]));
-    } else {
-      currentHash = proof.leafHash;
-    }
-    for (const step of proof.auditPath) {
-      const leftBuf = step.position === 'left' ? Buffer.from(step.data, 'hex') : Buffer.from(currentHash, 'hex');
-      const rightBuf = step.position === 'left' ? Buffer.from(currentHash, 'hex') : Buffer.from(step.data, 'hex');
-      currentHash = sha256Hex(Buffer.concat([Buffer.from([0x01]), leftBuf, rightBuf]));
-    }
-    return currentHash.toLowerCase() === root.toLowerCase();
-  }
 }
 
 // Generate Verifiable PDF 2.0
@@ -410,9 +179,17 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const pathname = url.pathname;
 
-  const readJsonBody = () => new Promise((resolve, reject) => {
+  const readJsonBody = (maxBytes = 10 * 1024 * 1024) => new Promise((resolve, reject) => {
     let body = '';
-    req.on('data', chunk => body += chunk);
+    let receivedBytes = 0;
+    req.on('data', chunk => {
+      receivedBytes += chunk.length;
+      if (receivedBytes > maxBytes) {
+        req.destroy(new Error('Payload Too Large: request body exceeds 10MB limit'));
+        return;
+      }
+      body += chunk;
+    });
     req.on('end', () => {
       try {
         resolve(body ? JSON.parse(body) : {});

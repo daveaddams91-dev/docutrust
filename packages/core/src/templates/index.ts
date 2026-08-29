@@ -7,6 +7,15 @@ export interface RenderCertificateOptions {
   theme?: 'academic-gold' | 'corporate-blue' | 'cyber-dark' | 'minimal-modern';
 }
 
+function escapeXml(str: string): string {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 /**
  * Generates an ultra-crisp, high-fidelity SVG certificate with embedded QR codes,
  * security watermarks, issuer seal, and cryptographic hashes.
@@ -18,17 +27,22 @@ export function renderCertificateSvg(options: RenderCertificateOptions): string 
     theme = 'academic-gold'
   } = options;
 
-  const subject = credential.credentialSubject;
-  const recipientName = subject.name || subject.recipientName || subject.studentName || 'Recipient Name';
-  const title = subject.title || subject.degree || subject.awardTitle || subject.role || 'Certificate of Achievement';
-  const institutionName = (typeof credential.issuer === 'object' && credential.issuer.name) || 'Authorized Issuing Authority';
-  const issueDate = new Date(credential.validFrom).toLocaleDateString('en-US', {
+  const subject = credential.credentialSubject || {};
+  const rawRecipientName = String(subject.name || subject.recipientName || subject.studentName || 'Recipient Name');
+  const rawTitle = String(subject.title || subject.degree || subject.awardTitle || subject.role || 'Certificate of Achievement');
+  const rawInstitutionName = String((typeof credential.issuer === 'object' ? credential.issuer.name : credential.issuer) || 'Authorized Issuing Authority');
+
+  const recipientName = escapeXml(rawRecipientName);
+  const title = escapeXml(rawTitle);
+  const institutionName = escapeXml(rawInstitutionName);
+
+  const issueDate = escapeXml(new Date(credential.validFrom || new Date().toISOString()).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric'
-  });
-  const certId = credential.id.replace('urn:uuid:', '').substring(0, 16).toUpperCase();
-  const signatureHash = (credential.proof?.proofValue || '').substring(0, 24).toUpperCase();
+  }));
+  const certId = escapeXml(credential.id.replace('urn:uuid:', '').substring(0, 16).toUpperCase());
+  const signatureHash = escapeXml((credential.proof?.proofValue || '').substring(0, 24).toUpperCase());
   const verificationUrl = `${verificationBaseUrl}?id=${encodeURIComponent(credential.id)}`;
 
   // Color Palettes

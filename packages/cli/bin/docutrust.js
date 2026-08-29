@@ -205,7 +205,7 @@ const command = args[0];
 
 function printHelp() {
   console.log(`
-\x1b[1m\x1b[36m🛡️ DocuTrust CLI v1.2\x1b[0m — Open-Source Sovereign Trust Stack
+\x1b[1m\x1b[36m🛡️ DocuTrust CLI v1.6.0\x1b[0m — Open-Source Sovereign Trust Stack
 
 \x1b[1mCORE COMMANDS:\x1b[0m
   \x1b[32mdemo / wizard\x1b[0m                                 Run interactive 10-second end-to-end credential issuance & verification
@@ -215,6 +215,28 @@ function printHelp() {
   \x1b[32mbatch\x1b[0m  --csv <file> --key <keyfile>           Batch issue credentials from CSV with Polygon Merkle Tree Anchor
   \x1b[32mverify\x1b[0m --vc <file>                            Verify cryptographic signature, Merkle proof & ledger anchor
   \x1b[32mhelp\x1b[0m                                          Show this help menu
+
+\x1b[1mPRIVACY & ZERO-KNOWLEDGE:\x1b[0m
+  \x1b[32mencrypt\x1b[0m --data <str> --pass <pass>             Encrypt data with AES-256-GCM authenticated envelope
+  \x1b[32mdecrypt\x1b[0m --payload <file> --pass <pass>         Decrypt AES-256-GCM envelope payload
+  \x1b[32mzk-range\x1b[0m --val <num> --min <num> --max <num>   Generate ZK Range Proof with hidden commitment
+  \x1b[32mto-sd-jwt\x1b[0m --claims <file> --key <keyfile>      Issue IETF SD-JWT with salted disclosures
+  \x1b[32mverify-sd-jwt\x1b[0m --presentation <str>            Verify SD-JWT presentation against issuer public key
+  \x1b[32mbbs-issue\x1b[0m --messages <msg1,msg2>               Issue BBS+ multi-message signature
+  \x1b[32mbbs-prove\x1b[0m --sig <file> --reveal <0,2>          Derive BBS+ unlinkable zero-knowledge proof
+  \x1b[32mbbs-verify\x1b[0m --proof <file>                      Verify BBS+ zero-knowledge proof
+
+\x1b[1mPOST-QUANTUM & KEY MANAGEMENT:\x1b[0m
+  \x1b[32mkem-keygen\x1b[0m [--out <file>]                     Generate Post-Quantum ML-KEM-768 hybrid keypair
+  \x1b[32mpop-challenge\x1b[0m --aud <audience>                 Create Proof-of-Possession challenge
+  \x1b[32mshamir-split\x1b[0m --secret <text> -n 5 -k 3         Split secret into K-of-N Shamir polynomial shares
+  \x1b[32mshamir-combine\x1b[0m --shares <file>                 Reconstruct secret from Shamir shares
+
+\x1b[1mFEDERATION & STREAMING LEDGER:\x1b[0m
+  \x1b[32moracle-timestamp\x1b[0m --data <text>                 Issue RFC 3161 timestamp token from TSA Oracle
+  \x1b[32mdidcomm-pack\x1b[0m --msg <file> --to <pubHex>        Pack DIDComm v2 encrypted envelope
+  \x1b[32mdidcomm-unpack\x1b[0m --envelope <file> --key <priv>  Unpack and decrypt DIDComm v2 envelope
+  \x1b[32mmmr-append\x1b[0m --leaf <text>                       Append entry to Merkle Mountain Range ledger
 
 \x1b[1mQUICKSTART:\x1b[0m
   $ docutrust demo
