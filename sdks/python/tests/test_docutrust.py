@@ -303,6 +303,35 @@ class TestDocuTrustPython(unittest.TestCase):
         raw = b"DocuTrust 2026"
         self.assertEqual(decode_base58(encode_base58(raw)), raw)
 
+    def test_shamir_duplicate_and_length_validation(self):
+        secret = "PythonShamirSecret2026"
+        shares = split_secret(secret, 5, 3)
+        self.assertEqual(len(shares), 5)
+        reconstructed = combine_shares([shares[0], shares[2], shares[4]])
+        self.assertEqual(reconstructed.decode('utf-8'), secret)
+
+        # Duplicate shares
+        with self.assertRaises(ValueError):
+            combine_shares([shares[0], shares[0], shares[1]])
+
+        # Mismatched share length
+        corrupted = {**shares[2], "shareHex": shares[2]["shareHex"][:8]}
+        with self.assertRaises(ValueError):
+            combine_shares([shares[0], shares[1], corrupted])
+
+    def test_tsa_oracle_verification(self):
+        data = "Government Issued Patent Claim #98124"
+        token = issue_timestamp_token(data)
+        self.assertEqual(token["type"], "DocuTrustTimestampToken2026")
+        self.assertEqual(token["version"], "2.1.1")
+        audit = verify_timestamp_token(token, data)
+        self.assertTrue(audit["valid"])
+        self.assertGreaterEqual(audit["ageSeconds"], 0)
+
+        # Hash mismatch
+        audit_bad = verify_timestamp_token(token, data + " tampered")
+        self.assertFalse(audit_bad["valid"])
+
     @patch('requests.Session.get')
     def test_client_get_endpoints(self, mock_get):
         mock_resp = MagicMock()

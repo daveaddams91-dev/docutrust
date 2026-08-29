@@ -1,5 +1,53 @@
 # 📝 DocuTrust Changelog & Release Notes
 
+## [v2.1.1] - GitHub Actions Automation, DID Method Expansion & Cryptographic Ecosystem Hardening - 2026-08-29
+
+### 🌟 Release Overview (v2.1.1)
+DocuTrust 2.1.1 introduces complete GitHub Actions CI/CD automation across Node.js & Python matrices, CodeQL security scanning, official issue and PR templates, deterministic DID resolution for Post-Quantum KEM and BBS+ identifiers, Shamir secret sharing duplicate validation, SD-JWT standard `sub` formatting, and unified API PDF validation.
+
+---
+
+### ⚙️ GitHub Ecosystem & Automation (`.github`)
+- **Multi-Matrix CI Testing Workflow (`.github/workflows/ci.yml`)**:
+  - Automatically executes full build, TypeScript compilation, and Node.js test suites across Node.js `18.x`, `20.x`, and `22.x`.
+  - Runs Python SDK test discovery across Python `3.8`, `3.9`, `3.10`, `3.11`, and `3.12`.
+  - Verifies production Web Dashboard builds on all pushes and pull requests to `main`.
+- **Automated Release Workflow (`.github/workflows/release.yml`)**:
+  - Triggers on tag pushes matching `v*`, compiling all packages and generating automated GitHub Release assets.
+- **CodeQL Security Analysis (`.github/workflows/codeql.yml`)**:
+  - Scheduled and PR-triggered static code analysis for JavaScript/TypeScript and Python to identify potential security vulnerabilities.
+- **Structured Community & Contribution Templates (`.github/ISSUE_TEMPLATE` & `pull_request_template.md`)**:
+  - Added interactive GitHub issue forms for Bug Reports, Feature Proposals, and Security Vulnerability Disclosures.
+  - Added comprehensive Pull Request template with cryptographic verification and compliance checklist.
+
+---
+
+### 🛡️ Cryptographic & Protocol Improvements
+- **Deterministic DID Method Expansion (`@docutrust/core/did`)**:
+  - Added deterministic resolution in `DIDResolver.resolve` for `did:kem:` (NIST ML-KEM-768 + X25519 hybrid) and `did:bbs:` (BLS12-381 generator) without external network dependency.
+- **Shamir Secret Sharing Guardrails (`@docutrust/core/shamir` & `sdks/python/docutrust/shamir.py`)**:
+  - Added upfront verification in `combineShares` rejecting duplicate share indices and mismatched share buffer lengths before polynomial interpolation.
+- **SD-JWT Standard Compliance (`@docutrust/core/sd-jwt`)**:
+  - Standardized default `sub` claim to `issuerKeyPair.did` (`did:key:z6M...`), ensuring W3C multibase compliance when custom subject DIDs are omitted.
+  - Added defensive try-catch handling during JWT payload base64url decoding and JSON parsing.
+- **REST API Server Modernization (`@docutrust/api`)**:
+  - Replaced legacy duplicate PDF generator with `@docutrust/core`'s ISO 32000-1 dynamic xref generator (`generateVerifiablePdf`, `verifyPdfDocument`).
+  - Upgraded API persistent cache storage with `atomicWriteFileSync` (`.tmp` write + rename) to protect data integrity against crashes.
+- **Python TSA Oracle Verification (`sdks/python/docutrust/oracle.py`)**:
+  - Updated token versioning to `2.1.1` and implemented cryptographic payload signature verification in `verify_timestamp_token`.
+
+---
+
+### 🧪 Test Suite & Quality Assurance
+- Added Unit Tests 31 through 33 in `@docutrust/core/test/core.test.js`:
+  - **Test 31**: Deterministic DID resolution for `did:kem` and `did:bbs`.
+  - **Test 32**: Shamir duplicate share and length validation error handling.
+  - **Test 33**: SD-JWT standard W3C did:key subject DID and presentation integrity.
+- Added Python SDK tests for Shamir duplicate checks and TSA token signature validation (29 / 29 passed).
+- 100% test pass rate across all Node.js and Python test suites.
+
+---
+
 ## [v2.1.0] - Sovereign Cryptographic Hardening, Dynamic PDF XRef & Python SDK Parity - 2026-08-29
 
 ### 🌟 Release Overview (v2.1.0)

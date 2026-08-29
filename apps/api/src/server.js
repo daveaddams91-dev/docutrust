@@ -46,7 +46,10 @@ const {
   CryptographicTSAOracle,
   packDIDCommMessage,
   unpackDIDCommMessage,
-  MerkleMountainRange
+  MerkleMountainRange,
+  generateVerifiablePdf,
+  verifyPdfDocument,
+  extractVerifiablePdfProof
 } = require('@docutrust/core');
 
 const PORT = process.env.PORT || 4000;
@@ -75,92 +78,18 @@ try {
   if (fs.existsSync(ANCHORS_FILE)) anchorsStore = JSON.parse(fs.readFileSync(ANCHORS_FILE, 'utf-8'));
 } catch (e) {}
 
-function persistAll() {
-  try {
-    fs.writeFileSync(CREDS_FILE, JSON.stringify(credentialsStore, null, 2), 'utf-8');
-    fs.writeFileSync(API_KEYS_FILE, JSON.stringify(apiKeysStore, null, 2), 'utf-8');
-    fs.writeFileSync(ANCHORS_FILE, JSON.stringify(anchorsStore, null, 2), 'utf-8');
-  } catch (e) {}
+function atomicWriteFileSync(filePath, data) {
+  const tmpPath = `${filePath}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
+  fs.writeFileSync(tmpPath, data, 'utf-8');
+  fs.renameSync(tmpPath, filePath);
 }
 
-// Generate Verifiable PDF 2.0
-function generatePdfDiploma(credential) {
-  const subject = credential.credentialSubject || {};
-  const recipientName = subject.name || 'Recipient Name';
-  const degree = subject.title || subject.degree || 'Official Certificate';
-  const issuerName = typeof credential.issuer === 'object' ? credential.issuer.name : 'Authorized Issuing Authority';
-  const issueDate = new Date(credential.validFrom).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  const certId = credential.id ? credential.id.replace('urn:uuid:', '') : 'CERT-001';
-  const signatureHex = credential.proof?.proofValue || '';
-
-  const vcBase64 = Buffer.from(JSON.stringify(credential), 'utf-8').toString('base64');
-
-  const pdf = `%PDF-1.7
-1 0 obj
-<< /Type /Catalog /Pages 2 0 R /DocuTrustProof << /Type /VerifiableCredential /Payload (${vcBase64}) >> >>
-endobj
-2 0 obj
-<< /Type /Pages /Kids [3 0 R] /Count 1 >>
-endobj
-3 0 obj
-<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>
-endobj
-4 0 obj
-<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
-endobj
-5 0 obj
-<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
-endobj
-6 0 obj
-<< /Length 750 >>
-stream
-BT
-/F1 20 Tf
-100 700 Td
-(${issuerName}) Tj
-/F2 12 Tf
-0 -30 Td
-(SOVEREIGN VERIFIABLE CREDENTIAL - W3C VC 2.0) Tj
-/F2 10 Tf
-0 -40 Td
-(This certifies that:) Tj
-/F1 24 Tf
-0 -35 Td
-(${recipientName}) Tj
-/F2 12 Tf
-0 -30 Td
-(Has successfully completed requirements for:) Tj
-/F1 16 Tf
-0 -25 Td
-(${degree}) Tj
-/F2 9 Tf
-0 -50 Td
-(CREDENTIAL ID: ${certId}) Tj
-0 -15 Td
-(ISSUANCE DATE: ${issueDate}) Tj
-0 -15 Td
-(ED25519 SIGNATURE: ${signatureHex.substring(0, 48)}...) Tj
-0 -30 Td
-(Cryptographically sealed by DocuTrust. Verify at https://docutrust.org/verify) Tj
-ET
-endstream
-endobj
-xref
-0 7
-0000000000 65535 f 
-0000000009 00000 n 
-0000000120 00000 n 
-0000000179 00000 n 
-0000000300 00000 n 
-0000000375 00000 n 
-0000000446 00000 n 
-trailer
-<< /Size 7 /Root 1 0 R >>
-startxref
-1250
-%%EOF`;
-
-  return Buffer.from(pdf, 'utf-8');
+function persistAll() {
+  try {
+    atomicWriteFileSync(CREDS_FILE, JSON.stringify(credentialsStore, null, 2));
+    atomicWriteFileSync(API_KEYS_FILE, JSON.stringify(apiKeysStore, null, 2));
+    atomicWriteFileSync(ANCHORS_FILE, JSON.stringify(anchorsStore, null, 2));
+  } catch (e) {}
 }
 
 // In-Memory Revocation Status Registry
@@ -215,7 +144,7 @@ const server = http.createServer(async (req, res) => {
       return jsonResponse(200, {
         status: 'healthy',
         service: 'DocuTrust Sovereign Verifiable Credentials Engine',
-        version: '2.1.0',
+        version: '2.1.1',
         features: [
           'W3C VC 2.0',
           'DID Key Ed25519',
@@ -462,13 +391,13 @@ const server = http.createServer(async (req, res) => {
       const credential = body.credential;
       if (!credential) return jsonResponse(400, { error: 'Missing credential in request' });
 
-      const pdfBuf = generatePdfDiploma(credential);
+      const pdfResult = generateVerifiablePdf(credential);
       res.writeHead(200, {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="certificate-${credential.id.replace('urn:uuid:', '')}.pdf"`,
-        'Content-Length': pdfBuf.length
+        'Content-Length': pdfResult.pdfBuffer.length
       });
-      return res.end(pdfBuf);
+      return res.end(pdfResult.pdfBuffer);
     }
 
     // 6. Verify PDF Document
@@ -480,10 +409,10 @@ const server = http.createServer(async (req, res) => {
         return jsonResponse(400, { error: 'Missing pdfBase64 in request' });
       }
 
-      const rawPdf = Buffer.from(pdfBase64, 'base64').toString('utf-8');
-      const match = rawPdf.match(/\/DocuTrustProof\s*<<\s*\/Type\s*\/VerifiableCredential\s*\/Payload\s*\(([^)]+)\)\s*>>/);
+      const pdfBuf = Buffer.from(pdfBase64, 'base64');
+      const extractedVC = extractVerifiablePdfProof(pdfBuf);
 
-      if (!match || !match[1]) {
+      if (!extractedVC) {
         return jsonResponse(200, {
           valid: false,
           isPdfValid: false,
@@ -491,29 +420,19 @@ const server = http.createServer(async (req, res) => {
         });
       }
 
-      const extractedVC = JSON.parse(Buffer.from(match[1], 'base64').toString('utf-8'));
+      const audit = await verifyPdfDocument(pdfBuf);
       const issuerId = typeof extractedVC.issuer === 'string' ? extractedVC.issuer : extractedVC.issuer.id;
-      const { proof, ...unsigned } = extractedVC;
-      const canonicalPayload = canonicalizeJson(unsigned);
-      const canonicalHash = sha256Hex(canonicalPayload);
-
-      let sigToVerify = proof.proofValue;
-      if (sigToVerify.startsWith('pqc1_')) {
-        sigToVerify = sigToVerify.replace('pqc1_', '').split('_')[0];
-      }
-
-      const isValid = verifySignature(canonicalHash, sigToVerify, issuerId);
 
       return jsonResponse(200, {
-        valid: isValid,
-        isPdfValid: isValid,
+        valid: audit.valid,
+        isPdfValid: audit.valid,
         extractedCredential: extractedVC,
         issuer: issuerId,
         recipientName: extractedVC.credentialSubject?.name,
         degree: extractedVC.credentialSubject?.title || extractedVC.credentialSubject?.degree,
-        signatureValid: isValid,
-        proofType: proof.type,
-        errors: isValid ? [] : ['Signature mismatch on embedded credential']
+        signatureValid: audit.signatureValid,
+        proofType: extractedVC.proof?.type,
+        errors: audit.errors
       });
     }
 

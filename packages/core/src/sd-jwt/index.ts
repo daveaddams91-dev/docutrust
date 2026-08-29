@@ -64,7 +64,7 @@ export function issueSDJWT(
 
   const payload = {
     iss: issuerKeyPair.did,
-    sub: subjectDid || `did:key:${issuerKeyPair.publicKeyHex}`,
+    sub: subjectDid || issuerKeyPair.did,
     iat: Math.floor(Date.now() / 1000),
     _sd: sdDigests,
     _sd_alg: 'sha-256'
@@ -126,7 +126,14 @@ export function verifySDJWTPresentation(
 
   const [headerB64, payloadB64, sigB64] = jwtParts;
   const signingInput = `${headerB64}.${payloadB64}`;
-  const payload = JSON.parse(base64UrlDecode(payloadB64));
+  
+  let payload: any;
+  try {
+    payload = JSON.parse(base64UrlDecode(payloadB64));
+  } catch (err: any) {
+    return { valid: false, issuerDid: '', subjectDid: '', disclosedClaims: {}, error: 'Failed to decode JWT payload JSON.' };
+  }
+
   const issuerDid = payload.iss;
   const subjectDid = payload.sub;
   const sdArray: string[] = payload._sd || [];

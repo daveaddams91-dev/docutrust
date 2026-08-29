@@ -68,10 +68,17 @@ def combine_shares(shares: List[Dict[str, Any]]) -> bytes:
         raise ValueError(f"Insufficient shares: got {len(shares)}, need {threshold}.")
 
     selected = shares[:threshold]
+    x_vals = [s["index"] for s in selected]
+    if len(set(x_vals)) != threshold:
+        raise ValueError("Duplicate share indices detected in reconstruction set.")
+
     share_bufs = [bytes.fromhex(s["shareHex"]) for s in selected]
     secret_len = len(share_bufs[0])
+    for s_buf in share_bufs:
+        if len(s_buf) != secret_len:
+            raise ValueError("Mismatched share lengths detected in reconstruction set.")
+
     secret = bytearray(secret_len)
-    x_vals = [s["index"] for s in selected]
 
     for byte_idx in range(secret_len):
         secret_byte = 0

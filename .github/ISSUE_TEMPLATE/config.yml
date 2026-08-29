@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🛡️ Security Policy & Private Reporting
+    url: https://github.com/Raj123-0/docutrust/blob/main/SECURITY.md
+    about: Read our security policy and find instructions for confidential vulnerability disclosures.
+  - name: 💬 GitHub Discussions & Questions
+    url: https://github.com/Raj123-0/docutrust/discussions
+    about: Ask questions and discuss sovereign verifiable credentials with the community.

@@ -968,6 +968,61 @@ test('30. DB: CredentialVault atomic persistence and sparse record searching', (
   fs.rmSync(tempDir, { recursive: true, force: true });
 });
 
+// 30. DID: Deterministic resolution for did:kem and did:bbs
+test('31. DID: Deterministic DIDResolver resolution for did:kem and did:bbs', async () => {
+  // Test did:kem resolution
+  const kemKeys = generateKEMKeyPair();
+  const kemDoc = await DIDResolver.resolve(kemKeys.hybridRecipientId);
+  assert.equal(kemDoc.id, kemKeys.hybridRecipientId);
+  assert.equal(kemDoc.verificationMethod[0].type, 'ML-KEM-768-X25519-Hybrid-2026');
+  assert.ok(kemDoc.verificationMethod[0].publicKeyMultibase);
+
+  // Test did:bbs resolution
+  const bbsKeys = generateBBSKeyPair(5);
+  const bbsDoc = await DIDResolver.resolve(bbsKeys.did);
+  assert.equal(bbsDoc.id, bbsKeys.did);
+  assert.equal(bbsDoc.verificationMethod[0].type, 'BBSPlusVerificationKey2026');
+});
+
+// 31. Shamir: Duplicate share index and length validation
+test('32. Shamir: Error handling for duplicate share indices and mismatched lengths', () => {
+  const secret = 'TopSecretDocuTrustVaultKey';
+  const shares = splitSecret(secret, 5, 3);
+
+  // Attempt combine with duplicate shares
+  const duplicateShares = [shares[0], shares[0], shares[1]];
+  assert.throws(() => {
+    combineShares(duplicateShares);
+  }, /Duplicate share indices detected/);
+
+  // Attempt combine with corrupted share length
+  const corruptedShare = { ...shares[2], shareHex: shares[2].shareHex.slice(0, 10) };
+  assert.throws(() => {
+    combineShares([shares[0], shares[1], corruptedShare]);
+  }, /Mismatched share lengths detected/);
+});
+
+// 32. SD-JWT: Standard DID sub claim format and presentation verification
+test('33. SD-JWT: Standard W3C did:key subject DID and presentation integrity', () => {
+  const kp = generateKeyPair();
+  const claims = {
+    holderName: 'Alexander Hayes',
+    clearanceLevel: 'Top Secret / SCI',
+    issueYear: 2026
+  };
+
+  const sdPkg = issueSDJWT(claims, kp);
+  assert.ok(sdPkg.issuerDid.startsWith('did:key:z6M'));
+  
+  // Verify presentation
+  const pres = createSDJWTPresentation(sdPkg, ['holderName', 'clearanceLevel']);
+  const audit = verifySDJWTPresentation(pres);
+  assert.equal(audit.valid, true);
+  assert.equal(audit.disclosedClaims.holderName, 'Alexander Hayes');
+  assert.equal(audit.disclosedClaims.clearanceLevel, 'Top Secret / SCI');
+  assert.equal(audit.disclosedClaims.issueYear, undefined);
+});
+
 
 
 

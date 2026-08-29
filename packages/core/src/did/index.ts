@@ -44,6 +44,14 @@ export class DIDResolver {
       return this.resolveDidPqc(did);
     }
 
+    if (did.startsWith('did:kem:')) {
+      return this.resolveDidKem(did);
+    }
+
+    if (did.startsWith('did:bbs:')) {
+      return this.resolveDidBbs(did);
+    }
+
     if (did.startsWith('did:web:')) {
       return this.resolveDidWeb(did);
     }
@@ -132,6 +140,75 @@ export class DIDResolver {
           controller: did,
           publicKeyMultibase: multibase,
           publicKeyHex
+        }
+      ],
+      authentication: [keyId],
+      assertionMethod: [keyId]
+    };
+
+    return doc;
+  }
+
+  /**
+   * Deterministically resolve a did:kem (ML-KEM-768 + X25519) without network access.
+   */
+  public static resolveDidKem(did: string): DIDDocument {
+    const multibase = did.replace('did:kem:', '');
+    if (!multibase.startsWith('z')) {
+      throw new Error(`Invalid did:kem format. Expected multibase 'z' prefix.`);
+    }
+
+    const decoded = decodeBase58(multibase.substring(1));
+    if (decoded[0] !== 0x20 || decoded[1] !== 0x01) {
+      throw new Error(`Unsupported did:kem algorithm prefix. Expected 0x2001.`);
+    }
+
+    const x25519PubHex = decoded.subarray(2, 34).toString('hex');
+    const mlKemPubHex = decoded.subarray(34, 66).toString('hex');
+    const keyId = `${did}#kem-hybrid-1`;
+
+    const doc: DIDDocument = {
+      '@context': [
+        'https://www.w3.org/ns/did/v1',
+        'https://w3id.org/security/suites/jws-2020/v1'
+      ],
+      id: did,
+      verificationMethod: [
+        {
+          id: keyId,
+          type: 'ML-KEM-768-X25519-Hybrid-2026',
+          controller: did,
+          publicKeyMultibase: multibase,
+          publicKeyHex: x25519PubHex
+        }
+      ],
+      authentication: [keyId],
+      assertionMethod: [keyId],
+      capabilityInvocation: [keyId]
+    };
+
+    return doc;
+  }
+
+  /**
+   * Deterministically resolve a did:bbs (BBS+ BLS12-381) without network access.
+   */
+  public static resolveDidBbs(did: string): DIDDocument {
+    const multibase = did.replace('did:bbs:', '');
+    const keyId = `${did}#bbs-1`;
+
+    const doc: DIDDocument = {
+      '@context': [
+        'https://www.w3.org/ns/did/v1',
+        'https://w3id.org/security/suites/bbs-2023/v1'
+      ],
+      id: did,
+      verificationMethod: [
+        {
+          id: keyId,
+          type: 'BBSPlusVerificationKey2026',
+          controller: did,
+          publicKeyMultibase: multibase
         }
       ],
       authentication: [keyId],

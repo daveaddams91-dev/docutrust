@@ -21,7 +21,7 @@ from .oracle import issue_timestamp_token, verify_timestamp_token
 from .didcomm import pack_didcomm_message, unpack_didcomm_message
 from .mmr import MerkleMountainRange
 
-__version__ = "2.1.0"
+__version__ = "2.1.1"
 __all__ = [
     "DocuTrustClient",
     "canonicalize_json",

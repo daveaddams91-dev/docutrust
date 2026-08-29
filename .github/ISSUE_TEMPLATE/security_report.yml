@@ -1,0 +1,31 @@
+name: 🔒 Security Vulnerability Report
+description: Report a security vulnerability privately and responsibly
+title: "[Security]: "
+labels: ["security", "vulnerability"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **IMPORTANT**: For sensitive cryptographic vulnerabilities or exploits, please review [SECURITY.md](https://github.com/Raj123-0/docutrust/blob/main/SECURITY.md) before submitting public issues.
+
+  - type: textarea
+    id: overview
+    attributes:
+      label: Vulnerability Overview
+      description: Provide an overview of the vulnerability.
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Severity & Impact
+      description: What is the potential impact (e.g. credential forgery, replay attack, side-channel)?
+    validations:
+      required: true
+
+  - type: textarea
+    id: mitigation
+    attributes:
+      label: Suggested Mitigation / Patch
+      description: If you have identified a mitigation or patch, please provide details.

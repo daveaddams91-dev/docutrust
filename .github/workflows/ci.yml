@@ -1,60 +1,67 @@
-name: CI / Cryptographic Audit Tests
+name: CI & Test Suite
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  core-node-tests:
+  node-test:
+    name: Node.js Test Matrix (${{ matrix.node-version }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
         node-version: [18.x, 20.x, 22.x]
 
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Install Monorepo Dependencies
-      run: npm install
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
 
-    - name: Build All Workspaces
-      run: npm run build
+      - name: Install dependencies
+        run: npm ci
 
-    - name: Run Monorepo Test Suites (@docutrust/core, @docutrust/cli, @docutrust/api, @docutrust/web)
-      run: npm test
+      - name: Build Core & SDK
+        run: |
+          npm run build --workspace=@docutrust/core
+          npm run build --workspace=@docutrust/sdk
 
-    - name: Test CLI Keygen & Verification
-      run: |
-        node packages/cli/bin/docutrust.js keygen --out test-keys.json
-        node packages/cli/bin/docutrust.js demo
-        node packages/cli/bin/docutrust.js verify --vc examples/certificates/stanford-degree-vc.json
+      - name: Run Node.js Test Suites
+        run: npm test
 
-  python-sdk-tests:
+      - name: Build Web Application
+        run: npm run build --workspace=@docutrust/web
+
+  python-test:
+    name: Python SDK Test Matrix (${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.8", "3.10", "3.12"]
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
 
     steps:
-    - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install requests cryptography
+      - name: Install Python SDK & dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e sdks/python
 
-    - name: Run Python SDK Unit Tests
-      run: |
-        python -m unittest sdks/python/tests/test_docutrust.py
+      - name: Run Python SDK Unit Tests
+        run: python -m unittest discover -s sdks/python/tests

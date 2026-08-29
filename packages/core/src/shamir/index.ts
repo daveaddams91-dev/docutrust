@@ -86,11 +86,20 @@ export function combineShares(shares: ShamirShare[]): Buffer {
   }
 
   const selected = shares.slice(0, threshold);
+  const xVals = selected.map(s => s.index);
+  if (new Set(xVals).size !== threshold) {
+    throw new Error('Duplicate share indices detected in reconstruction set.');
+  }
+
   const shareBuffers = selected.map(s => Buffer.from(s.shareHex, 'hex'));
   const secretLen = shareBuffers[0].length;
-  const secret = Buffer.alloc(secretLen);
+  for (const sBuf of shareBuffers) {
+    if (sBuf.length !== secretLen) {
+      throw new Error('Mismatched share lengths detected in reconstruction set.');
+    }
+  }
 
-  const xVals = selected.map(s => s.index);
+  const secret = Buffer.alloc(secretLen);
 
   for (let byteIdx = 0; byteIdx < secretLen; byteIdx++) {
     let secretByte = 0;
