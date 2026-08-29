@@ -438,4 +438,126 @@ class DocuTrustClient:
         res.raise_for_status()
         return res.json()
 
+    def generate_secp256k1_keys(self, chain_id: int = 1) -> Dict[str, str]:
+        """Generates Ethereum secp256k1 keypair and did:pkh DID."""
+        from .eip712 import generate_secp256k1_key_pair
+        return generate_secp256k1_key_pair(chain_id)
+
+    def sign_vc_eip712(
+        self,
+        unsigned_vc: Dict[str, Any],
+        key_pair: Dict[str, str],
+        domain: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Signs W3C Verifiable Credential using EIP-712 structured typing."""
+        from .eip712 import sign_vc_eip712
+        return sign_vc_eip712(unsigned_vc, key_pair, domain)
+
+    def verify_vc_eip712(
+        self,
+        credential: Dict[str, Any],
+        expected_signer: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Verifies EIP-712 structured signature on W3C Verifiable Credential."""
+        from .eip712 import verify_vc_eip712
+        return verify_vc_eip712(credential, expected_signer)
+
+    def setup_social_recovery(
+        self,
+        owner_did: str,
+        secret: str,
+        guardians: List[Dict[str, str]],
+        threshold: int = 3,
+        challenge_period_hours: int = 48
+    ) -> Dict[str, Any]:
+        """Sets up decentralized social recovery with guardian DIDs."""
+        from .social_recovery import SocialRecoveryEngine
+        return SocialRecoveryEngine.setup_recovery(owner_did, secret, guardians, threshold, challenge_period_hours)
+
+    def initiate_social_recovery(
+        self,
+        owner_did: str,
+        requester_did: str,
+        config: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Initiates a timelocked social recovery session."""
+        from .social_recovery import SocialRecoveryEngine
+        return SocialRecoveryEngine.initiate_recovery(owner_did, requester_did, config)
+
+    def cast_social_recovery_vote(
+        self,
+        session: Dict[str, Any],
+        guardian_did: str,
+        share_index: int,
+        raw_share_hex: str
+    ) -> Dict[str, Any]:
+        """Guardian casts vote with decrypted secret share."""
+        from .social_recovery import SocialRecoveryEngine
+        return SocialRecoveryEngine.cast_vote(session, guardian_did, share_index, raw_share_hex)
+
+    def veto_social_recovery(
+        self,
+        session: Dict[str, Any],
+        reason: str = "Unauthorized recovery attempt"
+    ) -> Dict[str, Any]:
+        """Genuine owner vetoes fraudulent recovery session."""
+        from .social_recovery import SocialRecoveryEngine
+        return SocialRecoveryEngine.veto_recovery(session, reason)
+
+    def finalize_social_recovery(
+        self,
+        session: Dict[str, Any],
+        force_timelock_override: bool = False
+    ) -> Dict[str, Any]:
+        """Finalizes social recovery session and reconstructs root secret."""
+        from .social_recovery import SocialRecoveryEngine
+        return SocialRecoveryEngine.finalize_recovery(session, force_timelock_override)
+
+    def prove_set_non_membership(
+        self,
+        claim_key: str,
+        secret_value: str,
+        salt: str,
+        restricted_set: List[str]
+    ) -> Dict[str, Any]:
+        """Generates ZK proof that secret_value is NOT in restricted set."""
+        from .zk_predicates import prove_set_non_membership
+        return prove_set_non_membership(claim_key, secret_value, salt, restricted_set)
+
+    def verify_set_non_membership(
+        self,
+        proof: Dict[str, Any],
+        restricted_set: List[str],
+        expected_commitment: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Verifies ZK Set Non-Membership proof."""
+        from .zk_predicates import verify_set_non_membership_proof
+        return verify_set_non_membership_proof(proof, restricted_set, expected_commitment)
+
+    def prove_composite_predicate(self, proofs: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Combines multiple ZK predicate proofs into a single composite proof."""
+        from .zk_predicates import prove_composite_predicate
+        return prove_composite_predicate(proofs)
+
+    def verify_composite_predicate(
+        self,
+        composite_proof: Dict[str, Any],
+        context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Verifies multi-predicate composite ZK proof."""
+        from .zk_predicates import verify_composite_predicate
+        return verify_composite_predicate(composite_proof, context)
+
+    def format_multichain_anchor(
+        self,
+        chain: str,
+        merkle_root: str,
+        batch_count: int,
+        memo: str = "DocuTrust Merkle Batch Anchor"
+    ) -> Dict[str, Any]:
+        """Generates standardized calldata or payload for multi-chain anchoring."""
+        from .multichain import MultiChainLedgerAnchor
+        return MultiChainLedgerAnchor.format_anchor(chain, merkle_root, batch_count, memo)
+
+
 

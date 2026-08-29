@@ -40,7 +40,7 @@ export * from './db';
 // Export Fortress Encryption (AES-256-GCM, HKDF-SHA512, Zeroization)
 export * from './encryption';
 
-// Export Zero-Knowledge Predicates & Range Proofs
+// Export Zero-Knowledge Predicates & Range Proofs (Range, Age, Date, Set Membership & Non-Membership, Composite)
 export * from './zk-predicates';
 
 // Export Post-Quantum Key Encapsulation (ML-KEM-768 / Kyber)
@@ -54,6 +54,9 @@ export * from './chain';
 
 // Export Shamir's Secret Sharing (K-of-N Key Recovery)
 export * from './shamir';
+
+// Export Decentralized Social Key Recovery & Timelocked Escrow
+export * from './social-recovery';
 
 // Export IETF SD-JWT (Selective Disclosure JWT for Mobile Wallets)
 export * from './sd-jwt';
@@ -75,3 +78,9 @@ export * from './didcomm';
 
 // Export Merkle Mountain Range (MMR) High-Throughput Ledger
 export * from './mmr';
+
+// Export EIP-712 Structured Ethereum Signature Suite
+export * from './eip712';
+
+// Export Multi-Chain Ledger Anchor & Calldata Formatter
+export * from './multichain';

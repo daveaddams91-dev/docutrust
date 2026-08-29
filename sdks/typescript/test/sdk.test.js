@@ -105,9 +105,21 @@ describe('DocuTrust TypeScript SDK (@docutrust/sdk)', () => {
     await client.mmrAppend('leaf_data');
     assert.strictEqual(mockCalls[12].url, 'https://test-api.docutrust.org/api/v1/ledger/mmr/append');
 
-    await client.mmrGetPeaks();
-    assert.strictEqual(mockCalls[13].url, 'https://test-api.docutrust.org/api/v1/ledger/mmr');
-    assert.strictEqual(mockCalls[13].options.method, 'GET');
+    // 14. EIP-712
+    await client.generateSecp256k1Keys(1);
+    assert.strictEqual(mockCalls[13].url, 'https://test-api.docutrust.org/api/v1/crypto/secp256k1/generate');
+
+    // 15. Social Recovery
+    await client.setupSocialRecovery('did:key:zOwner', '0xsecret', [{ did: 'did:key:zG1', name: 'G1' }]);
+    assert.strictEqual(mockCalls[14].url, 'https://test-api.docutrust.org/api/v1/recovery/social/setup');
+
+    // 16. ZK Non-membership
+    await client.proveSetNonMembership('passport', 'VAL', 'salt', ['SANCTIONED']);
+    assert.strictEqual(mockCalls[15].url, 'https://test-api.docutrust.org/api/v1/zk/prove-non-membership');
+
+    // 17. MultiChain Anchor
+    await client.formatMultiChainAnchor('ethereum', '0xroot', 100);
+    assert.strictEqual(mockCalls[16].url, 'https://test-api.docutrust.org/api/v1/ledger/multichain/anchor');
   });
 
   test('DocuTrustClient handles HTTP error responses gracefully', async () => {

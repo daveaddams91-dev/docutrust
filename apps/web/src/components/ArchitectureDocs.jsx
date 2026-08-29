@@ -80,6 +80,45 @@ export default function ArchitectureDocs() {
           The verifier reconstructs the Merkle branch and confirms the issuer signature against the claims root without uncovering blinded attributes.
         </p>
       </div>
+
+      {/* 5. EIP-712 Ethereum Structured Typing */}
+      <div className="glass-card p-6 sm:p-8 rounded-2xl border border-gray-800 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center">
+            <ShieldCheck className="w-4 h-4" />
+          </div>
+          <h3 className="text-lg font-bold text-white">5. Ethereum EIP-712 Structured Credential Suite</h3>
+        </div>
+        <p className="text-sm text-gray-300 leading-relaxed">
+          Integrates <code className="text-amber-400 bg-gray-900 px-1.5 py-0.5 rounded font-mono text-xs">EthereumEip712Signature2026</code> with deterministic <code className="text-amber-400 bg-gray-900 px-1.5 py-0.5 rounded font-mono text-xs">did:pkh:eip155</code> identifiers, domain separators, and Keccak-256 type hashing for native EVM and smart-contract verification.
+        </p>
+      </div>
+
+      {/* 6. Social Recovery & Timelocked Escrow */}
+      <div className="glass-card p-6 sm:p-8 rounded-2xl border border-gray-800 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+            <GitBranch className="w-4 h-4" />
+          </div>
+          <h3 className="text-lg font-bold text-white">6. Decentralized Guardian Social Recovery & Timelocks</h3>
+        </div>
+        <p className="text-sm text-gray-300 leading-relaxed">
+          Protects high-value institutional root keys through K-of-N Shamir Secret Sharing mapped to authenticated Guardian DIDs with configurable timelock challenge periods and real-time Owner Veto guards.
+        </p>
+      </div>
+
+      {/* 7. Multi-Chain Ledger Anchoring */}
+      <div className="glass-card p-6 sm:p-8 rounded-2xl border border-gray-800 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-violet-500/10 text-violet-400 flex items-center justify-center">
+            <Layers className="w-4 h-4" />
+          </div>
+          <h3 className="text-lg font-bold text-white">7. Cross-Chain Sovereign Ledger Anchoring</h3>
+        </div>
+        <p className="text-sm text-gray-300 leading-relaxed">
+          Standardized byte-level calldata formatting for EVM (Ethereum, Arbitrum, Base, Polygon), Solana Anchor program instructions, and Bitcoin OP_RETURN scripts ensuring tamper-proof Merkle root provenance across any public ledger.
+        </p>
+      </div>
     </div>
   );
 }

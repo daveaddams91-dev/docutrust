@@ -49,7 +49,16 @@ const {
   MerkleMountainRange,
   generateVerifiablePdf,
   verifyPdfDocument,
-  extractVerifiablePdfProof
+  extractVerifiablePdfProof,
+  generateSecp256k1KeyPair,
+  signVcEIP712,
+  verifyVcEIP712,
+  SocialRecoveryEngine,
+  proveSetNonMembership,
+  verifySetNonMembershipProof,
+  proveCompositePredicate,
+  verifyCompositePredicate,
+  MultiChainLedgerAnchor
 } = require('@docutrust/core');
 
 const PORT = process.env.PORT || 4000;
@@ -144,7 +153,7 @@ const server = http.createServer(async (req, res) => {
       return jsonResponse(200, {
         status: 'healthy',
         service: 'DocuTrust Sovereign Verifiable Credentials Engine',
-        version: '2.1.1',
+        version: '2.2.0',
         features: [
           'W3C VC 2.0',
           'DID Key Ed25519',
@@ -905,6 +914,160 @@ const server = http.createServer(async (req, res) => {
       return jsonResponse(200, { valid });
     }
 
+    // 31. EIP-712 Ethereum Structured Credential Engine
+    if (pathname === '/api/v1/crypto/secp256k1/generate' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const chainId = body.chainId || 1;
+      const keyPair = generateSecp256k1KeyPair(chainId);
+      return jsonResponse(200, { success: true, keyPair });
+    }
+
+    if (pathname === '/api/v1/credentials/eip712/sign' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { unsignedVc, keyPair, domain } = body;
+      if (!unsignedVc) return jsonResponse(400, { error: 'Missing unsignedVc.' });
+      const kp = keyPair || generateSecp256k1KeyPair(1);
+      const signedVc = signVcEIP712(unsignedVc, kp, domain);
+      return jsonResponse(200, { success: true, signedVc });
+    }
+
+    if (pathname === '/api/v1/credentials/eip712/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { credential, expectedSigner } = body;
+      if (!credential) return jsonResponse(400, { error: 'Missing credential in request.' });
+      const result = verifyVcEIP712(credential, expectedSigner);
+      return jsonResponse(200, result);
+    }
+
+    // 32. Decentralized Social Recovery & Timelocked Escrow
+    if (pathname === '/api/v1/recovery/social/setup' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { ownerDid, secret, guardians, threshold, challengePeriodHours } = body;
+      if (!ownerDid || !secret || !guardians || !Array.isArray(guardians)) {
+        return jsonResponse(400, { error: 'Missing ownerDid, secret, or guardians array.' });
+      }
+      try {
+        const setup = SocialRecoveryEngine.setupRecovery(
+          ownerDid,
+          secret,
+          guardians,
+          threshold || 3,
+          challengePeriodHours || 48
+        );
+        return jsonResponse(200, { success: true, ...setup });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/recovery/social/initiate' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { ownerDid, requesterDid, config } = body;
+      if (!ownerDid || !requesterDid || !config) {
+        return jsonResponse(400, { error: 'Missing ownerDid, requesterDid, or config.' });
+      }
+      try {
+        const session = SocialRecoveryEngine.initiateRecovery(ownerDid, requesterDid, config);
+        return jsonResponse(200, { success: true, session });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/recovery/social/vote' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { session, guardianDid, shareIndex, rawShareHex } = body;
+      if (!session || !guardianDid || shareIndex === undefined || !rawShareHex) {
+        return jsonResponse(400, { error: 'Missing session, guardianDid, shareIndex, or rawShareHex.' });
+      }
+      try {
+        const updatedSession = SocialRecoveryEngine.castVote(session, guardianDid, parseInt(shareIndex), rawShareHex);
+        return jsonResponse(200, { success: true, session: updatedSession });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/recovery/social/veto' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { session, reason } = body;
+      if (!session) return jsonResponse(400, { error: 'Missing session in request.' });
+      try {
+        const updatedSession = SocialRecoveryEngine.vetoRecovery(session, reason);
+        return jsonResponse(200, { success: true, session: updatedSession });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/recovery/social/finalize' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { session, forceTimelockOverride } = body;
+      if (!session) return jsonResponse(400, { error: 'Missing session in request.' });
+      const result = SocialRecoveryEngine.finalizeRecovery(session, Boolean(forceTimelockOverride));
+      return jsonResponse(200, result);
+    }
+
+    // 33. Zero-Knowledge Set Non-Membership & Composite Predicates
+    if (pathname === '/api/v1/zk/prove-non-membership' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { claimKey, secretValue, salt, restrictedSet } = body;
+      if (!claimKey || secretValue === undefined || !salt || !restrictedSet || !Array.isArray(restrictedSet)) {
+        return jsonResponse(400, { error: 'Missing claimKey, secretValue, salt, or restrictedSet.' });
+      }
+      try {
+        const proof = proveSetNonMembership(claimKey, secretValue, salt, restrictedSet);
+        return jsonResponse(200, { success: true, proof });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/zk/verify-non-membership' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { proof, restrictedSet, expectedCommitment } = body;
+      if (!proof || !restrictedSet || !Array.isArray(restrictedSet)) {
+        return jsonResponse(400, { error: 'Missing proof or restrictedSet array.' });
+      }
+      const result = verifySetNonMembershipProof(proof, restrictedSet, expectedCommitment);
+      return jsonResponse(200, result);
+    }
+
+    if (pathname === '/api/v1/zk/prove-composite' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { proofs } = body;
+      if (!proofs || !Array.isArray(proofs)) return jsonResponse(400, { error: 'Missing proofs array.' });
+      try {
+        const compositeProof = proveCompositePredicate(proofs);
+        return jsonResponse(200, { success: true, compositeProof });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/zk/verify-composite' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { compositeProof, context } = body;
+      if (!compositeProof) return jsonResponse(400, { error: 'Missing compositeProof.' });
+      const result = verifyCompositePredicate(compositeProof, context);
+      return jsonResponse(200, result);
+    }
+
+    // 34. Multi-Chain Ledger Anchor Calldata
+    if (pathname === '/api/v1/ledger/multichain/anchor' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { chain, merkleRoot, batchCount, memo } = body;
+      if (!chain || !merkleRoot || batchCount === undefined) {
+        return jsonResponse(400, { error: 'Missing chain, merkleRoot, or batchCount.' });
+      }
+      try {
+        const anchor = MultiChainLedgerAnchor.formatAnchor(chain, merkleRoot, parseInt(batchCount), memo);
+        return jsonResponse(200, { success: true, anchor });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
     // Default 404
     jsonResponse(404, { error: 'Route not found' });
   } catch (err) {
@@ -914,7 +1077,7 @@ const server = http.createServer(async (req, res) => {
 
 if (require.main === module) {
   server.listen(PORT, () => {
-    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v1.1.0 running on http://localhost:${PORT}`);
+    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v2.2.0 running on http://localhost:${PORT}`);
   });
 }
 

@@ -60,7 +60,7 @@ test('API Server Suite', async (t) => {
     const res = await makeRequest('GET', '/api/v1/health');
     assert.equal(res.status, 200);
     assert.equal(res.body.status, 'healthy');
-    assert.equal(res.body.version, '2.1.1');
+    assert.equal(res.body.version, '2.2.0');
     assert.ok(Array.isArray(res.body.features));
     assert.ok(res.body.systemDid.startsWith('did:key:z6M'));
   });
@@ -470,6 +470,129 @@ test('API Server Suite', async (t) => {
     });
     assert.equal(verifyRes.status, 200);
     assert.equal(verifyRes.body.valid, true);
+  });
+
+  await t.test('25. POST /api/v1/credentials/eip712 (Keygen, Sign, Verify)', async () => {
+    const keyRes = await makeRequest('POST', '/api/v1/crypto/secp256k1/generate', { chainId: 1 });
+    assert.equal(keyRes.status, 200);
+    assert.ok(keyRes.body.keyPair.did.startsWith('did:pkh:eip155:1:0x'));
+    const ethKeys = keyRes.body.keyPair;
+
+    const unsignedVc = {
+      '@context': ['https://www.w3.org/ns/credentials/v2'],
+      id: 'urn:uuid:api-eth-001',
+      type: ['VerifiableCredential', 'DegreeCredential'],
+      issuer: ethKeys.did,
+      credentialSubject: { id: 'did:pkh:eip155:1:0x123', student: 'Vitalik' }
+    };
+
+    const signRes = await makeRequest('POST', '/api/v1/credentials/eip712/sign', {
+      unsignedVc,
+      keyPair: ethKeys
+    });
+    assert.equal(signRes.status, 200);
+    assert.equal(signRes.body.signedVc.proof.type, 'EthereumEip712Signature2026');
+
+    const verifyRes = await makeRequest('POST', '/api/v1/credentials/eip712/verify', {
+      credential: signRes.body.signedVc,
+      expectedSigner: ethKeys.ethereumAddress
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.valid, true);
+  });
+
+  await t.test('26. POST /api/v1/recovery/social (Setup, Initiate, Vote, Finalize)', async () => {
+    const guardians = [
+      { did: 'did:key:zGuard1', name: 'Alice' },
+      { did: 'did:key:zGuard2', name: 'Bob' },
+      { did: 'did:key:zGuard3', name: 'Charlie' }
+    ];
+    const setupRes = await makeRequest('POST', '/api/v1/recovery/social/setup', {
+      ownerDid: 'did:key:zOwner123',
+      secret: 'VaultMasterSecret123',
+      guardians,
+      threshold: 2,
+      challengePeriodHours: 24
+    });
+    assert.equal(setupRes.status, 200);
+    assert.equal(setupRes.body.guardians.length, 3);
+    const shares = setupRes.body.rawShares;
+
+    const initRes = await makeRequest('POST', '/api/v1/recovery/social/initiate', {
+      ownerDid: 'did:key:zOwner123',
+      requesterDid: 'did:key:zReq999',
+      config: setupRes.body.config
+    });
+    assert.equal(initRes.status, 200);
+    let session = initRes.body.session;
+
+    const vote1 = await makeRequest('POST', '/api/v1/recovery/social/vote', {
+      session,
+      guardianDid: guardians[0].did,
+      shareIndex: shares[0].index,
+      rawShareHex: shares[0].shareHex
+    });
+    assert.equal(vote1.status, 200);
+    session = vote1.body.session;
+
+    const vote2 = await makeRequest('POST', '/api/v1/recovery/social/vote', {
+      session,
+      guardianDid: guardians[1].did,
+      shareIndex: shares[1].index,
+      rawShareHex: shares[1].shareHex
+    });
+    assert.equal(vote2.status, 200);
+    session = vote2.body.session;
+
+    const finalizeRes = await makeRequest('POST', '/api/v1/recovery/social/finalize', {
+      session,
+      forceTimelockOverride: true
+    });
+    assert.equal(finalizeRes.status, 200);
+    assert.equal(finalizeRes.body.status, 'SUCCESS');
+    assert.equal(finalizeRes.body.reconstructedSecret, 'VaultMasterSecret123');
+  });
+
+  await t.test('27. POST /api/v1/zk (Non-membership & Composite Predicates)', async () => {
+    const proveNonMem = await makeRequest('POST', '/api/v1/zk/prove-non-membership', {
+      claimKey: 'passportId',
+      secretValue: 'US-991238',
+      salt: '11223344556677881122334455667788',
+      restrictedSet: ['SANCTIONED-01', 'SANCTIONED-02']
+    });
+    assert.equal(proveNonMem.status, 200);
+    assert.equal(proveNonMem.body.proof.type, 'ZKSetNonMembershipProof2026');
+
+    const verifyNonMem = await makeRequest('POST', '/api/v1/zk/verify-non-membership', {
+      proof: proveNonMem.body.proof,
+      restrictedSet: ['SANCTIONED-01', 'SANCTIONED-02']
+    });
+    assert.equal(verifyNonMem.status, 200);
+    assert.equal(verifyNonMem.body.valid, true);
+
+    const compProve = await makeRequest('POST', '/api/v1/zk/prove-composite', {
+      proofs: [proveNonMem.body.proof]
+    });
+    assert.equal(compProve.status, 200);
+    assert.equal(compProve.body.compositeProof.type, 'ZKCompositePredicateProof2026');
+
+    const compVerify = await makeRequest('POST', '/api/v1/zk/verify-composite', {
+      compositeProof: compProve.body.compositeProof,
+      context: { restrictedSets: { passportId: ['SANCTIONED-01', 'SANCTIONED-02'] } }
+    });
+    assert.equal(compVerify.status, 200);
+    assert.equal(compVerify.body.valid, true);
+  });
+
+  await t.test('28. POST /api/v1/ledger/multichain/anchor', async () => {
+    const anchorRes = await makeRequest('POST', '/api/v1/ledger/multichain/anchor', {
+      chain: 'ethereum',
+      merkleRoot: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
+      batchCount: 250
+    });
+    assert.equal(anchorRes.status, 200);
+    assert.equal(anchorRes.body.success, true);
+    assert.ok(anchorRes.body.anchor.calldataHex.startsWith('0x892a4b12'));
   });
 });
 

@@ -538,4 +538,171 @@ export class DocuTrustClient {
   public async autoAnchorVault(): Promise<any> {
     return this.request('/vault/auto-anchor', 'POST', {});
   }
+
+  /**
+   * Generates Ethereum secp256k1 keypair and did:pkh DID.
+   */
+  public async generateSecp256k1Keys(chainId: number = 1): Promise<any> {
+    return this.request('/crypto/secp256k1/generate', 'POST', { chainId });
+  }
+
+  /**
+   * Signs W3C Verifiable Credential using EIP-712 structured typed data.
+   */
+  public async signVcEIP712(unsignedVc: Record<string, any>, keyPair: any, domain?: any): Promise<any> {
+    return this.request('/credentials/eip712/sign', 'POST', { unsignedVc, keyPair, domain });
+  }
+
+  /**
+   * Verifies EIP-712 structured signature on W3C Verifiable Credential.
+   */
+  public async verifyVcEIP712(credential: Record<string, any>, expectedSigner?: string): Promise<any> {
+    return this.request('/credentials/eip712/verify', 'POST', { credential, expectedSigner });
+  }
+
+  /**
+   * Sets up decentralized social recovery with guardian DIDs.
+   */
+  public async setupSocialRecovery(
+    ownerDid: string,
+    secret: string,
+    guardians: Array<{ did: string; name: string }>,
+    threshold: number = 3,
+    challengePeriodHours: number = 48
+  ): Promise<any> {
+    return this.request('/recovery/social/setup', 'POST', {
+      ownerDid,
+      secret,
+      guardians,
+      threshold,
+      challengePeriodHours
+    });
+  }
+
+  /**
+   * Initiates a timelocked social recovery session.
+   */
+  public async initiateSocialRecovery(
+    ownerDid: string,
+    requesterDid: string,
+    config: any
+  ): Promise<any> {
+    return this.request('/recovery/social/initiate', 'POST', {
+      ownerDid,
+      requesterDid,
+      config
+    });
+  }
+
+  /**
+   * Guardian casts a vote releasing recovery share.
+   */
+  public async castSocialRecoveryVote(
+    session: any,
+    guardianDid: string,
+    shareIndex: number,
+    rawShareHex: string
+  ): Promise<any> {
+    return this.request('/recovery/social/vote', 'POST', {
+      session,
+      guardianDid,
+      shareIndex,
+      rawShareHex
+    });
+  }
+
+  /**
+   * Genuine owner vetoes a fraudulent recovery session.
+   */
+  public async vetoSocialRecovery(
+    session: any,
+    reason: string = 'Unauthorized recovery attempt'
+  ): Promise<any> {
+    return this.request('/recovery/social/veto', 'POST', {
+      session,
+      reason
+    });
+  }
+
+  /**
+   * Finalizes social recovery and reconstructs the root secret.
+   */
+  public async finalizeSocialRecovery(
+    session: any,
+    forceTimelockOverride: boolean = false
+  ): Promise<any> {
+    return this.request('/recovery/social/finalize', 'POST', {
+      session,
+      forceTimelockOverride
+    });
+  }
+
+  /**
+   * Generates a Zero-Knowledge Set Non-Membership Proof.
+   */
+  public async proveSetNonMembership(
+    claimKey: string,
+    secretValue: string,
+    salt: string,
+    restrictedSet: string[]
+  ): Promise<any> {
+    return this.request('/zk/prove-non-membership', 'POST', {
+      claimKey,
+      secretValue,
+      salt,
+      restrictedSet
+    });
+  }
+
+  /**
+   * Verifies a Zero-Knowledge Set Non-Membership Proof.
+   */
+  public async verifySetNonMembership(
+    proof: Record<string, any>,
+    restrictedSet: string[],
+    expectedCommitment?: string
+  ): Promise<any> {
+    return this.request('/zk/verify-non-membership', 'POST', {
+      proof,
+      restrictedSet,
+      expectedCommitment
+    });
+  }
+
+  /**
+   * Combines multiple ZK predicate proofs into a composite proof.
+   */
+  public async proveCompositePredicate(proofs: any[]): Promise<any> {
+    return this.request('/zk/prove-composite', 'POST', { proofs });
+  }
+
+  /**
+   * Verifies a multi-predicate composite ZK proof.
+   */
+  public async verifyCompositePredicate(
+    compositeProof: Record<string, any>,
+    context?: { allowedSets?: Record<string, string[]>; restrictedSets?: Record<string, string[]> }
+  ): Promise<any> {
+    return this.request('/zk/verify-composite', 'POST', {
+      compositeProof,
+      context
+    });
+  }
+
+  /**
+   * Generates standardized multi-chain anchor payload and calldata.
+   */
+  public async formatMultiChainAnchor(
+    chain: string,
+    merkleRoot: string,
+    batchCount: number,
+    memo?: string
+  ): Promise<any> {
+    return this.request('/ledger/multichain/anchor', 'POST', {
+      chain,
+      merkleRoot,
+      batchCount,
+      memo
+    });
+  }
 }

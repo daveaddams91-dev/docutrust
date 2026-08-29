@@ -232,5 +232,67 @@ test('CLI Suite', async (t) => {
     assert.equal(proof.minDate, '2020-01-01');
     assert.equal(proof.maxDate, '2026-12-31');
   });
+
+  const ethKeyFile = path.join(tempDir, 'eth-keys.json');
+  const ethVcFile = path.join(tempDir, 'eth-vc.json');
+  const ethSignedVcFile = path.join(tempDir, 'eth-signed-vc.json');
+  await t.test('19. docutrust keygen-secp256k1, eip712-sign, and eip712-verify', () => {
+    const outKeygen = execSync(`node "${cliPath}" keygen-secp256k1 --chain 1 --out "${ethKeyFile}"`).toString();
+    assert.ok(outKeygen.includes('Ethereum secp256k1 KeyPair generated'));
+    assert.ok(fs.existsSync(ethKeyFile));
+
+    const ethKeys = JSON.parse(fs.readFileSync(ethKeyFile, 'utf-8'));
+    fs.writeFileSync(ethVcFile, JSON.stringify({
+      '@context': ['https://www.w3.org/ns/credentials/v2'],
+      id: 'urn:uuid:cli-eth-01',
+      issuer: ethKeys.did,
+      credentialSubject: { id: 'did:pkh:eip155:1:0x999', recipient: 'Satoshi' }
+    }), 'utf-8');
+
+    const outSign = execSync(`node "${cliPath}" eip712-sign --vc "${ethVcFile}" --key "${ethKeyFile}" --out "${ethSignedVcFile}"`).toString();
+    assert.ok(outSign.includes('EIP-712 Structured VC signed'));
+    assert.ok(fs.existsSync(ethSignedVcFile));
+
+    const outVerify = execSync(`node "${cliPath}" eip712-verify --vc "${ethSignedVcFile}"`).toString();
+    assert.ok(outVerify.includes('VALID'));
+    assert.ok(outVerify.includes(ethKeys.ethereumAddress.toLowerCase()));
+  });
+
+  const recoveryConfigFile = path.join(tempDir, 'social-recovery.json');
+  await t.test('20. docutrust social-recovery-setup generates guardian config and shares', () => {
+    const guardiansFile = path.join(tempDir, 'guardians.json');
+    fs.writeFileSync(guardiansFile, JSON.stringify([
+      { did: 'did:key:zG1', name: 'Alice' },
+      { did: 'did:key:zG2', name: 'Bob' },
+      { did: 'did:key:zG3', name: 'Charlie' }
+    ]), 'utf-8');
+
+    const out = execSync(`node "${cliPath}" social-recovery-setup --secret "VaultRootSecretKey" --guardians "${guardiansFile}" --threshold 2 --hours 48 --out "${recoveryConfigFile}"`).toString();
+    assert.ok(out.includes('Social Recovery configured'));
+    assert.ok(fs.existsSync(recoveryConfigFile));
+    const setup = JSON.parse(fs.readFileSync(recoveryConfigFile, 'utf-8'));
+    assert.equal(setup.guardians.length, 3);
+    assert.equal(setup.config.threshold, 2);
+  });
+
+  const zkNonMemFile = path.join(tempDir, 'zk-non-membership.json');
+  await t.test('21. docutrust zk-non-membership generates restricted-set exclusion proof', () => {
+    const out = execSync(`node "${cliPath}" zk-non-membership --key passportId --val USER-VALID --restricted "BLOCKED-1,BLOCKED-2" --out "${zkNonMemFile}"`).toString();
+    assert.ok(out.includes('ZK Non-Membership Proof saved'));
+    assert.ok(fs.existsSync(zkNonMemFile));
+    const proof = JSON.parse(fs.readFileSync(zkNonMemFile, 'utf-8'));
+    assert.equal(proof.type, 'ZKSetNonMembershipProof2026');
+  });
+
+  const anchorPayloadFile = path.join(tempDir, 'multichain-anchor.json');
+  await t.test('22. docutrust multichain-anchor formats calldata for EVM/Solana/Bitcoin', () => {
+    const root = '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef';
+    const out = execSync(`node "${cliPath}" multichain-anchor --chain polygon --root "${root}" --count 500 --out "${anchorPayloadFile}"`).toString();
+    assert.ok(out.includes('MultiChain Anchor payload generated'));
+    assert.ok(fs.existsSync(anchorPayloadFile));
+    const payload = JSON.parse(fs.readFileSync(anchorPayloadFile, 'utf-8'));
+    assert.equal(payload.chain, 'polygon');
+    assert.ok(payload.calldataHex.startsWith('0x892a4b12'));
+  });
 });
 

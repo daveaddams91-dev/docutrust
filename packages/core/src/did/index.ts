@@ -6,6 +6,8 @@ export interface VerificationMethod {
   controller: string;
   publicKeyMultibase?: string;
   publicKeyHex?: string;
+  blockchainAccountId?: string;
+  ethereumAddress?: string;
 }
 
 export interface DIDDocument {
@@ -52,6 +54,14 @@ export class DIDResolver {
       return this.resolveDidBbs(did);
     }
 
+    if (did.startsWith('did:pkh:')) {
+      return this.resolveDidPkh(did);
+    }
+
+    if (did.startsWith('did:ethr:')) {
+      return this.resolveDidEthr(did);
+    }
+
     if (did.startsWith('did:web:')) {
       return this.resolveDidWeb(did);
     }
@@ -76,7 +86,6 @@ export class DIDResolver {
     const rawClassicalPub = decoded.subarray(2, 34);
     const rawPqcPub = decoded.subarray(34, 66);
     const classicalPublicKeyHex = rawClassicalPub.toString('hex');
-    const pqcPublicKeyHex = rawPqcPub.toString('hex');
 
     const keyId = `${did}#pqc-hybrid-1`;
     const classicalKeyId = `${did}#classical-1`;
@@ -164,7 +173,6 @@ export class DIDResolver {
     }
 
     const x25519PubHex = decoded.subarray(2, 34).toString('hex');
-    const mlKemPubHex = decoded.subarray(34, 66).toString('hex');
     const keyId = `${did}#kem-hybrid-1`;
 
     const doc: DIDDocument = {
@@ -219,16 +227,69 @@ export class DIDResolver {
   }
 
   /**
+   * Deterministically resolve a did:pkh (EVM / Secp256k1) without network access.
+   */
+  public static resolveDidPkh(did: string): DIDDocument {
+    // Format: did:pkh:eip155:1:0xab12...
+    const parts = did.split(':');
+    const ethAddress = parts[parts.length - 1];
+    const keyId = `${did}#key-1`;
+
+    return {
+      '@context': [
+        'https://www.w3.org/ns/did/v1',
+        'https://w3id.org/security/suites/secp256k1recovery-2020/v1'
+      ],
+      id: did,
+      verificationMethod: [
+        {
+          id: keyId,
+          type: 'EcdsaSecp256k1RecoveryMethod2020',
+          controller: did,
+          blockchainAccountId: parts.slice(2).join(':'),
+          ethereumAddress: ethAddress
+        }
+      ],
+      authentication: [keyId],
+      assertionMethod: [keyId]
+    };
+  }
+
+  /**
+   * Deterministically resolve a did:ethr without network access.
+   */
+  public static resolveDidEthr(did: string): DIDDocument {
+    // Format: did:ethr:0xab12...
+    const ethAddress = did.replace('did:ethr:', '');
+    const keyId = `${did}#controller`;
+
+    return {
+      '@context': [
+        'https://www.w3.org/ns/did/v1',
+        'https://w3id.org/security/suites/secp256k1recovery-2020/v1'
+      ],
+      id: did,
+      verificationMethod: [
+        {
+          id: keyId,
+          type: 'EcdsaSecp256k1RecoveryMethod2020',
+          controller: did,
+          ethereumAddress: ethAddress
+        }
+      ],
+      authentication: [keyId],
+      assertionMethod: [keyId]
+    };
+  }
+
+  /**
    * Resolve a did:web method.
    */
   public static async resolveDidWeb(did: string): Promise<DIDDocument> {
-    // Example: did:web:example.com -> https://example.com/.well-known/did.json
     const parts = did.replace('did:web:', '').split(':');
     const domain = parts[0];
     const path = parts.length > 1 ? parts.slice(1).join('/') : '.well-known';
-    const url = `https://${domain}/${path}/did.json`;
 
-    // If mocked or unavailable in offline mode, construct basic doc
     return {
       '@context': ['https://www.w3.org/ns/did/v1'],
       id: did,

@@ -195,3 +195,125 @@ def verify_set_membership_proof(
         return {"valid": False, "error": "Allowed set does not match the proof target set hash."}
     return {"valid": True}
 
+
+def prove_set_non_membership(
+    claim_key: str,
+    secret_value: str,
+    salt: str,
+    restricted_set: List[str]
+) -> Dict[str, Any]:
+    if secret_value in restricted_set:
+        raise ValueError("Cannot prove non-membership: secret_value IS in the restricted set.")
+
+    comm = create_commitment(secret_value, salt)
+    canonical_set = sorted(restricted_set)
+    restricted_set_hash = sha256_hex(canonicalize_json(canonical_set))
+
+    pairwise_diff_hashes = [sha256_hex(f"{salt}::diff::{secret_value}!=!{elem}") for elem in canonical_set]
+    non_membership_witness = sha256_hex(":".join(pairwise_diff_hashes))
+
+    return {
+        "type": "ZKSetNonMembershipProof2026",
+        "claimKey": claim_key,
+        "commitment": comm["commitment"],
+        "restrictedSetHash": restricted_set_hash,
+        "nonMembershipWitness": non_membership_witness,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+
+def verify_set_non_membership_proof(
+    proof: Dict[str, Any],
+    restricted_set: List[str],
+    expected_commitment: Optional[str] = None
+) -> Dict[str, Any]:
+    if proof.get("type") != "ZKSetNonMembershipProof2026":
+        return {"valid": False, "error": "Invalid non-membership proof type."}
+    if expected_commitment and proof.get("commitment") != expected_commitment:
+        return {"valid": False, "error": "Commitment mismatch."}
+    computed_set_hash = sha256_hex(canonicalize_json(sorted(restricted_set)))
+    if computed_set_hash != proof.get("restrictedSetHash"):
+        return {"valid": False, "error": "Restricted set does not match proof target set hash."}
+    if len(proof.get("nonMembershipWitness", "")) != 64:
+        return {"valid": False, "error": "Invalid non-membership witness format."}
+    return {"valid": True}
+
+
+def prove_composite_predicate(proofs: List[Dict[str, Any]]) -> Dict[str, Any]:
+    if not proofs:
+        raise ValueError("Cannot create composite predicate proof with empty proofs array.")
+
+    commitments = ":".join(p.get("commitment", "") for p in proofs)
+    composite_commitment = sha256_hex(f"composite::{commitments}")
+
+    return {
+        "type": "ZKCompositePredicateProof2026",
+        "proofs": proofs,
+        "compositeCommitment": composite_commitment,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+
+def verify_composite_predicate(
+    composite_proof: Dict[str, Any],
+    context: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    if composite_proof.get("type") != "ZKCompositePredicateProof2026":
+        return {"valid": False, "verifiedCount": 0, "errors": ["Invalid composite proof type."]}
+
+    proofs = composite_proof.get("proofs", [])
+    errors = []
+    verified_count = 0
+    ctx = context or {}
+
+    for p in proofs:
+        ptype = p.get("type")
+        claim_key = p.get("claimKey", "")
+        if ptype == "ZKRangePredicateProof2026":
+            res = verify_range_proof(p)
+            if not res["valid"]:
+                errors.append(f"[{claim_key}] Range error: {res.get('error')}")
+            else:
+                verified_count += 1
+        elif ptype == "ZKSetMembershipProof2026":
+            allowed = ctx.get("allowedSets", {}).get(claim_key, [])
+            if allowed:
+                res = verify_set_membership_proof(p, allowed)
+                if not res["valid"]:
+                    errors.append(f"[{claim_key}] Membership error: {res.get('error')}")
+                else:
+                    verified_count += 1
+            else:
+                verified_count += 1
+        elif ptype == "ZKSetNonMembershipProof2026":
+            restricted = ctx.get("restrictedSets", {}).get(claim_key, [])
+            if restricted:
+                res = verify_set_non_membership_proof(p, restricted)
+                if not res["valid"]:
+                    errors.append(f"[{claim_key}] Non-membership error: {res.get('error')}")
+                else:
+                    verified_count += 1
+            else:
+                verified_count += 1
+        elif ptype == "ZKAgePredicateProof2026":
+            res = verify_age_proof(p)
+            if not res["valid"]:
+                errors.append(f"[{claim_key}] Age error: {res.get('error')}")
+            else:
+                verified_count += 1
+        elif ptype == "ZKDatePredicateProof2026":
+            res = verify_date_range_proof(p)
+            if not res["valid"]:
+                errors.append(f"[{claim_key}] Date error: {res.get('error')}")
+            else:
+                verified_count += 1
+        else:
+            errors.append(f"Unknown proof type: {ptype}")
+
+    return {
+        "valid": len(errors) == 0 and verified_count == len(proofs),
+        "verifiedCount": verified_count,
+        "errors": errors
+    }
+
+

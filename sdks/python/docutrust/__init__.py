@@ -12,7 +12,11 @@ from .zk_predicates import (
     prove_date_range,
     verify_date_range_proof,
     prove_set_membership,
-    verify_set_membership_proof
+    verify_set_membership_proof,
+    prove_set_non_membership,
+    verify_set_non_membership_proof,
+    prove_composite_predicate,
+    verify_composite_predicate
 )
 from .kem import generate_kem_keypair
 from .shamir import split_secret, combine_shares
@@ -20,8 +24,16 @@ from .bbs import generate_bbs_keypair, sign_bbs, derive_bbs_proof, verify_bbs_pr
 from .oracle import issue_timestamp_token, verify_timestamp_token
 from .didcomm import pack_didcomm_message, unpack_didcomm_message
 from .mmr import MerkleMountainRange
+from .eip712 import (
+    generate_secp256k1_key_pair,
+    sign_vc_eip712,
+    verify_vc_eip712,
+    derive_ethereum_address
+)
+from .social_recovery import SocialRecoveryEngine
+from .multichain import MultiChainLedgerAnchor
 
-__version__ = "2.1.1"
+__version__ = "2.2.0"
 __all__ = [
     "DocuTrustClient",
     "canonicalize_json",
@@ -39,6 +51,10 @@ __all__ = [
     "verify_date_range_proof",
     "prove_set_membership",
     "verify_set_membership_proof",
+    "prove_set_non_membership",
+    "verify_set_non_membership_proof",
+    "prove_composite_predicate",
+    "verify_composite_predicate",
     "generate_kem_keypair",
     "split_secret",
     "combine_shares",
@@ -50,5 +66,11 @@ __all__ = [
     "verify_timestamp_token",
     "pack_didcomm_message",
     "unpack_didcomm_message",
-    "MerkleMountainRange"
+    "MerkleMountainRange",
+    "generate_secp256k1_key_pair",
+    "sign_vc_eip712",
+    "verify_vc_eip712",
+    "derive_ethereum_address",
+    "SocialRecoveryEngine",
+    "MultiChainLedgerAnchor"
 ]

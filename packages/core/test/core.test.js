@@ -94,7 +94,20 @@ const {
   packDIDCommMessage,
   unpackDIDCommMessage,
   // MMR
-  MerkleMountainRange
+  MerkleMountainRange,
+  // EIP-712
+  generateSecp256k1KeyPair,
+  signVcEIP712,
+  verifyVcEIP712,
+  // Social Recovery
+  SocialRecoveryEngine,
+  // ZK Non-Membership & Composite
+  proveSetNonMembership,
+  verifySetNonMembershipProof,
+  proveCompositePredicate,
+  verifyCompositePredicate,
+  // MultiChain
+  MultiChainLedgerAnchor
 } = require('../dist/index.js');
 
 // 1. Cryptography Tests
@@ -1022,6 +1035,162 @@ test('33. SD-JWT: Standard W3C did:key subject DID and presentation integrity', 
   assert.equal(audit.disclosedClaims.clearanceLevel, 'Top Secret / SCI');
   assert.equal(audit.disclosedClaims.issueYear, undefined);
 });
+
+// 33. EIP-712 Ethereum Structured Credential Signing and Verification
+test('34. EIP-712: Ethereum secp256k1 key generation, did:pkh resolution, EIP-712 VC signing and verification', async () => {
+  const ethKey = generateSecp256k1KeyPair(1);
+  assert.ok(ethKey.did.startsWith('did:pkh:eip155:1:0x'));
+  assert.ok(ethKey.ethereumAddress.startsWith('0x'));
+
+  // Test DID resolution for did:pkh
+  const didDoc = await DIDResolver.resolve(ethKey.did);
+  assert.equal(didDoc.id, ethKey.did);
+  assert.equal(didDoc.verificationMethod[0].type, 'EcdsaSecp256k1RecoveryMethod2020');
+
+  const unsignedVc = {
+    '@context': ['https://www.w3.org/ns/credentials/v2'],
+    id: 'urn:uuid:eth-degree-001',
+    type: ['VerifiableCredential', 'EthereumCertifiedDegree'],
+    issuer: ethKey.did,
+    validFrom: new Date().toISOString(),
+    credentialSubject: {
+      id: 'did:pkh:eip155:1:0x1111111111111111111111111111111111111111',
+      studentName: 'Vitalik Buterin',
+      honor: 'Doctorate of Sovereign Cryptography'
+    }
+  };
+
+  const signedVc = signVcEIP712(unsignedVc, ethKey);
+  assert.equal(signedVc.proof.type, 'EthereumEip712Signature2026');
+  assert.ok(signedVc.proof.signature.startsWith('0x'));
+
+  // Direct EIP-712 verification
+  const audit1 = verifyVcEIP712(signedVc);
+  assert.equal(audit1.valid, true);
+  assert.equal(audit1.signerAddress.toLowerCase(), ethKey.ethereumAddress.toLowerCase());
+
+  // Verification via VerifiableCredentialsEngine.verify()
+  const audit2 = await VerifiableCredentialsEngine.verify(signedVc);
+  assert.equal(audit2.valid, true);
+  assert.equal(audit2.signatureValid, true);
+});
+
+// 34. Social Recovery & Timelocked Escrow Protocol
+test('35. Social Recovery: Setup, Guardian voting, Timelock expiration, and Owner Veto Protection', () => {
+  const rootSecret = '0xfeedfacecafe0102030405060708090a0b0c0d0e0f1011121314151617181920';
+  const ownerDid = 'did:key:z6Mowner123';
+  const guardians = [
+    { did: 'did:key:z6Mguardian1', name: 'Alice (Security Lead)' },
+    { did: 'did:key:z6Mguardian2', name: 'Bob (VP Engineering)' },
+    { did: 'did:key:z6Mguardian3', name: 'Charlie (Board Member)' },
+    { did: 'did:key:z6Mguardian4', name: 'Diana (Legal Counsel)' }
+  ];
+
+  // 1. Setup 3-of-4 recovery
+  const setup = SocialRecoveryEngine.setupRecovery(ownerDid, rootSecret, guardians, 3, 48);
+  assert.equal(setup.guardians.length, 4);
+  assert.equal(setup.rawShares.length, 4);
+  assert.equal(setup.config.threshold, 3);
+
+  // 2. Initiate recovery session
+  let session = SocialRecoveryEngine.initiateRecovery(ownerDid, 'did:key:z6Mrequester', setup.config);
+  assert.equal(session.status, 'PENDING_TIMELOCK');
+  assert.equal(session.threshold, 3);
+
+  // 3. Guardians cast votes
+  session = SocialRecoveryEngine.castVote(session, guardians[0].did, setup.rawShares[0].index, setup.rawShares[0].shareHex);
+  session = SocialRecoveryEngine.castVote(session, guardians[1].did, setup.rawShares[1].index, setup.rawShares[1].shareHex);
+  session = SocialRecoveryEngine.castVote(session, guardians[2].did, setup.rawShares[2].index, setup.rawShares[2].shareHex);
+  assert.equal(session.votes.length, 3);
+
+  // 4. Timelock active check (without override, should block)
+  const prematureFinalize = SocialRecoveryEngine.finalizeRecovery(session, false);
+  assert.equal(prematureFinalize.status, 'TIMELOCK_ACTIVE');
+
+  // 5. Finalize with timelock expired / simulated
+  const successFinalize = SocialRecoveryEngine.finalizeRecovery(session, true);
+  assert.equal(successFinalize.status, 'SUCCESS');
+  assert.equal(successFinalize.reconstructedSecret, rootSecret);
+
+  // 6. Test Owner Veto
+  let vetoSession = SocialRecoveryEngine.initiateRecovery(ownerDid, 'did:key:z6Mmalicious', setup.config);
+  vetoSession = SocialRecoveryEngine.castVote(vetoSession, guardians[0].did, setup.rawShares[0].index, setup.rawShares[0].shareHex);
+  vetoSession = SocialRecoveryEngine.vetoRecovery(vetoSession, 'Malicious SIM swap detected');
+  assert.equal(vetoSession.status, 'VETOED_BY_OWNER');
+
+  const vetoFinalize = SocialRecoveryEngine.finalizeRecovery(vetoSession, true);
+  assert.equal(vetoFinalize.status, 'VETOED');
+});
+
+// 35. ZK Set Non-Membership & Composite Predicates
+test('36. ZK Predicates: Set Non-Membership & Composite Multi-Predicate Proof Verification', () => {
+  const secretSubjectId = 'PASSPORT-US-991823';
+  const { salt } = createCommitment(secretSubjectId);
+  const sanctionsList = ['SANCTIONED-001', 'SANCTIONED-002', 'BLOCKED-USER-99'];
+
+  // 1. Prove secretSubjectId is NOT in sanctionsList
+  const nonMemberProof = proveSetNonMembership('passportId', secretSubjectId, salt, sanctionsList);
+  assert.equal(nonMemberProof.type, 'ZKSetNonMembershipProof2026');
+
+  const nonMemberAudit = verifySetNonMembershipProof(nonMemberProof, sanctionsList);
+  assert.equal(nonMemberAudit.valid, true);
+
+  // Should throw if value is in restricted list
+  assert.throws(() => {
+    proveSetNonMembership('passportId', 'SANCTIONED-001', salt, sanctionsList);
+  }, /secretValue IS in the restricted set/);
+
+  // 2. Composite Multi-Predicate Proof: Combine Range, Set Membership, Set Non-Membership, and Age
+  const { salt: gpaSalt } = createCommitment(3.95);
+  const rangeProof = proveRange('gpa', 3.95, gpaSalt, 3.5, 4.0);
+
+  const { salt: uniSalt } = createCommitment('Stanford');
+  const allowedUnis = ['MIT', 'Stanford', 'Oxford'];
+  const memberProof = proveSetMembership('university', 'Stanford', uniSalt, allowedUnis);
+
+  const ageProof = proveAgeAbove('birthDate', '2001-05-12', 21, undefined, '2026-08-29');
+
+  const compositeProof = proveCompositePredicate([rangeProof, memberProof, nonMemberProof, ageProof]);
+  assert.equal(compositeProof.type, 'ZKCompositePredicateProof2026');
+  assert.equal(compositeProof.proofs.length, 4);
+
+  const compositeAudit = verifyCompositePredicate(compositeProof, {
+    allowedSets: { university: allowedUnis },
+    restrictedSets: { passportId: sanctionsList }
+  });
+  assert.equal(compositeAudit.valid, true);
+  assert.equal(compositeAudit.verifiedCount, 4);
+});
+
+// 36. MultiChain Ledger Anchor & Calldata Generation
+test('37. MultiChain Anchor: EVM Calldata, Bitcoin OP_RETURN, Solana Anchor instruction generation', () => {
+  const merkleRoot = '0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789';
+  const batchCount = 1000;
+
+  // 1. EVM Calldata
+  const ethAnchor = MultiChainLedgerAnchor.formatAnchor('ethereum', merkleRoot, batchCount, 'DocuTrust Mainnet Batch');
+  assert.equal(ethAnchor.chain, 'ethereum');
+  assert.ok(ethAnchor.calldataHex.startsWith('0x892a4b12'));
+  assert.ok(ethAnchor.explorerUrl.includes('etherscan.io'));
+
+  // 2. Polygon Calldata
+  const polyAnchor = MultiChainLedgerAnchor.formatAnchor('polygon', merkleRoot, batchCount);
+  assert.equal(polyAnchor.chain, 'polygon');
+  assert.ok(polyAnchor.calldataHex.startsWith('0x892a4b12'));
+
+  // 3. Bitcoin OP_RETURN
+  const btcAnchor = MultiChainLedgerAnchor.formatAnchor('bitcoin', merkleRoot, batchCount);
+  assert.equal(btcAnchor.chain, 'bitcoin');
+  assert.ok(btcAnchor.opReturnHex.startsWith('0x6a28'));
+  assert.ok(btcAnchor.explorerUrl.includes('mempool.space'));
+
+  // 4. Solana Anchor Instruction
+  const solAnchor = MultiChainLedgerAnchor.formatAnchor('solana', merkleRoot, batchCount);
+  assert.equal(solAnchor.chain, 'solana');
+  assert.ok(solAnchor.instructionDataHex.startsWith('0x'));
+  assert.ok(solAnchor.explorerUrl.includes('solscan.io'));
+});
+
 
 
 

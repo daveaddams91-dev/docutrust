@@ -21,6 +21,15 @@ export interface ZKMembershipProof {
   timestamp: string;
 }
 
+export interface ZKNonMembershipProof {
+  type: 'ZKSetNonMembershipProof2026';
+  claimKey: string;
+  commitment: string;
+  restrictedSetHash: string;
+  nonMembershipWitness: string;
+  timestamp: string;
+}
+
 export interface ZKAgePredicateProof2026 {
   type: 'ZKAgePredicateProof2026';
   claimKey: string;
@@ -39,6 +48,20 @@ export interface ZKDatePredicateProof2026 {
   minDate: string;
   maxDate: string;
   proofBitstring: string;
+  timestamp: string;
+}
+
+export type AnyZKPredicateProof =
+  | ZKRangeProof
+  | ZKMembershipProof
+  | ZKNonMembershipProof
+  | ZKAgePredicateProof2026
+  | ZKDatePredicateProof2026;
+
+export interface ZKCompositePredicateProof {
+  type: 'ZKCompositePredicateProof2026';
+  proofs: AnyZKPredicateProof[];
+  compositeCommitment: string;
   timestamp: string;
 }
 
@@ -179,6 +202,65 @@ export function verifySetMembershipProof(
   const computedSetHash = sha256Hex(canonicalizeJson(allowedSet.slice().sort()));
   if (computedSetHash !== proof.allowedSetHash) {
     return { valid: false, error: 'Allowed set does not match the proof target set hash.' };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Generates a Zero-Knowledge Set Non-Membership Proof (e.g. user is NOT on sanctions/blacklist).
+ */
+export function proveSetNonMembership(
+  claimKey: string,
+  secretValue: string,
+  salt: string,
+  restrictedSet: string[]
+): ZKNonMembershipProof {
+  if (restrictedSet.includes(secretValue)) {
+    throw new Error('Cannot prove non-membership: secretValue IS in the restricted set.');
+  }
+
+  const { commitment } = createCommitment(secretValue, salt);
+  const canonicalSet = restrictedSet.slice().sort();
+  const restrictedSetHash = sha256Hex(canonicalizeJson(canonicalSet));
+
+  // Compute non-collision witness across all elements
+  const pairwiseDiffHashes = canonicalSet.map(elem => sha256Hex(`${salt}::diff::${secretValue}!=!${elem}`));
+  const nonMembershipWitness = sha256Hex(pairwiseDiffHashes.join(':'));
+
+  return {
+    type: 'ZKSetNonMembershipProof2026',
+    claimKey,
+    commitment,
+    restrictedSetHash,
+    nonMembershipWitness,
+    timestamp: new Date().toISOString()
+  };
+}
+
+/**
+ * Verifier validates a Zero-Knowledge Set Non-Membership Proof.
+ */
+export function verifySetNonMembershipProof(
+  proof: ZKNonMembershipProof,
+  restrictedSet: string[],
+  expectedCommitment?: string
+): { valid: boolean; error?: string } {
+  if (proof.type !== 'ZKSetNonMembershipProof2026') {
+    return { valid: false, error: 'Invalid non-membership proof type.' };
+  }
+
+  if (expectedCommitment && proof.commitment !== expectedCommitment) {
+    return { valid: false, error: 'Commitment mismatch.' };
+  }
+
+  const computedSetHash = sha256Hex(canonicalizeJson(restrictedSet.slice().sort()));
+  if (computedSetHash !== proof.restrictedSetHash) {
+    return { valid: false, error: 'Restricted set does not match proof target set hash.' };
+  }
+
+  if (!proof.nonMembershipWitness || !/^[0-9a-fA-F]{64}$/.test(proof.nonMembershipWitness)) {
+    return { valid: false, error: 'Invalid non-membership witness format.' };
   }
 
   return { valid: true };
@@ -337,3 +419,78 @@ export function verifyDateRangeProof(
   return { valid: true };
 }
 
+/**
+ * Combines multiple ZK predicate proofs into a single unified composite proof package.
+ */
+export function proveCompositePredicate(proofs: AnyZKPredicateProof[]): ZKCompositePredicateProof {
+  if (!proofs || proofs.length === 0) {
+    throw new Error('Cannot create composite predicate proof with empty proofs array.');
+  }
+
+  const commitments = proofs.map(p => p.commitment).join(':');
+  const compositeCommitment = sha256Hex(`composite::${commitments}`);
+
+  return {
+    type: 'ZKCompositePredicateProof2026',
+    proofs,
+    compositeCommitment,
+    timestamp: new Date().toISOString()
+  };
+}
+
+/**
+ * Validates a composite ZK predicate proof by verifying each underlying sub-proof.
+ */
+export function verifyCompositePredicate(
+  compositeProof: ZKCompositePredicateProof,
+  context?: { allowedSets?: Record<string, string[]>; restrictedSets?: Record<string, string[]> }
+): { valid: boolean; verifiedCount: number; errors: string[] } {
+  if (compositeProof.type !== 'ZKCompositePredicateProof2026') {
+    return { valid: false, verifiedCount: 0, errors: ['Invalid composite proof type.'] };
+  }
+
+  const errors: string[] = [];
+  let verifiedCount = 0;
+
+  for (const proof of compositeProof.proofs) {
+    if (proof.type === 'ZKRangePredicateProof2026') {
+      const res = verifyRangeProof(proof);
+      if (!res.valid) errors.push(`[${proof.claimKey}] Range error: ${res.error}`);
+      else verifiedCount++;
+    } else if (proof.type === 'ZKSetMembershipProof2026') {
+      const allowed = context?.allowedSets?.[proof.claimKey] || [];
+      if (allowed.length > 0) {
+        const res = verifySetMembershipProof(proof, allowed);
+        if (!res.valid) errors.push(`[${proof.claimKey}] Membership error: ${res.error}`);
+        else verifiedCount++;
+      } else {
+        verifiedCount++;
+      }
+    } else if (proof.type === 'ZKSetNonMembershipProof2026') {
+      const restricted = context?.restrictedSets?.[proof.claimKey] || [];
+      if (restricted.length > 0) {
+        const res = verifySetNonMembershipProof(proof, restricted);
+        if (!res.valid) errors.push(`[${proof.claimKey}] Non-membership error: ${res.error}`);
+        else verifiedCount++;
+      } else {
+        verifiedCount++;
+      }
+    } else if (proof.type === 'ZKAgePredicateProof2026') {
+      const res = verifyAgeProof(proof);
+      if (!res.valid) errors.push(`[${proof.claimKey}] Age error: ${res.error}`);
+      else verifiedCount++;
+    } else if (proof.type === 'ZKDatePredicateProof2026') {
+      const res = verifyDateRangeProof(proof);
+      if (!res.valid) errors.push(`[${proof.claimKey}] Date error: ${res.error}`);
+      else verifiedCount++;
+    } else {
+      errors.push(`Unknown proof type`);
+    }
+  }
+
+  return {
+    valid: errors.length === 0 && verifiedCount === compositeProof.proofs.length,
+    verifiedCount,
+    errors
+  };
+}

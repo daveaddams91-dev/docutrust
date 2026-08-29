@@ -19,7 +19,11 @@ from docutrust.zk_predicates import (
     prove_date_range,
     verify_date_range_proof,
     prove_set_membership,
-    verify_set_membership_proof
+    verify_set_membership_proof,
+    prove_set_non_membership,
+    verify_set_non_membership_proof,
+    prove_composite_predicate,
+    verify_composite_predicate
 )
 from docutrust.kem import generate_kem_keypair
 from docutrust.shamir import split_secret, combine_shares
@@ -27,6 +31,9 @@ from docutrust.bbs import generate_bbs_keypair, sign_bbs, derive_bbs_proof, veri
 from docutrust.oracle import issue_timestamp_token, verify_timestamp_token
 from docutrust.didcomm import pack_didcomm_message, unpack_didcomm_message
 from docutrust.mmr import MerkleMountainRange
+from docutrust.eip712 import generate_secp256k1_key_pair, sign_vc_eip712, verify_vc_eip712
+from docutrust.social_recovery import SocialRecoveryEngine
+from docutrust.multichain import MultiChainLedgerAnchor
 
 class TestDocuTrustPython(unittest.TestCase):
     def test_didcomm_messaging(self):
@@ -343,6 +350,78 @@ class TestDocuTrustPython(unittest.TestCase):
         self.assertTrue(client.mmr_get_peaks()["success"])
         self.assertTrue(client.get_hashchain()["success"])
         self.assertTrue(client.get_vault_metrics()["success"])
+
+    def test_eip712_signing_and_verification(self):
+        eth_key = generate_secp256k1_key_pair(1)
+        self.assertTrue(eth_key["did"].startswith("did:pkh:eip155:1:0x"))
+        self.assertTrue(eth_key["ethereumAddress"].startswith("0x"))
+
+        vc = {
+            "id": "urn:uuid:py-eth-vc-01",
+            "issuer": eth_key["did"],
+            "credentialSubject": {"degree": "Python Quantum Master", "gpa": 4.0}
+        }
+        signed = sign_vc_eip712(vc, eth_key)
+        self.assertEqual(signed["proof"]["type"], "EthereumEip712Signature2026")
+        self.assertTrue(signed["proof"]["signature"].startswith("0x"))
+
+        audit = verify_vc_eip712(signed, eth_key["ethereumAddress"])
+        self.assertTrue(audit["valid"])
+        self.assertEqual(audit["signerAddress"], eth_key["ethereumAddress"].lower())
+
+    def test_social_recovery_and_veto(self):
+        secret = "PythonRootSecretKeyHex12345678"
+        owner_did = "did:key:zOwner"
+        guardians = [
+            {"did": "did:key:zG1", "name": "Guardian 1"},
+            {"did": "did:key:zG2", "name": "Guardian 2"},
+            {"did": "did:key:zG3", "name": "Guardian 3"}
+        ]
+        setup = SocialRecoveryEngine.setup_recovery(owner_did, secret, guardians, 2, 24)
+        self.assertEqual(len(setup["guardians"]), 3)
+
+        session = SocialRecoveryEngine.initiate_recovery(owner_did, "did:key:zReq", setup["config"])
+        session = SocialRecoveryEngine.cast_vote(session, guardians[0]["did"], setup["rawShares"][0]["index"], setup["rawShares"][0]["shareHex"])
+        session = SocialRecoveryEngine.cast_vote(session, guardians[1]["did"], setup["rawShares"][1]["index"], setup["rawShares"][1]["shareHex"])
+
+        final = SocialRecoveryEngine.finalize_recovery(session, force_timelock_override=True)
+        self.assertEqual(final["status"], "SUCCESS")
+        self.assertEqual(final["reconstructedSecret"], secret)
+
+        # Test Veto
+        veto_session = SocialRecoveryEngine.initiate_recovery(owner_did, "did:key:zMal", setup["config"])
+        veto_session = SocialRecoveryEngine.veto_recovery(veto_session, "Unauthorized access detected")
+        self.assertEqual(veto_session["status"], "VETOED_BY_OWNER")
+        veto_res = SocialRecoveryEngine.finalize_recovery(veto_session, force_timelock_override=True)
+        self.assertEqual(veto_res["status"], "VETOED")
+
+    def test_zk_non_membership_and_composite(self):
+        secret_id = "USER-CLEARED-99"
+        comm = create_commitment(secret_id)
+        restricted = ["SANCTIONED-A", "SANCTIONED-B"]
+
+        proof = prove_set_non_membership("userId", secret_id, comm["salt"], restricted)
+        self.assertEqual(proof["type"], "ZKSetNonMembershipProof2026")
+        audit = verify_set_non_membership_proof(proof, restricted)
+        self.assertTrue(audit["valid"])
+
+        # Composite predicate
+        age_p = prove_age_above("birthDate", "2000-01-01", 21, reference_date_str="2026-08-29")
+        comp = prove_composite_predicate([proof, age_p])
+        comp_audit = verify_composite_predicate(comp, {"restrictedSets": {"userId": restricted}})
+        self.assertTrue(comp_audit["valid"])
+        self.assertEqual(comp_audit["verifiedCount"], 2)
+
+    def test_multichain_anchor_generation(self):
+        root = "0x1122334455667788990011223344556677889900112233445566778899001122"
+        eth = MultiChainLedgerAnchor.format_anchor("ethereum", root, 500)
+        self.assertTrue(eth["calldataHex"].startswith("0x892a4b12"))
+
+        btc = MultiChainLedgerAnchor.format_anchor("bitcoin", root, 500)
+        self.assertTrue(btc["opReturnHex"].startswith("0x6a28"))
+
+        sol = MultiChainLedgerAnchor.format_anchor("solana", root, 500)
+        self.assertTrue(sol["instructionDataHex"].startswith("0x"))
 
 if __name__ == '__main__':
     unittest.main()

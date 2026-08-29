@@ -205,7 +205,7 @@ const command = args[0];
 
 function printHelp() {
   console.log(`
-\x1b[1m\x1b[36m🛡️ DocuTrust CLI v2.1.1\x1b[0m — Open-Source Sovereign Trust Stack
+\x1b[1m\x1b[36m🛡️ DocuTrust CLI v2.2.0\x1b[0m — Open-Source Sovereign Trust Stack
 
 \x1b[1mCORE COMMANDS:\x1b[0m
   \x1b[32mdemo / wizard\x1b[0m                                 Run interactive 10-second end-to-end credential issuance & verification
@@ -229,12 +229,17 @@ function printHelp() {
   \x1b[32mbbs-verify\x1b[0m --proof <file>                      Verify BBS+ zero-knowledge proof
 
 \x1b[1mPOST-QUANTUM & KEY MANAGEMENT:\x1b[0m
+  \x1b[32mkeygen-secp256k1\x1b[0m [--chain <id>] [--out <file>]   Generate Ethereum secp256k1 keypair & did:pkh
+  \x1b[32meip712-sign\x1b[0m --vc <file> --key <keyfile>       Sign W3C VC with EIP-712 structured typing
+  \x1b[32meip712-verify\x1b[0m --vc <file>                     Verify EIP-712 structured VC signature
+  \x1b[32msocial-recovery-setup\x1b[0m --secret <txt> -g <file>   Setup decentralized guardian recovery with timelock
   \x1b[32mkem-keygen\x1b[0m [--out <file>]                     Generate Post-Quantum ML-KEM-768 hybrid keypair
   \x1b[32mpop-challenge\x1b[0m --aud <audience>                 Create Proof-of-Possession challenge
   \x1b[32mshamir-split\x1b[0m --secret <text> -n 5 -k 3         Split secret into K-of-N Shamir polynomial shares
   \x1b[32mshamir-combine\x1b[0m --shares <file>                 Reconstruct secret from Shamir shares
 
 \x1b[1mFEDERATION & STREAMING LEDGER:\x1b[0m
+  \x1b[32mmultichain-anchor\x1b[0m --chain <eth|sol|btc> --root <h> Generate anchor calldata / payload
   \x1b[32moracle-timestamp\x1b[0m --data <text>                 Issue RFC 3161 timestamp token from TSA Oracle
   \x1b[32mdidcomm-pack\x1b[0m --msg <file> --to <pubHex>        Pack DIDComm v2 encrypted envelope
   \x1b[32mdidcomm-unpack\x1b[0m --envelope <file> --key <priv>  Unpack and decrypt DIDComm v2 envelope
@@ -901,6 +906,129 @@ async function main() {
     if (outFile) {
       fs.writeFileSync(outFile, outStr, 'utf-8');
       console.log(`\x1b[32m✔\x1b[0m Merkle Mountain Range element appended to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    return;
+  }
+
+  if (command === 'keygen-secp256k1' || command === 'eth-keygen') {
+    const chainId = parseInt(getArgValue('--chain') || getArgValue('-c') || '1');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+    const keyPair = core.generateSecp256k1KeyPair(chainId);
+    const outStr = JSON.stringify(keyPair, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m Ethereum secp256k1 KeyPair generated and saved to: \x1b[1m${outFile}\x1b[0m`);
+      console.log(`  DID:            \x1b[1m${keyPair.did}\x1b[0m`);
+      console.log(`  ETH Address:    \x1b[1m${keyPair.ethereumAddress}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    return;
+  }
+
+  if (command === 'eip712-sign') {
+    const vcFile = getArgValue('--vc') || getArgValue('-v');
+    const keyFile = getArgValue('--key') || getArgValue('-k');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!vcFile || !keyFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --vc <file> or --key <file>');
+      process.exit(1);
+    }
+    const unsignedVc = JSON.parse(fs.readFileSync(vcFile, 'utf-8'));
+    const keyPair = JSON.parse(fs.readFileSync(keyFile, 'utf-8'));
+    const signedVc = core.signVcEIP712(unsignedVc, keyPair);
+    const outStr = JSON.stringify(signedVc, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m EIP-712 Structured VC signed and saved to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    return;
+  }
+
+  if (command === 'eip712-verify') {
+    const vcFile = getArgValue('--vc') || getArgValue('-v');
+    const expectedSigner = getArgValue('--signer') || getArgValue('-s');
+    if (!vcFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --vc <file>');
+      process.exit(1);
+    }
+    const vc = JSON.parse(fs.readFileSync(vcFile, 'utf-8'));
+    const audit = core.verifyVcEIP712(vc, expectedSigner);
+    console.log(`\n\x1b[1m--- EIP-712 SIGNATURE VERIFICATION REPORT ---\x1b[0m`);
+    console.log(`Signer Address:   ${audit.signerAddress || 'N/A'}`);
+    console.log(`Signature Status: ${audit.valid ? '\x1b[32m✔ VALID\x1b[0m' : '\x1b[31m✖ INVALID\x1b[0m'}`);
+    if (audit.error) console.log(`Error:            ${audit.error}`);
+    console.log(`---------------------------------------------\n`);
+    return;
+  }
+
+  if (command === 'social-recovery-setup') {
+    const secret = getArgValue('--secret') || getArgValue('-s');
+    const guardiansFile = getArgValue('--guardians') || getArgValue('-g');
+    const threshold = parseInt(getArgValue('--threshold') || getArgValue('-t') || '3');
+    const hours = parseInt(getArgValue('--hours') || '48');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!secret || !guardiansFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --secret <text> or --guardians <file>');
+      process.exit(1);
+    }
+    const guardians = JSON.parse(fs.readFileSync(guardiansFile, 'utf-8'));
+    const setup = core.SocialRecoveryEngine.setupRecovery('did:key:zOwnerCLI', secret, guardians, threshold, hours);
+    const outStr = JSON.stringify(setup, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m Social Recovery configured and saved to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    return;
+  }
+
+  if (command === 'zk-non-membership') {
+    const claimKey = getArgValue('--key') || getArgValue('-k') || 'restrictedList';
+    const val = getArgValue('--val') || getArgValue('-v');
+    const salt = getArgValue('--salt') || crypto.randomBytes(16).toString('hex');
+    const restrictedStr = getArgValue('--restricted') || getArgValue('-r');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!val || !restrictedStr) {
+      console.error('\x1b[31mError:\x1b[0m Missing --val <value> or --restricted <a,b,c>');
+      process.exit(1);
+    }
+    const restrictedSet = restrictedStr.split(',').map(s => s.trim());
+    const proof = core.proveSetNonMembership(claimKey, val, salt, restrictedSet);
+    const outStr = JSON.stringify(proof, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m ZK Non-Membership Proof saved to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    return;
+  }
+
+  if (command === 'multichain-anchor') {
+    const chain = getArgValue('--chain') || getArgValue('-c') || 'ethereum';
+    const root = getArgValue('--root') || getArgValue('-r');
+    const count = parseInt(getArgValue('--count') || getArgValue('-n') || '100');
+    const memo = getArgValue('--memo') || getArgValue('-m') || 'DocuTrust Anchor';
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!root) {
+      console.error('\x1b[31mError:\x1b[0m Missing --root <merkleRootHex>');
+      process.exit(1);
+    }
+    const anchor = core.MultiChainLedgerAnchor.formatAnchor(chain, root, count, memo);
+    const outStr = JSON.stringify(anchor, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m MultiChain Anchor payload generated for ${chain}: \x1b[1m${outFile}\x1b[0m`);
     } else {
       console.log(outStr);
     }

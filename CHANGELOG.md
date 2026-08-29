@@ -1,5 +1,78 @@
 # 📝 DocuTrust Changelog & Release Notes
 
+## [v2.2.0] - Ethereum EIP-712 Structured Credentials, Social Recovery Escrow, ZK Non-Membership & Multi-Chain Anchoring - 2026-08-29
+
+### 🌟 Release Overview (v2.2.0)
+DocuTrust 2.2.0 introduces native Ethereum EIP-712 structured credential signing and `did:pkh` resolution, decentralized Guardian Social Key Recovery with timelocked challenge periods and Owner Veto protection, Zero-Knowledge Set Non-Membership and Composite Predicate aggregation, and standardized Cross-Chain Ledger Anchoring calldata for EVM, Solana, and Bitcoin.
+
+---
+
+### 🛡️ Core Cryptographic & Protocol Implementations (`@docutrust/core`)
+- **Ethereum EIP-712 Structured Credential Suite (`packages/core/src/eip712`)**:
+  - Implemented `EthereumEip712Signature2026` proof type for W3C Verifiable Credentials with domain separation (`DocuTrust Verified Credential`, version `2.2.0`).
+  - Added secp256k1 key generation, DER/hex ECDSA signing, public key recovery, and Keccak-256 typed data hashing.
+  - Added deterministic resolution in `DIDResolver.resolve` for `did:pkh:eip155:<chainId>:<address>` and `did:ethr:<address>`.
+  - Embedded native EIP-712 signature verification inside `VerifiableCredentialsEngine.verify()`.
+- **Decentralized Social Key Recovery & Timelocked Escrow (`packages/core/src/social-recovery`)**:
+  - Combines K-of-N Shamir Secret Sharing with authenticated Guardian DIDs.
+  - Implemented unforgeable timelocked challenge periods preventing instantaneous theft.
+  - Added Guardian vote accumulation and immediate cryptographic secret reconstruction upon threshold attainment and timelock maturity.
+  - Added owner veto defense (`vetoRecovery`) permanently aborting fraudulent recovery attempts.
+- **Zero-Knowledge Set Non-Membership & Composite Predicates (`packages/core/src/zk-predicates`)**:
+  - Implemented `proveSetNonMembership` and `verifySetNonMembershipProof` allowing subjects to mathematically prove their hidden attribute is excluded from a prohibited/sanctioned set.
+  - Implemented `proveCompositePredicate` and `verifyCompositePredicate` allowing users to combine multiple discrete ZK proofs (Range, Membership, Non-Membership, Age, Date) into a single composite verifiable presentation.
+- **Cross-Chain Sovereign Ledger Anchoring (`packages/core/src/multichain`)**:
+  - Implemented `MultiChainLedgerAnchor` generating byte-level calldata and payloads for EVM (`anchorBatch(bytes32,uint256,string)` function selector `0x892a4b12`), Bitcoin (`OP_RETURN` script `0x6a28...`), and Solana Anchor program instruction data.
+
+---
+
+### 🐍 Python SDK Parity (`docutrust` v2.2.0)
+- Added `docutrust.eip712` (EIP-712 typed data hashing, secp256k1 key generation, signing, and verification).
+- Added `docutrust.social_recovery` (`SocialRecoveryEngine` with guardian voting, timelocks, veto, and secret recovery).
+- Added `docutrust.multichain` (`MultiChainLedgerAnchor` for EVM, Solana, Bitcoin).
+- Added `prove_set_non_membership`, `verify_set_non_membership_proof`, `prove_composite_predicate`, and `verify_composite_predicate` in `docutrust.zk_predicates`.
+- Added high-level helper methods to `DocuTrustClient`.
+- 100% test pass rate across 33 Python unit tests.
+
+---
+
+### 💻 TypeScript SDK & Developer Ecosystem (`@docutrust/sdk` v2.2.0)
+- Added `generateSecp256k1Keys`, `signVcEIP712`, `verifyVcEIP712`, `setupSocialRecovery`, `initiateSocialRecovery`, `castSocialRecoveryVote`, `vetoSocialRecovery`, `finalizeSocialRecovery`, `proveSetNonMembership`, `verifySetNonMembership`, `proveCompositePredicate`, `verifyCompositePredicate`, and `formatMultiChainAnchor`.
+- 100% test pass rate.
+
+---
+
+### 🌐 REST API Endpoints (`@docutrust/api` v2.2.0)
+- Added 13 new REST API endpoints:
+  - `POST /api/v1/crypto/secp256k1/generate`
+  - `POST /api/v1/credentials/eip712/sign`
+  - `POST /api/v1/credentials/eip712/verify`
+  - `POST /api/v1/recovery/social/setup`
+  - `POST /api/v1/recovery/social/initiate`
+  - `POST /api/v1/recovery/social/vote`
+  - `POST /api/v1/recovery/social/veto`
+  - `POST /api/v1/recovery/social/finalize`
+  - `POST /api/v1/zk/prove-non-membership`
+  - `POST /api/v1/zk/verify-non-membership`
+  - `POST /api/v1/zk/prove-composite`
+  - `POST /api/v1/zk/verify-composite`
+  - `POST /api/v1/ledger/multichain/anchor`
+- 100% test pass rate across all 28 test suites (29 tests).
+
+---
+
+### 🛠️ CLI Subcommands (`@docutrust/cli` v2.2.0)
+- Added `keygen-secp256k1`, `eip712-sign`, `eip712-verify`, `social-recovery-setup`, `zk-non-membership`, and `multichain-anchor`.
+- 100% test pass rate across 23 test suites.
+
+---
+
+### 🎨 Web Platform & Documentation (`@docutrust/web` v2.2.0)
+- Updated `ArchitectureDocs.jsx` and `DeveloperHub.jsx` to feature EIP-712, Social Recovery, MultiChain Anchoring, and Composite ZK Predicates.
+- Verified production build.
+
+---
+
 ## [v2.1.1] - GitHub Actions Automation, DID Method Expansion & Cryptographic Ecosystem Hardening - 2026-08-29
 
 ### 🌟 Release Overview (v2.1.1)

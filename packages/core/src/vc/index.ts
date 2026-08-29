@@ -13,6 +13,7 @@ import {
   SelectiveDisclosurePackage
 } from '../selective-disclosure';
 import { AnchorReceipt, LocalLedgerAnchor } from '../ledger';
+import { verifyVcEIP712 } from '../eip712';
 
 export interface CredentialSubject {
   id?: string;
@@ -32,11 +33,15 @@ export interface Proof {
   created: string;
   verificationMethod: string;
   proofPurpose: string;
-  proofValue: string;
+  proofValue?: string;
+  signature?: string;
   merkleProof?: MerkleInclusionProof;
   anchorReceipt?: AnchorReceipt;
   claimsRoot?: string;
   jcsCanonicalHash?: string;
+  domain?: any;
+  primaryType?: string;
+  signerAddress?: string;
 }
 
 export interface VerifiableCredential {
@@ -304,7 +309,13 @@ export class VerifiableCredentialsEngine {
 
     // 3. Resolve Issuer Public Key & Verify Signature
     try {
-      if (credential.proof.type === 'MultiSigThresholdSignature2026') {
+      if (credential.proof.type === 'EthereumEip712Signature2026') {
+        const eipRes = verifyVcEIP712(credential, expectedPublicKeyHex || issuerId);
+        signatureValid = eipRes.valid;
+        if (!signatureValid) {
+          errors.push(eipRes.error || 'Ethereum EIP-712 structured signature verification failed.');
+        }
+      } else if (credential.proof.type === 'MultiSigThresholdSignature2026') {
         const multiProof = credential.proof as any;
         const signatures = multiProof.signatures || [];
         const required = multiProof.threshold?.required || 1;
@@ -349,11 +360,12 @@ export class VerifiableCredentialsEngine {
           });
 
           const computedHash = sha256Hex(canonicalPayload);
-          signatureValid = verifySignature(computedHash, proof.proofValue, pubKey);
+          const val = proof.proofValue || proof.signature || '';
+          signatureValid = verifySignature(computedHash, val, pubKey);
 
           if (!signatureValid) {
             // Also try direct canonical string verification for compatibility
-            signatureValid = verifySignature(canonicalPayload, proof.proofValue, pubKey);
+            signatureValid = verifySignature(canonicalPayload, val, pubKey);
           }
 
           if (!signatureValid) {

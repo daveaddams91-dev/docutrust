@@ -1,6 +1,6 @@
 {
   "name": "@docutrust/web",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "DocuTrust Sovereign Verifiable Credentials Web Platform",
   "scripts": {
     "dev": "vite",
