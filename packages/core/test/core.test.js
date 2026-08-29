@@ -85,7 +85,12 @@ const {
   deriveBBSProof,
   verifyBBSProof,
   // Oracle
-  CryptographicTSAOracle
+  CryptographicTSAOracle,
+  // DIDComm
+  packDIDCommMessage,
+  unpackDIDCommMessage,
+  // MMR
+  MerkleMountainRange
 } = require('../dist/index.js');
 
 // 1. Cryptography Tests
@@ -719,6 +724,59 @@ test('23. Oracle: Issue RFC 3161 timestamp token and verify multi-oracle quorum'
   assert.equal(quorumAudit.valid, true);
   assert.equal(quorumAudit.validSignaturesCount, 3);
 });
+
+// 23. DIDComm v2 Encrypted Messaging & Peer-to-Peer Agent Tunnel
+test('24. DIDComm: Pack authenticated encrypted envelope and unpack by recipient', () => {
+  const aliceKp = generateKeyPair();
+  const bobKp = generateKeyPair();
+
+  const msg = {
+    id: 'msg-uuid-9901',
+    type: 'https://docutrust.org/didcomm/credential-offer/v2',
+    body: {
+      degreeName: 'Master of Science in Cybersecurity',
+      issuer: aliceKp.did,
+      recipient: bobKp.did
+    },
+    from: aliceKp.did,
+    to: [bobKp.did],
+    created_time: Math.floor(Date.now() / 1000)
+  };
+
+  const envelope = packDIDCommMessage(msg, aliceKp, bobKp.publicKeyHex, bobKp.did);
+  assert.ok(envelope.protected.length > 0);
+  assert.ok(envelope.recipients[0].encrypted_key.length > 0);
+  assert.ok(envelope.ciphertext.length > 0);
+
+  // Bob unpacks and decrypts the envelope
+  const unpacked = unpackDIDCommMessage(envelope, bobKp, aliceKp.did);
+  assert.equal(unpacked.valid, true);
+  assert.equal(unpacked.senderDid, aliceKp.did);
+  assert.equal(unpacked.message.body.degreeName, 'Master of Science in Cybersecurity');
+});
+
+// 24. Merkle Mountain Range (MMR) High-Throughput Ledger
+test('25. MMR: Streaming append, binary peak decomposition, and peak proof verification', () => {
+  const mmr = new MerkleMountainRange();
+
+  const item1 = mmr.append('Audit Log Entry #1: Key Rotation');
+  const item2 = mmr.append('Audit Log Entry #2: Credential Issued');
+  const item3 = mmr.append('Audit Log Entry #3: Revocation Bit Updated');
+  const item4 = mmr.append('Audit Log Entry #4: Oracle TSA Signed');
+  const item5 = mmr.append('Audit Log Entry #5: Multi-Sig Threshold Met');
+
+  assert.equal(mmr.size, 5);
+  const peaks = mmr.getPeaks();
+  assert.ok(peaks.length > 0);
+
+  const proof = mmr.getProof(2);
+  assert.equal(proof.elementIndex, 2);
+  assert.equal(proof.size, 5);
+
+  const isProofValid = MerkleMountainRange.verifyProof(proof);
+  assert.equal(isProofValid, true);
+});
+
 
 
 

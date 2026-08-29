@@ -185,4 +185,30 @@ test('CLI Suite', async (t) => {
     const token = JSON.parse(fs.readFileSync(tsaTokenFile, 'utf-8'));
     assert.equal(token.type, 'DocuTrustTimestampToken2026');
   });
+
+  const didcommMsgFile = path.join(tempDir, 'didcomm-msg.json');
+  const didcommEnvFile = path.join(tempDir, 'didcomm-env.json');
+  const didcommDecFile = path.join(tempDir, 'didcomm-dec.json');
+  await t.test('15. docutrust didcomm-pack and didcomm-unpack', () => {
+    const keysData = JSON.parse(fs.readFileSync(keysFile, 'utf-8'));
+    fs.writeFileSync(didcommMsgFile, JSON.stringify({ id: 'msg-01', type: 'https://docutrust.org/didcomm/ping', body: { text: 'Hello Secure Agent' }, to: [keysData.did] }), 'utf-8');
+
+    const outPack = execSync(`node "${cliPath}" didcomm-pack --msg "${didcommMsgFile}" --key "${keysFile}" --recipient-pub "${keysData.publicKeyHex}" --recipient-did "${keysData.did}" --out "${didcommEnvFile}"`).toString();
+    assert.ok(outPack.includes('DIDComm v2 encrypted envelope packed'));
+    assert.ok(fs.existsSync(didcommEnvFile));
+
+    const outUnpack = execSync(`node "${cliPath}" didcomm-unpack --envelope "${didcommEnvFile}" --key "${keysFile}" --out "${didcommDecFile}"`).toString();
+    assert.ok(outUnpack.includes('DIDComm v2 envelope decrypted'));
+    assert.ok(fs.existsSync(didcommDecFile));
+    const decrypted = JSON.parse(fs.readFileSync(didcommDecFile, 'utf-8'));
+    assert.equal(decrypted.valid, true);
+    assert.equal(decrypted.message.body.text, 'Hello Secure Agent');
+  });
+
+  const mmrFile = path.join(tempDir, 'mmr-entry.json');
+  await t.test('16. docutrust mmr-append appends to Merkle Mountain Range', () => {
+    const outMMR = execSync(`node "${cliPath}" mmr-append --leaf "Audit Leaf Stream #1" --out "${mmrFile}"`).toString();
+    assert.ok(outMMR.includes('Merkle Mountain Range element appended'));
+    assert.ok(fs.existsSync(mmrFile));
+  });
 });

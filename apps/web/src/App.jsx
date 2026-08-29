@@ -14,6 +14,7 @@ import ArchitectureDocs from './components/ArchitectureDocs.jsx';
 import FortressArmorStudio from './components/FortressArmorStudio.jsx';
 import TrustRecoveryStudio from './components/TrustRecoveryStudio.jsx';
 import BBSOracleStudio from './components/BBSOracleStudio.jsx';
+import FederationDIDCommStudio from './components/FederationDIDCommStudio.jsx';
 import Footer from './components/Footer.jsx';
 
 export default function App() {
@@ -34,6 +35,7 @@ export default function App() {
         {activeTab === 'armor' && <FortressArmorStudio />}
         {activeTab === 'trustmesh' && <TrustRecoveryStudio />}
         {activeTab === 'bbs' && <BBSOracleStudio />}
+        {activeTab === 'didcomm' && <FederationDIDCommStudio />}
         {activeTab === 'issuer' && <IssuerStudio onInspectCredential={handleInspectCredential} />}
         {activeTab === 'designer' && <CertificateDesigner />}
         {activeTab === 'multisig' && <MultiSigStudio />}

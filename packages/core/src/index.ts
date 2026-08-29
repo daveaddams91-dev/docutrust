@@ -69,3 +69,9 @@ export * from './bbs';
 
 // Export Cryptographic TSA Timestamp Authority & Multi-Oracle Quorum
 export * from './oracle';
+
+// Export DIDComm v2 Encrypted Messaging & Peer-to-Peer Agent Tunnel
+export * from './didcomm';
+
+// Export Merkle Mountain Range (MMR) High-Throughput Ledger
+export * from './mmr';

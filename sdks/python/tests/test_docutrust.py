@@ -15,8 +15,32 @@ from docutrust.kem import generate_kem_keypair
 from docutrust.shamir import split_secret, combine_shares
 from docutrust.bbs import generate_bbs_keypair, sign_bbs, derive_bbs_proof, verify_bbs_proof
 from docutrust.oracle import issue_timestamp_token, verify_timestamp_token
+from docutrust.didcomm import pack_didcomm_message, unpack_didcomm_message
+from docutrust.mmr import MerkleMountainRange
 
 class TestDocuTrustPython(unittest.TestCase):
+    def test_didcomm_messaging(self):
+        msg = {"id": "msg-py-01", "body": {"greeting": "Python Zero-Trust"}}
+        rec_pub = "11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff"
+        rec_did = "did:key:zBob"
+        sender_did = "did:key:zAlice"
+
+        env = pack_didcomm_message(msg, sender_did, rec_pub, rec_did)
+        self.assertTrue("ciphertext" in env)
+
+        unpacked = unpack_didcomm_message(env, rec_pub, sender_did)
+        self.assertTrue(unpacked["valid"])
+        self.assertEqual(unpacked["message"]["body"]["greeting"], "Python Zero-Trust")
+
+    def test_merkle_mountain_range(self):
+        mmr = MerkleMountainRange()
+        mmr.append("Block #1")
+        mmr.append("Block #2")
+        mmr.append("Block #3")
+        self.assertEqual(mmr.size, 3)
+
+        proof = mmr.get_proof(1)
+        self.assertTrue(MerkleMountainRange.verify_proof(proof))
     def test_bbs_signatures_and_zk_proofs(self):
         kp = generate_bbs_keypair(5)
         self.assertTrue(kp["did"].startswith("did:bbs:z"))

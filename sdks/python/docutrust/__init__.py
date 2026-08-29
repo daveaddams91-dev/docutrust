@@ -8,8 +8,10 @@ from .kem import generate_kem_keypair
 from .shamir import split_secret, combine_shares
 from .bbs import generate_bbs_keypair, sign_bbs, derive_bbs_proof, verify_bbs_proof
 from .oracle import issue_timestamp_token, verify_timestamp_token
+from .didcomm import pack_didcomm_message, unpack_didcomm_message
+from .mmr import MerkleMountainRange
 
-__version__ = "1.5.0"
+__version__ = "1.6.0"
 __all__ = [
     "DocuTrustClient",
     "canonicalize_json",
@@ -29,5 +31,8 @@ __all__ = [
     "derive_bbs_proof",
     "verify_bbs_proof",
     "issue_timestamp_token",
-    "verify_timestamp_token"
+    "verify_timestamp_token",
+    "pack_didcomm_message",
+    "unpack_didcomm_message",
+    "MerkleMountainRange"
 ]

@@ -4,10 +4,12 @@
 
 ### The Open-Source Sovereign Trust Stack for Verifiable Credentials, Post-Quantum Cryptography, M-of-N Multi-Signatures & Ledger Anchoring
 
-[![Version](https://img.shields.io/badge/Version-v1.5.0-blue.svg)]()
+[![Version](https://img.shields.io/badge/Version-v1.6.0-blue.svg)]()
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CI Status](https://img.shields.io/badge/CI-100%25%20Passing-brightgreen.svg)]()
 [![Post-Quantum](https://img.shields.io/badge/Quantum_Safe-NIST%20FIPS%20203%20%26%20204%20(ML--KEM%20%7C%20ML--DSA)-purple.svg)]()
+[![DIDComm v2](https://img.shields.io/badge/Messaging-DIDComm%20v2%20(ECDH--1PU)-blue.svg)]()
+[![MMR Ledger](https://img.shields.io/badge/Immutable_Log-Merkle%20Mountain%20Range-success.svg)]()
 [![BBS+ Signatures](https://img.shields.io/badge/BBS%2B-BLS12--381%20Unlinkable%20ZK-fuchsia.svg)]()
 [![TSA Oracle](https://img.shields.io/badge/TSA_Oracle-RFC%203161%20Timestamp-cyan.svg)]()
 [![Key Recovery](https://img.shields.io/badge/Recovery-Shamir%20(K--of--N)%20Threshold-amber.svg)]()
@@ -20,7 +22,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)]()
 
 <p align="center">
-  <b>DocuTrust</b> enables universities, enterprises, and governments to issue tamper-proof academic degrees, employment certificates, and licenses with <b>sub-50ms instant verification</b>, <b>BBS+ unlinkable zero-knowledge proofs</b>, <b>RFC 3161 TSA attestation oracles</b>, <b>Shamir (k-of-n) key recovery</b>, <b>IETF SD-JWT mobile wallet interoperability</b>, and <b>NIST ML-KEM & ML-DSA quantum armor</b>.
+  <b>DocuTrust</b> enables universities, enterprises, and governments to issue tamper-proof academic degrees, employment certificates, and licenses with <b>sub-50ms instant verification</b>, <b>DIDComm v2 encrypted agent messaging</b>, <b>Merkle Mountain Range streaming logs</b>, <b>BBS+ unlinkable zero-knowledge proofs</b>, <b>RFC 3161 TSA attestation oracles</b>, <b>Shamir (k-of-n) key recovery</b>, <b>IETF SD-JWT mobile wallet interoperability</b>, and <b>NIST ML-KEM & ML-DSA quantum armor</b>.
 </p>
 
 [Quickstart Demo](#-10-second-quickstart-demo) • [Architecture](#-architecture) • [Security Hardening](#-defense-in-depth-security-hardening) • [CLI Toolkit](#-cli-toolkit) • [Python SDK](#-python-sdk) • [REST API](#-rest-api-endpoints)

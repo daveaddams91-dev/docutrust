@@ -384,4 +384,54 @@ test('API Server Suite', async (t) => {
     assert.equal(verifyRes.status, 200);
     assert.equal(verifyRes.body.valid, true);
   });
+
+  let didcommEnvelope;
+  await t.test('21. POST /api/v1/didcomm/pack & /unpack', async () => {
+    const packRes = await makeRequest('POST', '/api/v1/didcomm/pack', {
+      message: {
+        id: 'msg-001',
+        type: 'https://docutrust.org/didcomm/ping',
+        body: { greeting: 'Zero-Trust Handshake' },
+        to: [classicalKeys.did]
+      },
+      senderKeyPair: classicalKeys,
+      recipientPublicKeyHex: classicalKeys.publicKeyHex,
+      recipientDid: classicalKeys.did
+    });
+    assert.equal(packRes.status, 200);
+    assert.ok(packRes.body.envelope.ciphertext);
+    didcommEnvelope = packRes.body.envelope;
+
+    const unpackRes = await makeRequest('POST', '/api/v1/didcomm/unpack', {
+      envelope: didcommEnvelope,
+      recipientKeyPair: classicalKeys
+    });
+    assert.equal(unpackRes.status, 200);
+    assert.equal(unpackRes.body.valid, true);
+    assert.equal(unpackRes.body.message.body.greeting, 'Zero-Trust Handshake');
+  });
+
+  await t.test('22. POST & GET /api/v1/ledger/mmr (Append, Peaks, Proof, Verify)', async () => {
+    const appendRes = await makeRequest('POST', '/api/v1/ledger/mmr/append', {
+      leaf: 'Ledger MMR Leaf #1'
+    });
+    assert.equal(appendRes.status, 200);
+    assert.ok(appendRes.body.entry.peakRoot);
+
+    const getRes = await makeRequest('GET', '/api/v1/ledger/mmr');
+    assert.equal(getRes.status, 200);
+    assert.ok(getRes.body.size >= 1);
+
+    const proofRes = await makeRequest('POST', '/api/v1/ledger/mmr/proof', {
+      elementIndex: 0
+    });
+    assert.equal(proofRes.status, 200);
+    assert.ok(proofRes.body.proof);
+
+    const verifyRes = await makeRequest('POST', '/api/v1/ledger/mmr/verify', {
+      proof: proofRes.body.proof
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.valid, true);
+  });
 });

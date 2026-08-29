@@ -786,6 +786,67 @@ async function main() {
     return;
   }
 
+  if (command === 'didcomm-pack') {
+    const msgFile = getArgValue('--msg') || getArgValue('-m');
+    const keyFile = getArgValue('--key') || getArgValue('-k');
+    const recPub = getArgValue('--recipient-pub') || getArgValue('-r');
+    const recDid = getArgValue('--recipient-did') || getArgValue('-d') || 'did:key:zRecipient';
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!msgFile || !keyFile || !recPub) {
+      console.error('\x1b[31mError:\x1b[0m Missing --msg, --key, or --recipient-pub');
+      process.exit(1);
+    }
+    const message = JSON.parse(fs.readFileSync(msgFile, 'utf-8'));
+    const senderKp = JSON.parse(fs.readFileSync(keyFile, 'utf-8'));
+    const envelope = core.packDIDCommMessage(message, senderKp, recPub, recDid);
+    const outStr = JSON.stringify(envelope, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m DIDComm v2 encrypted envelope packed to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    return;
+  }
+
+  if (command === 'didcomm-unpack') {
+    const envFile = getArgValue('--envelope') || getArgValue('-e');
+    const keyFile = getArgValue('--key') || getArgValue('-k');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!envFile || !keyFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --envelope or --key');
+      process.exit(1);
+    }
+    const envelope = JSON.parse(fs.readFileSync(envFile, 'utf-8'));
+    const recipientKp = JSON.parse(fs.readFileSync(keyFile, 'utf-8'));
+    const result = core.unpackDIDCommMessage(envelope, recipientKp);
+    const outStr = JSON.stringify(result, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m DIDComm v2 envelope decrypted to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    return;
+  }
+
+  if (command === 'mmr-append') {
+    const leaf = getArgValue('--leaf') || getArgValue('-l') || 'Immutable MMR Block';
+    const outFile = getArgValue('--out') || getArgValue('-o');
+    const mmr = new core.MerkleMountainRange();
+    const entry = mmr.append(leaf);
+    const outStr = JSON.stringify(entry, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m Merkle Mountain Range element appended to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    return;
+  }
+
   console.log(`Unknown command: ${command}. Run 'docutrust help' for usage.`);
 }
 

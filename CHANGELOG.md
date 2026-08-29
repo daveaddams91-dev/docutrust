@@ -1,5 +1,39 @@
 # 📝 DocuTrust Changelog & Release Notes
 
+## [v1.6.0] - DIDComm v2 Encrypted Messaging, Peer Federation & Merkle Mountain Ranges - 2026-08-29
+
+### 💬 DIDComm v2 Authenticated Encrypted Messaging
+- **`@docutrust/core/didcomm` & `sdks/python/docutrust/didcomm`**:
+  - Implements DIDComm v2 specification (`packDIDCommMessage` / `unpackDIDCommMessage`, `pack_didcomm_message` / `unpack_didcomm_message`).
+  - Enables sovereign agents, issuers, and holders to communicate end-to-end over authenticated ECDH-1PU + AES-256-GCM encrypted tunnels without centralized mediators or relay leaks.
+
+---
+
+### ⛰️ Merkle Mountain Range (MMR) Streaming Immutable Ledger
+- **`@docutrust/core/mmr` & `sdks/python/docutrust/mmr`**:
+  - Industrial append-only Merkle Mountain Range ledger data structure (`MerkleMountainRange`).
+  - Supports continuous streaming inserts in $O(1)$ amortized time with logarithmic $O(\log n)$ peak inclusion proofs and right-to-left peak bagging.
+
+---
+
+### 🌐 REST API v1.6 Extensions (`@docutrust/api`)
+- Added `POST /api/v1/didcomm/pack` & `POST /api/v1/didcomm/unpack`.
+- Added `POST /api/v1/ledger/mmr/append`, `GET /api/v1/ledger/mmr`, `POST /api/v1/ledger/mmr/proof`, and `POST /api/v1/ledger/mmr/verify`.
+
+---
+
+### 💻 CLI v1.6 Commands (`@docutrust/cli`)
+- `docutrust didcomm-pack --msg <file> --key <keyfile> --recipient-pub <hex> --recipient-did <did> --out <file>`
+- `docutrust didcomm-unpack --envelope <file> --key <keyfile> --out <file>`
+- `docutrust mmr-append --leaf <string> --out <file>`
+
+---
+
+### 🎨 Web Studio v1.6 (`@docutrust/web`)
+- Added **DIDComm & MMR Studio** (`FederationDIDCommStudio.jsx`) with live authenticated JWM packaging, recipient decryptor sandbox, and streaming Merkle Mountain Range visual inspector.
+
+---
+
 ## [v1.5.0] - BBS+ Signatures, Zero-Knowledge Unlinkability & TSA Oracle Release - 2026-08-29
 
 ### ✨ BBS+ Pairing-Friendly Multi-Message Signatures & Unlinkable ZK Proofs

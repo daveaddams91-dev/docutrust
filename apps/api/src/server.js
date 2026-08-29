@@ -30,7 +30,10 @@ const {
   signBBS,
   deriveBBSProof,
   verifyBBSProof,
-  CryptographicTSAOracle
+  CryptographicTSAOracle,
+  packDIDCommMessage,
+  unpackDIDCommMessage,
+  MerkleMountainRange
 } = require('@docutrust/core');
 
 const PORT = process.env.PORT || 4000;
@@ -51,6 +54,7 @@ let apiKeysStore = [];
 let anchorsStore = [];
 const hashChainLedger = new TamperEvidentHashChain();
 const trustRegistry = new DecentralizedTrustRegistry();
+const mmrLedger = new MerkleMountainRange();
 
 try {
   if (fs.existsSync(CREDS_FILE)) credentialsStore = JSON.parse(fs.readFileSync(CREDS_FILE, 'utf-8'));
@@ -1119,6 +1123,68 @@ const server = http.createServer(async (req, res) => {
       if (!token) return jsonResponse(400, { error: 'Missing token in request.' });
       const result = CryptographicTSAOracle.verifyTimestampToken(token, expectedData);
       return jsonResponse(200, result);
+    }
+
+    // 29. DIDComm v2 Encrypted Messaging
+    if (pathname === '/api/v1/didcomm/pack' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { message, senderKeyPair, recipientPublicKeyHex, recipientDid } = body;
+      if (!message || !recipientPublicKeyHex || !recipientDid) {
+        return jsonResponse(400, { error: 'Missing message, recipientPublicKeyHex, or recipientDid.' });
+      }
+      const sender = senderKeyPair || systemKeyPair;
+      const envelope = packDIDCommMessage(message, sender, recipientPublicKeyHex, recipientDid);
+      return jsonResponse(200, { success: true, envelope });
+    }
+
+    if (pathname === '/api/v1/didcomm/unpack' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { envelope, recipientKeyPair, expectedSenderDid } = body;
+      if (!envelope || !recipientKeyPair) {
+        return jsonResponse(400, { error: 'Missing envelope or recipientKeyPair.' });
+      }
+      const result = unpackDIDCommMessage(envelope, recipientKeyPair, expectedSenderDid);
+      return jsonResponse(200, result);
+    }
+
+    // 30. Merkle Mountain Range (MMR) High-Throughput Ledger
+    if (pathname === '/api/v1/ledger/mmr/append' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { leaf } = body;
+      if (!leaf) return jsonResponse(400, { error: 'Missing leaf to append.' });
+      const entry = mmrLedger.append(leaf);
+      return jsonResponse(200, { success: true, entry });
+    }
+
+    if (pathname === '/api/v1/ledger/mmr' && req.method === 'GET') {
+      const peaks = mmrLedger.getPeaks();
+      const peakRoot = mmrLedger.getBaggedPeakRoot();
+      return jsonResponse(200, {
+        success: true,
+        size: mmrLedger.size,
+        peaks,
+        baggedPeakRoot: peakRoot
+      });
+    }
+
+    if (pathname === '/api/v1/ledger/mmr/proof' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { elementIndex } = body;
+      if (elementIndex === undefined) return jsonResponse(400, { error: 'Missing elementIndex.' });
+      try {
+        const proof = mmrLedger.getProof(parseInt(elementIndex));
+        return jsonResponse(200, { success: true, proof });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/ledger/mmr/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { proof } = body;
+      if (!proof) return jsonResponse(400, { error: 'Missing proof.' });
+      const valid = MerkleMountainRange.verifyProof(proof);
+      return jsonResponse(200, { valid });
     }
 
     // Default 404
