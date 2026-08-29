@@ -9,6 +9,8 @@ jobs:
   build-and-release:
     name: Build & Create GitHub Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
