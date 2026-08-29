@@ -13,6 +13,7 @@ import DeveloperHub from './components/DeveloperHub.jsx';
 import ArchitectureDocs from './components/ArchitectureDocs.jsx';
 import FortressArmorStudio from './components/FortressArmorStudio.jsx';
 import TrustRecoveryStudio from './components/TrustRecoveryStudio.jsx';
+import BBSOracleStudio from './components/BBSOracleStudio.jsx';
 import Footer from './components/Footer.jsx';
 
 export default function App() {
@@ -32,6 +33,7 @@ export default function App() {
         {activeTab === 'hero' && <HeroSection setActiveTab={setActiveTab} />}
         {activeTab === 'armor' && <FortressArmorStudio />}
         {activeTab === 'trustmesh' && <TrustRecoveryStudio />}
+        {activeTab === 'bbs' && <BBSOracleStudio />}
         {activeTab === 'issuer' && <IssuerStudio onInspectCredential={handleInspectCredential} />}
         {activeTab === 'designer' && <CertificateDesigner />}
         {activeTab === 'multisig' && <MultiSigStudio />}

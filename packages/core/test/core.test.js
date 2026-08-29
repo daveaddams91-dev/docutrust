@@ -78,7 +78,14 @@ const {
   // Trust Registry
   DecentralizedTrustRegistry,
   // Bloom Filter
-  RevocationBloomFilter
+  RevocationBloomFilter,
+  // BBS+
+  generateBBSKeyPair,
+  signBBS,
+  deriveBBSProof,
+  verifyBBSProof,
+  // Oracle
+  CryptographicTSAOracle
 } = require('../dist/index.js');
 
 // 1. Cryptography Tests
@@ -649,5 +656,69 @@ test('21. Bloom Filter: High-speed revocation accumulator with cryptographic sig
   assert.equal(audit2.signatureValid, true);
   assert.equal(audit2.isRevoked, false);
 });
+
+// 21. BBS+ Unlinkable Multi-Message Signatures & ZK Proofs
+test('22. BBS+: Sign message vector, derive unlinkable ZK proof, and verify', () => {
+  const bbsKp = generateBBSKeyPair(5);
+  assert.ok(bbsKp.did.startsWith('did:bbs:z'));
+
+  const messages = [
+    'Alice Smith',
+    'Stanford University',
+    'Ph.D. Computer Science',
+    'GPA: 3.98',
+    'Clearance: TOP_SECRET'
+  ];
+
+  const sig = signBBS(messages, bbsKp);
+  assert.equal(sig.type, 'BBSPlusSignature2026');
+  assert.equal(sig.messageCount, 5);
+
+  // Holder derives unlinkable proof for messages [1, 2] (Stanford, Ph.D.) hiding name, GPA, and Clearance
+  const proof = deriveBBSProof(sig, messages, [1, 2], bbsKp, 'verifier-session-nonce-99');
+  assert.equal(proof.type, 'BBSPlusZKProof2026');
+  assert.deepEqual(proof.disclosedIndices, [1, 2]);
+
+  const audit = verifyBBSProof(proof, bbsKp.did);
+  assert.equal(audit.valid, true);
+  assert.equal(audit.disclosedMessages[1], 'Stanford University');
+  assert.equal(audit.disclosedMessages[2], 'Ph.D. Computer Science');
+  assert.equal(audit.disclosedMessages[0], undefined);
+  assert.equal(audit.disclosedMessages[3], undefined);
+});
+
+// 22. Cryptographic TSA Timestamp Authority & Multi-Oracle Quorum
+test('23. Oracle: Issue RFC 3161 timestamp token and verify multi-oracle quorum', () => {
+  const tsaKp = generateKeyPair();
+  const oracle = new CryptographicTSAOracle(tsaKp);
+
+  const documentData = 'Critical Quantum Verification Ledger Record 2026';
+  const token = oracle.issueTimestampToken(documentData, 'client-nonce-001');
+
+  assert.equal(token.type, 'DocuTrustTimestampToken2026');
+  assert.equal(token.version, '1.5.0');
+  assert.ok(token.unixTimeSeconds > 0);
+
+  const audit = CryptographicTSAOracle.verifyTimestampToken(token, documentData);
+  assert.equal(audit.valid, true);
+  assert.ok(audit.ageSeconds >= 0);
+
+  // Multi-Oracle Quorum Test
+  const oracle1 = generateKeyPair();
+  const oracle2 = generateKeyPair();
+  const oracle3 = generateKeyPair();
+
+  const quorum = CryptographicTSAOracle.createQuorumAttestation(
+    token.targetDataHash,
+    [oracle1, oracle2, oracle3],
+    2
+  );
+  assert.equal(quorum.requiredQuorum, 2);
+
+  const quorumAudit = CryptographicTSAOracle.verifyQuorumAttestation(quorum);
+  assert.equal(quorumAudit.valid, true);
+  assert.equal(quorumAudit.validSignaturesCount, 3);
+});
+
 
 

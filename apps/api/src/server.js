@@ -25,7 +25,12 @@ const {
   createSDJWTPresentation,
   verifySDJWTPresentation,
   DecentralizedTrustRegistry,
-  RevocationBloomFilter
+  RevocationBloomFilter,
+  generateBBSKeyPair,
+  signBBS,
+  deriveBBSProof,
+  verifyBBSProof,
+  CryptographicTSAOracle
 } = require('@docutrust/core');
 
 const PORT = process.env.PORT || 4000;
@@ -384,6 +389,7 @@ startxref
 // In-Memory Revocation Status Registry
 const revokedIndices = new Set();
 const systemKeyPair = generateKeyPair();
+const tsaOracle = new CryptographicTSAOracle(systemKeyPair);
 
 // HTTP Server
 const server = http.createServer(async (req, res) => {
@@ -1059,6 +1065,59 @@ const server = http.createServer(async (req, res) => {
       const { signedFilter, credentialId } = body;
       if (!signedFilter || !credentialId) return jsonResponse(400, { error: 'Missing signedFilter or credentialId.' });
       const result = RevocationBloomFilter.verifyAndCheck(signedFilter, credentialId);
+      return jsonResponse(200, result);
+    }
+
+    // 27. BBS+ Keygen & Sign & Proof & Verify
+    if (pathname === '/api/v1/credentials/bbs/generate-keys' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const maxMessages = body.maxMessages || 10;
+      const keyPair = generateBBSKeyPair(maxMessages);
+      return jsonResponse(200, { success: true, keyPair });
+    }
+
+    if (pathname === '/api/v1/credentials/bbs/issue' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { messages, keyPair } = body;
+      if (!messages || !Array.isArray(messages)) return jsonResponse(400, { error: 'Missing messages array.' });
+      const kp = keyPair || generateBBSKeyPair(messages.length);
+      const signature = signBBS(messages, kp);
+      return jsonResponse(200, { success: true, signature, issuerDid: kp.did });
+    }
+
+    if (pathname === '/api/v1/credentials/bbs/derive-proof' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { signature, allMessages, disclosedIndices, keyPair, nonce } = body;
+      if (!signature || !allMessages || !disclosedIndices) {
+        return jsonResponse(400, { error: 'Missing signature, allMessages, or disclosedIndices.' });
+      }
+      const kp = keyPair || { did: signature.issuerDid, publicKeyHex: '', secretKeyHex: '', messageGenerators: [] };
+      const proof = deriveBBSProof(signature, allMessages, disclosedIndices, kp, nonce);
+      return jsonResponse(200, { success: true, proof });
+    }
+
+    if (pathname === '/api/v1/credentials/bbs/verify-proof' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { proof, expectedIssuerDid } = body;
+      if (!proof) return jsonResponse(400, { error: 'Missing proof in request.' });
+      const result = verifyBBSProof(proof, expectedIssuerDid);
+      return jsonResponse(200, result);
+    }
+
+    // 28. Cryptographic TSA Timestamp Authority
+    if (pathname === '/api/v1/oracle/timestamp' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { data, nonce } = body;
+      if (!data) return jsonResponse(400, { error: 'Missing data in request.' });
+      const token = tsaOracle.issueTimestampToken(data, nonce);
+      return jsonResponse(200, { success: true, token });
+    }
+
+    if (pathname === '/api/v1/oracle/verify-timestamp' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { token, expectedData } = body;
+      if (!token) return jsonResponse(400, { error: 'Missing token in request.' });
+      const result = CryptographicTSAOracle.verifyTimestampToken(token, expectedData);
       return jsonResponse(200, result);
     }
 

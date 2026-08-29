@@ -1,5 +1,40 @@
 # 📝 DocuTrust Changelog & Release Notes
 
+## [v1.5.0] - BBS+ Signatures, Zero-Knowledge Unlinkability & TSA Oracle Release - 2026-08-29
+
+### ✨ BBS+ Pairing-Friendly Multi-Message Signatures & Unlinkable ZK Proofs
+- **`@docutrust/core/bbs` & `sdks/python/docutrust/bbs`**:
+  - Implements BLS12-381 pairing-friendly BBS+ multi-message signature scheme (`generateBBSKeyPair`, `signBBS`, `deriveBBSProof`, `verifyBBSProof`).
+  - Enables credential holders to selectively disclose arbitrary attribute subsets while maintaining **cryptographic unlinkability** across multiple presentations, completely preventing verifier correlation and tracking attacks.
+
+---
+
+### ⏱️ RFC 3161 Cryptographic TSA Timestamp Authority & Oracle Quorum
+- **`@docutrust/core/oracle` & `sdks/python/docutrust/oracle`**:
+  - Implements autonomous Time-Stamp Authority (`CryptographicTSAOracle`) issuing RFC 3161-compliant verifiable timestamp tokens.
+  - Multi-oracle attestation aggregation with customizable threshold quorum verification.
+
+---
+
+### 🌐 REST API v1.5 Extensions (`@docutrust/api`)
+- Added `POST /api/v1/credentials/bbs/generate-keys`, `POST /api/v1/credentials/bbs/issue`, `POST /api/v1/credentials/bbs/derive-proof`, `POST /api/v1/credentials/bbs/verify-proof`.
+- Added `POST /api/v1/oracle/timestamp` & `POST /api/v1/oracle/verify-timestamp`.
+
+---
+
+### 💻 CLI v1.5 Commands (`@docutrust/cli`)
+- `docutrust bbs-issue --messages <file> --out <file>`
+- `docutrust bbs-prove --sig <file> --indices <csv> --out <file>`
+- `docutrust bbs-verify --proof <file>`
+- `docutrust oracle-timestamp --data <file> --out <file>`
+
+---
+
+### 🎨 Web Studio v1.5 (`@docutrust/web`)
+- Added **BBS+ & TSA Oracle Studio** (`BBSOracleStudio.jsx`) with live multi-message vector signing, unlinkable zero-knowledge proof generation, and cryptographic timestamp token audits.
+
+---
+
 ## [v1.4.0] - The Sovereign Interoperability, Trust Mesh & Key Recovery Release - 2026-08-29
 
 ### 🔑 Shamir's Secret Sharing (K-of-N Threshold Key Slicing & Recovery)

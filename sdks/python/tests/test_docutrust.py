@@ -13,8 +13,30 @@ from docutrust.encryption import encrypt_aes_gcm, decrypt_aes_gcm
 from docutrust.zk_predicates import prove_range, verify_range_proof, create_commitment
 from docutrust.kem import generate_kem_keypair
 from docutrust.shamir import split_secret, combine_shares
+from docutrust.bbs import generate_bbs_keypair, sign_bbs, derive_bbs_proof, verify_bbs_proof
+from docutrust.oracle import issue_timestamp_token, verify_timestamp_token
 
 class TestDocuTrustPython(unittest.TestCase):
+    def test_bbs_signatures_and_zk_proofs(self):
+        kp = generate_bbs_keypair(5)
+        self.assertTrue(kp["did"].startswith("did:bbs:z"))
+        messages = ["Alice", "MIT", "Ph.D."]
+        sig = sign_bbs(messages, kp)
+        self.assertEqual(sig["messageCount"], 3)
+
+        proof = derive_bbs_proof(sig, messages, [1, 2], kp)
+        audit = verify_bbs_proof(proof, kp["did"])
+        self.assertTrue(audit["valid"])
+        self.assertEqual(audit["disclosedMessages"][1], "MIT")
+
+    def test_tsa_oracle_token(self):
+        data = "Blockchain Record 2026"
+        token = issue_timestamp_token(data)
+        self.assertEqual(token["type"], "DocuTrustTimestampToken2026")
+        audit = verify_timestamp_token(token, data)
+        self.assertTrue(audit["valid"])
+        self.assertGreaterEqual(audit["ageSeconds"], 0)
+
     def test_shamir_secret_sharing(self):
         secret = "MasterSecretKeyForPythonSDK2026!"
         shares = split_secret(secret, 5, 3)

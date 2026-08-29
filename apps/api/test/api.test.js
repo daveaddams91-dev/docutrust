@@ -331,4 +331,57 @@ test('API Server Suite', async (t) => {
     assert.equal(checkActive.status, 200);
     assert.equal(checkActive.body.isRevoked, false);
   });
+
+  let bbsKeyPair, bbsSignature, bbsProof;
+  await t.test('19. POST /api/v1/credentials/bbs (Keygen, Issue, Derive Proof, Verify Proof)', async () => {
+    const keyRes = await makeRequest('POST', '/api/v1/credentials/bbs/generate-keys', { maxMessages: 5 });
+    assert.equal(keyRes.status, 200);
+    assert.ok(keyRes.body.keyPair.did.startsWith('did:bbs:z'));
+    bbsKeyPair = keyRes.body.keyPair;
+
+    const messages = ['Elena', 'Stanford', 'Ph.D.', '3.98'];
+    const issueRes = await makeRequest('POST', '/api/v1/credentials/bbs/issue', {
+      messages,
+      keyPair: bbsKeyPair
+    });
+    assert.equal(issueRes.status, 200);
+    assert.equal(issueRes.body.signature.messageCount, 4);
+    bbsSignature = issueRes.body.signature;
+
+    const proofRes = await makeRequest('POST', '/api/v1/credentials/bbs/derive-proof', {
+      signature: bbsSignature,
+      allMessages: messages,
+      disclosedIndices: [1, 2],
+      keyPair: bbsKeyPair,
+      nonce: 'nonce-123'
+    });
+    assert.equal(proofRes.status, 200);
+    assert.deepEqual(proofRes.body.proof.disclosedIndices, [1, 2]);
+    bbsProof = proofRes.body.proof;
+
+    const verifyRes = await makeRequest('POST', '/api/v1/credentials/bbs/verify-proof', {
+      proof: bbsProof,
+      expectedIssuerDid: bbsKeyPair.did
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.valid, true);
+    assert.equal(verifyRes.body.disclosedMessages[1], 'Stanford');
+  });
+
+  await t.test('20. POST /api/v1/oracle/timestamp & /verify-timestamp', async () => {
+    const timeRes = await makeRequest('POST', '/api/v1/oracle/timestamp', {
+      data: 'Audit Record For Ledger 2026',
+      nonce: 'ts-nonce-001'
+    });
+    assert.equal(timeRes.status, 200);
+    assert.equal(timeRes.body.token.type, 'DocuTrustTimestampToken2026');
+    const token = timeRes.body.token;
+
+    const verifyRes = await makeRequest('POST', '/api/v1/oracle/verify-timestamp', {
+      token,
+      expectedData: 'Audit Record For Ledger 2026'
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.valid, true);
+  });
 });

@@ -154,4 +154,35 @@ test('CLI Suite', async (t) => {
     assert.ok(outVerify.includes('VALID'));
     assert.ok(outVerify.includes('Elena Rostova'));
   });
+
+  const bbsSigFile = path.join(tempDir, 'bbs-sig.json');
+  const bbsProofFile = path.join(tempDir, 'bbs-proof.json');
+  await t.test('13. docutrust bbs-issue, bbs-prove, and bbs-verify', () => {
+    const messagesFile = path.join(tempDir, 'bbs-messages.json');
+    fs.writeFileSync(messagesFile, JSON.stringify(['Elena Rostova', 'MIT', 'Ph.D. Quantum Computing']), 'utf-8');
+
+    const outIssue = execSync(`node "${cliPath}" bbs-issue --messages "${messagesFile}" --out "${bbsSigFile}"`).toString();
+    assert.ok(outIssue.includes('BBS+ multi-message signature issued'));
+    assert.ok(fs.existsSync(bbsSigFile));
+
+    const outProve = execSync(`node "${cliPath}" bbs-prove --sig "${bbsSigFile}" --indices 1,2 --out "${bbsProofFile}"`).toString();
+    assert.ok(outProve.includes('BBS+ unlinkable ZK proof derived'));
+    assert.ok(fs.existsSync(bbsProofFile));
+
+    const outVerify = execSync(`node "${cliPath}" bbs-verify --proof "${bbsProofFile}"`).toString();
+    assert.ok(outVerify.includes('CRYPTOGRAPHICALLY VALID'));
+    assert.ok(outVerify.includes('MIT'));
+  });
+
+  const tsaTokenFile = path.join(tempDir, 'tsa-token.json');
+  await t.test('14. docutrust oracle-timestamp generates timestamp token', () => {
+    const dataFile = path.join(tempDir, 'audit-target.txt');
+    fs.writeFileSync(dataFile, 'Critical Immutable Blockchain Transaction 2026', 'utf-8');
+
+    const outTSA = execSync(`node "${cliPath}" oracle-timestamp --data "${dataFile}" --out "${tsaTokenFile}"`).toString();
+    assert.ok(outTSA.includes('TSA Timestamp Token issued'));
+    assert.ok(fs.existsSync(tsaTokenFile));
+    const token = JSON.parse(fs.readFileSync(tsaTokenFile, 'utf-8'));
+    assert.equal(token.type, 'DocuTrustTimestampToken2026');
+  });
 });

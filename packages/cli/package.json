@@ -1,6 +1,6 @@
 {
   "name": "@docutrust/cli",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "DocuTrust CLI for Sovereign Verifiable Credentials and Ledger Anchoring",
   "bin": {
     "docutrust": "./bin/docutrust.js"

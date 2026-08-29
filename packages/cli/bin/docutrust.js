@@ -708,6 +708,84 @@ async function main() {
     return;
   }
 
+  if (command === 'bbs-issue') {
+    const messagesFile = getArgValue('--messages') || getArgValue('-m');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+    if (!messagesFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --messages <file>');
+      process.exit(1);
+    }
+    const messages = JSON.parse(fs.readFileSync(messagesFile, 'utf-8'));
+    const kp = core.generateBBSKeyPair(messages.length);
+    const sig = core.signBBS(messages, kp);
+    const outStr = JSON.stringify({ keyPair: kp, signature: sig, messages }, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m BBS+ multi-message signature issued to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    return;
+  }
+
+  if (command === 'bbs-prove') {
+    const sigFile = getArgValue('--sig') || getArgValue('-s');
+    const indicesStr = getArgValue('--indices') || getArgValue('-i') || '0';
+    const outFile = getArgValue('--out') || getArgValue('-o');
+    if (!sigFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --sig <file>');
+      process.exit(1);
+    }
+    const data = JSON.parse(fs.readFileSync(sigFile, 'utf-8'));
+    const indices = indicesStr.split(',').map(n => parseInt(n.trim()));
+    const proof = core.deriveBBSProof(data.signature, data.messages, indices, data.keyPair);
+    const outStr = JSON.stringify(proof, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m BBS+ unlinkable ZK proof derived to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    return;
+  }
+
+  if (command === 'bbs-verify') {
+    const proofFile = getArgValue('--proof') || getArgValue('-p');
+    if (!proofFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --proof <file>');
+      process.exit(1);
+    }
+    const proof = JSON.parse(fs.readFileSync(proofFile, 'utf-8'));
+    const result = core.verifyBBSProof(proof);
+    console.log(`\n\x1b[1m--- BBS+ ZERO-KNOWLEDGE PROOF REPORT ---\x1b[0m`);
+    console.log(`Issuer DID:        ${proof.issuerDid}`);
+    console.log(`Proof Status:      ${result.valid ? '\x1b[32m✔ CRYPTOGRAPHICALLY VALID\x1b[0m' : '\x1b[31m✖ INVALID\x1b[0m'}`);
+    console.log(`Disclosed Values:  ${JSON.stringify(result.disclosedMessages)}`);
+    console.log(`----------------------------------------\n`);
+    return;
+  }
+
+  if (command === 'oracle-timestamp') {
+    const dataFile = getArgValue('--data') || getArgValue('-d');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+    if (!dataFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --data <file>');
+      process.exit(1);
+    }
+    const content = fs.readFileSync(dataFile, 'utf-8');
+    const tsaKp = core.generateKeyPair();
+    const oracle = new core.CryptographicTSAOracle(tsaKp);
+    const token = oracle.issueTimestampToken(content);
+    const outStr = JSON.stringify(token, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m TSA Timestamp Token issued and saved to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    return;
+  }
+
   console.log(`Unknown command: ${command}. Run 'docutrust help' for usage.`);
 }
 

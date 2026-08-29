@@ -63,3 +63,9 @@ export * from './trust-registry';
 
 // Export Space-Efficient Revocation Bloom Filter
 export * from './bloom';
+
+// Export BBS+ Unlinkable Multi-Message Signatures & ZK Proofs
+export * from './bbs';
+
+// Export Cryptographic TSA Timestamp Authority & Multi-Oracle Quorum
+export * from './oracle';
