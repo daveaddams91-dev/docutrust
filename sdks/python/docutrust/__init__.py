@@ -32,8 +32,15 @@ from .eip712 import (
 )
 from .social_recovery import SocialRecoveryEngine
 from .multichain import MultiChainLedgerAnchor
+from .schema import SchemaValidator
+from .accumulator import CryptographicAccumulator
+from .jwe import MultiRecipientJWE
+from .zk_predicates import (
+    prove_set_intersection,
+    verify_set_intersection_proof
+)
 
-__version__ = "2.2.0"
+__version__ = "2.3.0"
 __all__ = [
     "DocuTrustClient",
     "canonicalize_json",
@@ -53,6 +60,8 @@ __all__ = [
     "verify_set_membership_proof",
     "prove_set_non_membership",
     "verify_set_non_membership_proof",
+    "prove_set_intersection",
+    "verify_set_intersection_proof",
     "prove_composite_predicate",
     "verify_composite_predicate",
     "generate_kem_keypair",
@@ -72,5 +81,9 @@ __all__ = [
     "verify_vc_eip712",
     "derive_ethereum_address",
     "SocialRecoveryEngine",
-    "MultiChainLedgerAnchor"
+    "MultiChainLedgerAnchor",
+    "SchemaValidator",
+    "CryptographicAccumulator",
+    "MultiRecipientJWE"
 ]
+

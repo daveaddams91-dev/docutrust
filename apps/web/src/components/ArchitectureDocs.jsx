@@ -119,6 +119,46 @@ export default function ArchitectureDocs() {
           Standardized byte-level calldata formatting for EVM (Ethereum, Arbitrum, Base, Polygon), Solana Anchor program instructions, and Bitcoin OP_RETURN scripts ensuring tamper-proof Merkle root provenance across any public ledger.
         </p>
       </div>
+
+      {/* 8. W3C Credential Schema Engine */}
+      <div className="glass-card p-6 sm:p-8 rounded-2xl border border-gray-800 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-teal-500/10 text-teal-400 flex items-center justify-center">
+            <ShieldCheck className="w-4 h-4" />
+          </div>
+          <h3 className="text-lg font-bold text-white">8. W3C Credential Schema Engine (RFC 8785 Hash)</h3>
+        </div>
+        <p className="text-sm text-gray-300 leading-relaxed">
+          Embeds strict JSON Schema validation conforming to the W3C VC 2.0 Credential Schema specification. Evaluates regex patterns, bounds, format validators (email, URI, DID, ISO-8601), required properties, and sealed extra attributes with deterministic SHA-256 canonical schema hashes.
+        </p>
+      </div>
+
+      {/* 9. Dynamic Cryptographic Accumulators */}
+      <div className="glass-card p-6 sm:p-8 rounded-2xl border border-gray-800 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center">
+            <Lock className="w-4 h-4" />
+          </div>
+          <h3 className="text-lg font-bold text-white">9. Dynamic Cryptographic Accumulators</h3>
+        </div>
+        <p className="text-sm text-gray-300 leading-relaxed">
+          Provides $O(1)$ constant-size membership and non-revocation witnesses based on RSA composite modular exponentiation and provable prime mapping. Allows millions of credentials to be accumulated with constant-time verification without leaking total credential volume.
+        </p>
+      </div>
+
+      {/* 10. Multi-Recipient JWE & ZK Set Intersection */}
+      <div className="glass-card p-6 sm:p-8 rounded-2xl border border-gray-800 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center">
+            <EyeOff className="w-4 h-4" />
+          </div>
+          <h3 className="text-lg font-bold text-white">10. Multi-Recipient General JWE & ZK Set Intersection</h3>
+        </div>
+        <p className="text-sm text-gray-300 leading-relaxed">
+          Implements General JWE with X25519 ECDH-ES key agreement, HKDF-SHA256 key wrapping, and AES-256-GCM authenticated payload encryption for multi-party federations, coupled with Zero-Knowledge Set Intersection proofs for private credential authorization.
+        </p>
+      </div>
     </div>
   );
 }
+

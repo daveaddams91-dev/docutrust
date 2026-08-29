@@ -423,7 +423,104 @@ class TestDocuTrustPython(unittest.TestCase):
         sol = MultiChainLedgerAnchor.format_anchor("solana", root, 500)
         self.assertTrue(sol["instructionDataHex"].startswith("0x"))
 
+    def test_schema_validator(self):
+        from docutrust.schema import SchemaValidator
+        schema = {
+            "$id": "https://schema.docutrust.org/student.json",
+            "type": "object",
+            "required": ["studentId", "gpa"],
+            "properties": {
+                "studentId": {"type": "string", "pattern": r"^STU-\d{4}$"},
+                "gpa": {"type": "number", "minimum": 0.0, "maximum": 4.0}
+            },
+            "additionalProperties": False
+        }
+        schema_hash = SchemaValidator.compute_schema_hash(schema)
+        self.assertEqual(len(schema_hash), 64)
+
+        valid_subject = {"studentId": "STU-9901", "gpa": 3.95}
+        res_valid = SchemaValidator.validate(valid_subject, schema)
+        self.assertTrue(res_valid["valid"])
+
+        invalid_subject = {"studentId": "BAD_ID", "gpa": 4.5, "extra": True}
+        res_invalid = SchemaValidator.validate(invalid_subject, schema)
+        self.assertFalse(res_invalid["valid"])
+        self.assertGreaterEqual(len(res_invalid["errors"]), 3)
+
+        vc = {
+            "id": "urn:uuid:vc-test",
+            "type": ["VerifiableCredential"],
+            "credentialSubject": valid_subject
+        }
+        self.assertTrue(SchemaValidator.validate_credential_subject(vc, schema)["valid"])
+
+    def test_cryptographic_accumulator(self):
+        from docutrust.accumulator import CryptographicAccumulator
+        acc = CryptographicAccumulator("acc-py-01")
+        m1 = "did:key:z6Mku1111111111111111111111111111111111111111111"
+        m2 = "did:key:z6Mku2222222222222222222222222222222222222222222"
+        m3 = "did:key:z6Mku3333333333333333333333333333333333333333333"
+
+        acc.add(m1)
+        acc.add_batch([m2, m3])
+        state = acc.export_state()
+        self.assertEqual(state["member_count"], 3)
+
+        w2 = acc.create_witness(m2)
+        self.assertTrue(CryptographicAccumulator.verify_witness(w2, state["accumulator"]))
+
+        acc.delete(m2)
+        state_after = acc.export_state()
+        self.assertEqual(state_after["member_count"], 2)
+        self.assertFalse(CryptographicAccumulator.verify_witness(w2, state_after["accumulator"]))
+
+        w1 = acc.create_witness(m1)
+        self.assertTrue(CryptographicAccumulator.verify_witness(w1, state_after["accumulator"]))
+
+    def test_multi_recipient_jwe(self):
+        from docutrust.jwe import MultiRecipientJWE
+        r1 = MultiRecipientJWE.generate_recipient_keypair()
+        r2 = MultiRecipientJWE.generate_recipient_keypair()
+        outsider = MultiRecipientJWE.generate_recipient_keypair()
+
+        payload = {"confidentialAudit": "TOP-SECRET-RECORD-2026", "score": 99}
+        recipients = [
+            {"did": r1["did"], "publicKey": r1["publicKeyHex"]},
+            {"did": r2["did"], "publicKey": r2["publicKeyHex"]}
+        ]
+
+        jwe = MultiRecipientJWE.encrypt(payload, recipients)
+        self.assertIn("ciphertext", jwe)
+        self.assertEqual(len(jwe["recipients"]), 2)
+
+        dec1 = MultiRecipientJWE.decrypt(jwe, r1["did"], r1["privateKeyHex"])
+        self.assertEqual(dec1["parsed_json"], payload)
+
+        dec2 = MultiRecipientJWE.decrypt(jwe, r2["did"], r2["privateKeyHex"])
+        self.assertEqual(dec2["parsed_json"], payload)
+
+        with self.assertRaises(ValueError):
+            MultiRecipientJWE.decrypt(jwe, outsider["did"], outsider["privateKeyHex"])
+
+    def test_zk_set_intersection_and_composite(self):
+        from docutrust.zk_predicates import prove_set_intersection, verify_set_intersection_proof, prove_composite_predicate, verify_composite_predicate
+        secret_badge = "SECURITY-CLEARANCE-LEVEL-4"
+        salt = os.urandom(16).hex()
+        recognized = ["SECURITY-CLEARANCE-LEVEL-3", "SECURITY-CLEARANCE-LEVEL-4", "SECURITY-CLEARANCE-LEVEL-5"]
+
+        proof = prove_set_intersection("clearance", secret_badge, salt, recognized)
+        self.assertEqual(proof["type"], "ZKSetIntersectionProof2026")
+
+        audit = verify_set_intersection_proof(proof, recognized)
+        self.assertTrue(audit["valid"])
+
+        # Composite verification
+        comp = prove_composite_predicate([proof])
+        comp_audit = verify_composite_predicate(comp, {"allowedSets": {"clearance": recognized}})
+        self.assertTrue(comp_audit["valid"])
+
 if __name__ == '__main__':
     unittest.main()
+
 
 

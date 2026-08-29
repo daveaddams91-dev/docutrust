@@ -2,15 +2,18 @@
 
 # 🛡️ DocuTrust
 
-### The Open-Source Sovereign Trust Stack for Verifiable Credentials, Post-Quantum Cryptography, EIP-712 Ethereum Signatures, Social Recovery & Cross-Chain Ledger Anchoring
+### The Open-Source Sovereign Trust Stack for Verifiable Credentials, JSON Schema Validation, Cryptographic Accumulators, Multi-Recipient JWE, Post-Quantum Cryptography & Cross-Chain Ledger Anchoring
 
-[![Version](https://img.shields.io/badge/Version-v2.2.0-blue.svg)]()
+[![Version](https://img.shields.io/badge/Version-v2.3.0-blue.svg)]()
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CI Status](https://img.shields.io/badge/CI-100%25%20Passing-brightgreen.svg)]()
+[![JSON Schema](https://img.shields.io/badge/Schema-W3C%20VC%202.0%20(RFC%208785%20Hash)-teal.svg)]()
+[![Accumulator](https://img.shields.io/badge/Accumulator-RSA%20O(1)%20Witness-rose.svg)]()
+[![JWE](https://img.shields.io/badge/Encryption-Multi--Recipient%20General%20JWE-amber.svg)]()
 [![EIP-712](https://img.shields.io/badge/Ethereum-EIP--712%20Typed%20Data-blue.svg)]()
 [![Multi-Chain](https://img.shields.io/badge/Ledger%20Anchor-EVM%20%7C%20Solana%20%7C%20Bitcoin-violet.svg)]()
 [![Social Recovery](https://img.shields.io/badge/Recovery-Guardian%20Escrow%20%2B%20Timelock-emerald.svg)]()
-[![ZK Predicates](https://img.shields.io/badge/Zero--Knowledge-Composite%20%26%20Non--Membership-fuchsia.svg)]()
+[![ZK Predicates](https://img.shields.io/badge/Zero--Knowledge-Composite%20%26%20Intersection-fuchsia.svg)]()
 [![Post-Quantum](https://img.shields.io/badge/Quantum_Safe-NIST%20FIPS%20203%20%26%20204%20(ML--KEM%20%7C%20ML--DSA)-purple.svg)]()
 [![DIDComm v2](https://img.shields.io/badge/Messaging-DIDComm%20v2%20(ECDH--1PU)-blue.svg)]()
 [![MMR Ledger](https://img.shields.io/badge/Immutable_Log-Merkle%20Mountain%20Range-success.svg)]()
@@ -23,7 +26,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)]()
 
 <p align="center">
-  <b>DocuTrust</b> enables universities, enterprises, and governments to issue tamper-proof academic degrees, employment certificates, and licenses with <b>sub-50ms instant verification</b>, <b>EIP-712 Ethereum typed credential signing</b>, <b>cross-chain ledger anchoring (EVM, Solana, Bitcoin)</b>, <b>decentralized guardian social recovery & timelocked escrow</b>, <b>composite zero-knowledge non-membership proofs</b>, <b>DIDComm v2 encrypted agent messaging</b>, <b>Merkle Mountain Range streaming logs</b>, <b>BBS+ unlinkable zero-knowledge proofs</b>, <b>RFC 3161 TSA attestation oracles</b>, <b>IETF SD-JWT mobile wallet interoperability</b>, and <b>NIST ML-KEM & ML-DSA quantum armor</b>.
+  <b>DocuTrust</b> enables universities, enterprises, and governments to issue tamper-proof academic degrees, employment certificates, and licenses with <b>sub-50ms instant verification</b>, <b>W3C VC 2.0 JSON Schema validation & RFC 8785 hashing</b>, <b>dynamic RSA cryptographic accumulators ($O(1)$ constant-size witnesses)</b>, <b>multi-recipient General JWE encryption</b>, <b>EIP-712 Ethereum typed credential signing</b>, <b>cross-chain ledger anchoring (EVM, Solana, Bitcoin)</b>, <b>decentralized guardian social recovery & timelocked escrow</b>, <b>composite zero-knowledge intersection proofs</b>, <b>DIDComm v2 encrypted agent messaging</b>, <b>Merkle Mountain Range streaming logs</b>, <b>BBS+ unlinkable zero-knowledge proofs</b>, <b>RFC 3161 TSA attestation oracles</b>, <b>IETF SD-JWT mobile wallet interoperability</b>, and <b>NIST ML-KEM & ML-DSA quantum armor</b>.
 </p>
 
 [Quickstart Demo](#-10-second-quickstart-demo) • [Architecture](#-architecture) • [Security Hardening](#-defense-in-depth-security-hardening) • [CLI Toolkit](#-cli-toolkit) • [Python SDK](#-python-sdk) • [REST API](#-rest-api-endpoints)

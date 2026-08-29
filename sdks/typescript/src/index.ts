@@ -705,4 +705,84 @@ export class DocuTrustClient {
       memo
     });
   }
+
+  /**
+   * Validates arbitrary data against a JSON schema.
+   */
+  public async validateSchema(data: any, schema: Record<string, any>, path?: string): Promise<any> {
+    return this.request('/schema/validate', 'POST', { data, schema, path });
+  }
+
+  /**
+   * Validates a VC's credentialSubject against a JSON schema.
+   */
+  public async validateCredentialSubjectSchema(
+    credential: Record<string, any>,
+    schema: Record<string, any>
+  ): Promise<any> {
+    return this.request('/schema/validate-credential', 'POST', { credential, schema });
+  }
+
+  /**
+   * Encrypts payload in General JWE format for multiple recipients.
+   */
+  public async encryptJWE(
+    payload: any,
+    recipients: Array<{ did: string; publicKey: string }>,
+    customProtectedHeader?: Record<string, any>
+  ): Promise<any> {
+    return this.request('/jwe/encrypt', 'POST', {
+      payload,
+      recipients,
+      customProtectedHeader
+    });
+  }
+
+  /**
+   * Decrypts General JWE for recipient DID.
+   */
+  public async decryptJWE(
+    jwe: Record<string, any>,
+    recipientDid: string,
+    recipientPrivateKey: string
+  ): Promise<any> {
+    return this.request('/jwe/decrypt', 'POST', {
+      jwe,
+      recipientDid,
+      recipientPrivateKey
+    });
+  }
+
+  /**
+   * Generates a Zero-Knowledge Set Intersection Proof.
+   */
+  public async proveSetIntersection(
+    claimKey: string,
+    secretValue: string,
+    salt: string,
+    targetSet: string[]
+  ): Promise<any> {
+    return this.request('/zk/prove-intersection', 'POST', {
+      claimKey,
+      secretValue,
+      salt,
+      targetSet
+    });
+  }
+
+  /**
+   * Verifies a Zero-Knowledge Set Intersection Proof.
+   */
+  public async verifySetIntersection(
+    proof: Record<string, any>,
+    targetSet: string[],
+    expectedCommitment?: string
+  ): Promise<any> {
+    return this.request('/zk/verify-intersection', 'POST', {
+      proof,
+      targetSet,
+      expectedCommitment
+    });
+  }
 }
+

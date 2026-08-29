@@ -254,6 +254,61 @@ def prove_composite_predicate(proofs: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
+def prove_set_intersection(
+    claim_key: str,
+    secret_value: str,
+    salt: str,
+    target_set: List[str]
+) -> Dict[str, Any]:
+    """Generates a Zero-Knowledge Set Intersection Proof."""
+    if secret_value not in target_set:
+        raise ValueError("Cannot prove set intersection: secret_value is not in target_set.")
+
+    comm = create_commitment(secret_value, salt)
+    canonical_set = sorted(target_set)
+    target_set_hash = sha256_hex(canonicalize_json(canonical_set))
+
+    blinded_set_commitments = [
+        sha256_hex(f"{salt}::intersection::{item}")
+        for item in canonical_set
+    ]
+    intersection_witness = sha256_hex(f"{salt}::intersection::{secret_value}")
+
+    return {
+        "type": "ZKSetIntersectionProof2026",
+        "claimKey": claim_key,
+        "commitment": comm["commitment"],
+        "targetSetHash": target_set_hash,
+        "intersectionWitness": intersection_witness,
+        "blindedSetCommitments": blinded_set_commitments,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+
+def verify_set_intersection_proof(
+    proof: Dict[str, Any],
+    target_set: List[str],
+    expected_commitment: Optional[str] = None
+) -> Dict[str, Any]:
+    """Verifies a Zero-Knowledge Set Intersection Proof."""
+    if proof.get("type") != "ZKSetIntersectionProof2026":
+        return {"valid": False, "error": "Invalid set intersection proof type."}
+
+    if expected_commitment and proof.get("commitment") != expected_commitment:
+        return {"valid": False, "error": "Commitment mismatch."}
+
+    computed_set_hash = sha256_hex(canonicalize_json(sorted(target_set)))
+    if computed_set_hash != proof.get("targetSetHash"):
+        return {"valid": False, "error": "Target set does not match proof set hash."}
+
+    blinded = proof.get("blindedSetCommitments", [])
+    witness = proof.get("intersectionWitness", "")
+    if witness not in blinded:
+        return {"valid": False, "error": "Intersection witness is not part of blinded set commitments."}
+
+    return {"valid": True}
+
+
 def verify_composite_predicate(
     composite_proof: Dict[str, Any],
     context: Optional[Dict[str, Any]] = None
@@ -291,6 +346,16 @@ def verify_composite_predicate(
                 res = verify_set_non_membership_proof(p, restricted)
                 if not res["valid"]:
                     errors.append(f"[{claim_key}] Non-membership error: {res.get('error')}")
+                else:
+                    verified_count += 1
+            else:
+                verified_count += 1
+        elif ptype == "ZKSetIntersectionProof2026":
+            target = ctx.get("allowedSets", {}).get(claim_key, [])
+            if target:
+                res = verify_set_intersection_proof(p, target)
+                if not res["valid"]:
+                    errors.append(f"[{claim_key}] Set intersection error: {res.get('error')}")
                 else:
                     verified_count += 1
             else:

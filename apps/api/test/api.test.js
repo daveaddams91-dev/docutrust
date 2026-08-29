@@ -594,5 +594,142 @@ test('API Server Suite', async (t) => {
     assert.equal(anchorRes.body.success, true);
     assert.ok(anchorRes.body.anchor.calldataHex.startsWith('0x892a4b12'));
   });
+
+  await t.test('29. POST /api/v1/schema endpoints (validate, validate-credential, hash)', async () => {
+    const schema = {
+      $id: 'https://schema.docutrust.org/diploma.json',
+      type: 'object',
+      required: ['studentId', 'gpa'],
+      properties: {
+        studentId: { type: 'string', pattern: '^STU-\\d{4}$' },
+        gpa: { type: 'number', minimum: 0.0, maximum: 4.0 }
+      },
+      additionalProperties: false
+    };
+
+    // 1. Compute hash
+    const hashRes = await makeRequest('POST', '/api/v1/schema/hash', { schema });
+    assert.equal(hashRes.status, 200);
+    assert.equal(hashRes.body.schemaHash.length, 64);
+
+    // 2. Validate data
+    const validRes = await makeRequest('POST', '/api/v1/schema/validate', {
+      data: { studentId: 'STU-1234', gpa: 3.8 },
+      schema
+    });
+    assert.equal(validRes.status, 200);
+    assert.equal(validRes.body.valid, true);
+
+    const invalidRes = await makeRequest('POST', '/api/v1/schema/validate', {
+      data: { studentId: 'INVALID', gpa: 4.5 },
+      schema
+    });
+    assert.equal(invalidRes.status, 200);
+    assert.equal(invalidRes.body.valid, false);
+
+    // 3. Validate credential subject
+    const credRes = await makeRequest('POST', '/api/v1/schema/validate-credential', {
+      credential: {
+        id: 'urn:uuid:vc-test',
+        credentialSubject: { studentId: 'STU-1234', gpa: 3.8 }
+      },
+      schema
+    });
+    assert.equal(credRes.status, 200);
+    assert.equal(credRes.body.valid, true);
+  });
+
+  await t.test('30. POST /api/v1/accumulator endpoints (create, add, witness, verify, delete)', async () => {
+    const accId = 'acc_api_test_01';
+    const createRes = await makeRequest('POST', '/api/v1/accumulator/create', { id: accId });
+    assert.equal(createRes.status, 200);
+    assert.equal(createRes.body.state.id, accId);
+
+    const member1 = 'did:key:z6MkuMember1';
+    const member2 = 'did:key:z6MkuMember2';
+
+    // Add batch
+    const addRes = await makeRequest('POST', '/api/v1/accumulator/add', {
+      id: accId,
+      elements: [member1, member2]
+    });
+    assert.equal(addRes.status, 200);
+    assert.equal(addRes.body.addedCount, 2);
+
+    // Create witness
+    const witRes = await makeRequest('POST', '/api/v1/accumulator/witness', {
+      id: accId,
+      element: member1
+    });
+    assert.equal(witRes.status, 200);
+    assert.equal(witRes.body.witness.element, member1);
+
+    // Verify witness
+    const verRes = await makeRequest('POST', '/api/v1/accumulator/verify-witness', {
+      witness: witRes.body.witness,
+      currentAccumulatorHex: addRes.body.state.accumulator
+    });
+    assert.equal(verRes.status, 200);
+    assert.equal(verRes.body.valid, true);
+
+    // Delete member1
+    const delRes = await makeRequest('POST', '/api/v1/accumulator/delete', {
+      id: accId,
+      element: member1
+    });
+    assert.equal(delRes.status, 200);
+
+    // Old witness should now be invalid against new accumulator state
+    const verAfterDel = await makeRequest('POST', '/api/v1/accumulator/verify-witness', {
+      witness: witRes.body.witness,
+      currentAccumulatorHex: delRes.body.state.accumulator
+    });
+    assert.equal(verAfterDel.status, 200);
+    assert.equal(verAfterDel.body.valid, false);
+  });
+
+  await t.test('31. POST /api/v1/jwe endpoints (generate-keys, encrypt, decrypt)', async () => {
+    const k1Res = await makeRequest('POST', '/api/v1/jwe/generate-keys');
+    const k2Res = await makeRequest('POST', '/api/v1/jwe/generate-keys');
+    assert.equal(k1Res.status, 200);
+    assert.equal(k2Res.status, 200);
+
+    const payload = { confidentialKey: 'SECRET-9988', classification: 'RESTRICTED' };
+    const recipients = [
+      { did: k1Res.body.keyPair.did, publicKey: k1Res.body.keyPair.publicKeyHex },
+      { did: k2Res.body.keyPair.did, publicKey: k2Res.body.keyPair.publicKeyHex }
+    ];
+
+    const encRes = await makeRequest('POST', '/api/v1/jwe/encrypt', { payload, recipients });
+    assert.equal(encRes.status, 200);
+    assert.equal(encRes.body.jwe.recipients.length, 2);
+
+    const dec1Res = await makeRequest('POST', '/api/v1/jwe/decrypt', {
+      jwe: encRes.body.jwe,
+      recipientDid: k1Res.body.keyPair.did,
+      recipientPrivateKey: k1Res.body.keyPair.privateKeyHex
+    });
+    assert.equal(dec1Res.status, 200);
+    assert.deepEqual(dec1Res.body.parsedJson, payload);
+  });
+
+  await t.test('32. POST /api/v1/zk (Set Intersection)', async () => {
+    const recognized = ['ROLE-ADMIN', 'ROLE-AUDITOR', 'ROLE-EXECUTIVE'];
+    const proveRes = await makeRequest('POST', '/api/v1/zk/prove-intersection', {
+      claimKey: 'role',
+      secretValue: 'ROLE-AUDITOR',
+      salt: '11223344556677881122334455667788',
+      targetSet: recognized
+    });
+    assert.equal(proveRes.status, 200);
+    assert.equal(proveRes.body.proof.type, 'ZKSetIntersectionProof2026');
+
+    const verifyRes = await makeRequest('POST', '/api/v1/zk/verify-intersection', {
+      proof: proveRes.body.proof,
+      targetSet: recognized
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.valid, true);
+  });
 });
 

@@ -120,6 +120,18 @@ describe('DocuTrust TypeScript SDK (@docutrust/sdk)', () => {
     // 17. MultiChain Anchor
     await client.formatMultiChainAnchor('ethereum', '0xroot', 100);
     assert.strictEqual(mockCalls[16].url, 'https://test-api.docutrust.org/api/v1/ledger/multichain/anchor');
+
+    // 18. Schema Validation
+    await client.validateSchema({ id: '1' }, { type: 'object' });
+    assert.strictEqual(mockCalls[17].url, 'https://test-api.docutrust.org/api/v1/schema/validate');
+
+    // 19. JWE Multi-Recipient
+    await client.encryptJWE({ data: 123 }, [{ did: 'did:key:z1', publicKey: 'abc' }]);
+    assert.strictEqual(mockCalls[18].url, 'https://test-api.docutrust.org/api/v1/jwe/encrypt');
+
+    // 20. ZK Set Intersection
+    await client.proveSetIntersection('badge', 'B1', 'salt', ['B1', 'B2']);
+    assert.strictEqual(mockCalls[19].url, 'https://test-api.docutrust.org/api/v1/zk/prove-intersection');
   });
 
   test('DocuTrustClient handles HTTP error responses gracefully', async () => {

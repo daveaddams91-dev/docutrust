@@ -84,3 +84,13 @@ export * from './eip712';
 
 // Export Multi-Chain Ledger Anchor & Calldata Formatter
 export * from './multichain';
+
+// Export W3C VC 2.0 Schema Validator & JSON Schema Engine
+export * from './schema';
+
+// Export Dynamic Cryptographic Accumulator (O(1) Revocation Witnesses)
+export * from './accumulator';
+
+// Export Multi-Recipient JSON Web Encryption (General JWE)
+export * from './jwe';
+

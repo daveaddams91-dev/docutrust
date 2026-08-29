@@ -294,5 +294,60 @@ test('CLI Suite', async (t) => {
     assert.equal(payload.chain, 'polygon');
     assert.ok(payload.calldataHex.startsWith('0x892a4b12'));
   });
+
+  const schemaFile = path.join(tempDir, 'schema.json');
+  const dataValidFile = path.join(tempDir, 'data-valid.json');
+  await t.test('23. docutrust schema-validate and schema-hash', () => {
+    fs.writeFileSync(schemaFile, JSON.stringify({
+      $id: 'https://schema.docutrust.org/badge.json',
+      type: 'object',
+      required: ['badgeCode'],
+      properties: { badgeCode: { type: 'string', pattern: '^SEC-\\d+$' } }
+    }), 'utf-8');
+
+    fs.writeFileSync(dataValidFile, JSON.stringify({ badgeCode: 'SEC-402' }), 'utf-8');
+
+    const outHash = execSync(`node "${cliPath}" schema-hash --schema "${schemaFile}"`).toString();
+    assert.ok(outHash.includes('RFC 8785 Canonical Schema Hash'));
+
+    const outVal = execSync(`node "${cliPath}" schema-validate --data "${dataValidFile}" --schema "${schemaFile}"`).toString();
+    assert.ok(outVal.includes('Schema validation PASSED'));
+  });
+
+  const jweKey1File = path.join(tempDir, 'jwe-k1.json');
+  const jweKey2File = path.join(tempDir, 'jwe-k2.json');
+  const jwePayloadFile = path.join(tempDir, 'jwe-payload.json');
+  const jweRecipientsFile = path.join(tempDir, 'jwe-recipients.json');
+  const jweEncryptedFile = path.join(tempDir, 'jwe-enc.json');
+  await t.test('24. docutrust jwe-keygen, jwe-encrypt, and jwe-decrypt', () => {
+    execSync(`node "${cliPath}" jwe-keygen --out "${jweKey1File}"`);
+    execSync(`node "${cliPath}" jwe-keygen --out "${jweKey2File}"`);
+    const k1 = JSON.parse(fs.readFileSync(jweKey1File, 'utf-8'));
+    const k2 = JSON.parse(fs.readFileSync(jweKey2File, 'utf-8'));
+
+    fs.writeFileSync(jwePayloadFile, JSON.stringify({ confidentialData: 'SovereignAuditPayload2026' }), 'utf-8');
+    fs.writeFileSync(jweRecipientsFile, JSON.stringify([
+      { did: k1.did, publicKey: k1.publicKeyHex },
+      { did: k2.did, publicKey: k2.publicKeyHex }
+    ]), 'utf-8');
+
+    const outEnc = execSync(`node "${cliPath}" jwe-encrypt --payload "${jwePayloadFile}" --recipients "${jweRecipientsFile}" --out "${jweEncryptedFile}"`).toString();
+    assert.ok(outEnc.includes('Multi-Recipient JWE encrypted'));
+    assert.ok(fs.existsSync(jweEncryptedFile));
+
+    const outDec = execSync(`node "${cliPath}" jwe-decrypt --jwe "${jweEncryptedFile}" --did "${k1.did}" --key "${k1.privateKeyHex}"`).toString();
+    assert.ok(outDec.includes('Decryption SUCCESS'));
+    assert.ok(outDec.includes('SovereignAuditPayload2026'));
+  });
+
+  const zkInterFile = path.join(tempDir, 'zk-intersection.json');
+  await t.test('25. docutrust zk-intersection generates set intersection proof', () => {
+    const out = execSync(`node "${cliPath}" zk-intersection --key clearance --val LEVEL-5 --target "LEVEL-4,LEVEL-5,LEVEL-6" --out "${zkInterFile}"`).toString();
+    assert.ok(out.includes('ZK Set Intersection Proof saved'));
+    assert.ok(fs.existsSync(zkInterFile));
+    const proof = JSON.parse(fs.readFileSync(zkInterFile, 'utf-8'));
+    assert.equal(proof.type, 'ZKSetIntersectionProof2026');
+  });
 });
+
 

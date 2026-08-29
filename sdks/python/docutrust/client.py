@@ -559,5 +559,86 @@ class DocuTrustClient:
         from .multichain import MultiChainLedgerAnchor
         return MultiChainLedgerAnchor.format_anchor(chain, merkle_root, batch_count, memo)
 
+    def validate_schema(
+        self,
+        data: Any,
+        schema: Dict[str, Any],
+        path: str = "$"
+    ) -> Dict[str, Any]:
+        """Validates arbitrary data against a JSON schema."""
+        from .schema import SchemaValidator
+        return SchemaValidator.validate(data, schema, path)
+
+    def validate_credential_subject_schema(
+        self,
+        credential: Dict[str, Any],
+        schema: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Validates W3C VC credentialSubject against a JSON Schema."""
+        from .schema import SchemaValidator
+        return SchemaValidator.validate_credential_subject(credential, schema)
+
+    def compute_schema_hash(self, schema: Dict[str, Any]) -> str:
+        """Computes deterministic RFC 8785 canonical hash of a schema."""
+        from .schema import SchemaValidator
+        return SchemaValidator.compute_schema_hash(schema)
+
+    def create_accumulator(
+        self,
+        accumulator_id: str,
+        modulus_hex: Optional[str] = None,
+        generator_hex: Optional[str] = None
+    ):
+        """Creates a dynamic cryptographic accumulator instance."""
+        from .accumulator import CryptographicAccumulator
+        kwargs = {}
+        if modulus_hex:
+            kwargs["modulus_hex"] = modulus_hex
+        if generator_hex:
+            kwargs["generator_hex"] = generator_hex
+        return CryptographicAccumulator(accumulator_id, **kwargs)
+
+    def encrypt_jwe(
+        self,
+        payload: Union[str, bytes, Dict[str, Any]],
+        recipients: List[Dict[str, Any]],
+        custom_protected_header: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Encrypts payload for multiple recipient DIDs in General JWE format."""
+        from .jwe import MultiRecipientJWE
+        return MultiRecipientJWE.encrypt(payload, recipients, custom_protected_header)
+
+    def decrypt_jwe(
+        self,
+        jwe: Dict[str, Any],
+        recipient_did: str,
+        recipient_private_key: Union[str, bytes]
+    ) -> Dict[str, Any]:
+        """Decrypts General JWE payload for recipient DID."""
+        from .jwe import MultiRecipientJWE
+        return MultiRecipientJWE.decrypt(jwe, recipient_did, recipient_private_key)
+
+    def prove_set_intersection(
+        self,
+        claim_key: str,
+        secret_value: str,
+        salt: str,
+        target_set: List[str]
+    ) -> Dict[str, Any]:
+        """Generates ZK Set Intersection Proof."""
+        from .zk_predicates import prove_set_intersection
+        return prove_set_intersection(claim_key, secret_value, salt, target_set)
+
+    def verify_set_intersection(
+        self,
+        proof: Dict[str, Any],
+        target_set: List[str],
+        expected_commitment: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Verifies ZK Set Intersection Proof."""
+        from .zk_predicates import verify_set_intersection_proof
+        return verify_set_intersection_proof(proof, target_set, expected_commitment)
+
+
 
 

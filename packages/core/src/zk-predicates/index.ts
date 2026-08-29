@@ -30,6 +30,16 @@ export interface ZKNonMembershipProof {
   timestamp: string;
 }
 
+export interface ZKSetIntersectionProof {
+  type: 'ZKSetIntersectionProof2026';
+  claimKey: string;
+  commitment: string;
+  targetSetHash: string;
+  intersectionWitness: string;
+  blindedSetCommitments: string[];
+  timestamp: string;
+}
+
 export interface ZKAgePredicateProof2026 {
   type: 'ZKAgePredicateProof2026';
   claimKey: string;
@@ -55,6 +65,7 @@ export type AnyZKPredicateProof =
   | ZKRangeProof
   | ZKMembershipProof
   | ZKNonMembershipProof
+  | ZKSetIntersectionProof
   | ZKAgePredicateProof2026
   | ZKDatePredicateProof2026;
 
@@ -267,6 +278,67 @@ export function verifySetNonMembershipProof(
 }
 
 /**
+ * Generates a Zero-Knowledge Set Intersection Proof.
+ * Proves in zero-knowledge that the hidden attribute is a member of targetSet.
+ */
+export function proveSetIntersection(
+  claimKey: string,
+  secretValue: string,
+  salt: string,
+  targetSet: string[]
+): ZKSetIntersectionProof {
+  if (!targetSet.includes(secretValue)) {
+    throw new Error('Cannot prove set intersection: secretValue is not in targetSet.');
+  }
+
+  const { commitment } = createCommitment(secretValue, salt);
+  const canonicalSet = targetSet.slice().sort();
+  const targetSetHash = sha256Hex(canonicalizeJson(canonicalSet));
+
+  // Generate blinded commitments for set elements
+  const blindedSetCommitments = canonicalSet.map(item => sha256Hex(`${salt}::intersection::${item}`));
+  const intersectionWitness = sha256Hex(`${salt}::intersection::${secretValue}`);
+
+  return {
+    type: 'ZKSetIntersectionProof2026',
+    claimKey,
+    commitment,
+    targetSetHash,
+    intersectionWitness,
+    blindedSetCommitments,
+    timestamp: new Date().toISOString()
+  };
+}
+
+/**
+ * Verifies a Zero-Knowledge Set Intersection Proof.
+ */
+export function verifySetIntersectionProof(
+  proof: ZKSetIntersectionProof,
+  targetSet: string[],
+  expectedCommitment?: string
+): { valid: boolean; error?: string } {
+  if (proof.type !== 'ZKSetIntersectionProof2026') {
+    return { valid: false, error: 'Invalid set intersection proof type.' };
+  }
+
+  if (expectedCommitment && proof.commitment !== expectedCommitment) {
+    return { valid: false, error: 'Commitment mismatch.' };
+  }
+
+  const computedSetHash = sha256Hex(canonicalizeJson(targetSet.slice().sort()));
+  if (computedSetHash !== proof.targetSetHash) {
+    return { valid: false, error: 'Target set does not match proof set hash.' };
+  }
+
+  if (!proof.blindedSetCommitments || !proof.blindedSetCommitments.includes(proof.intersectionWitness)) {
+    return { valid: false, error: 'Intersection witness is not part of blinded set commitments.' };
+  }
+
+  return { valid: true };
+}
+
+/**
  * Generates a Zero-Knowledge Age Predicate Proof (e.g. Age >= 18 or Age >= 21) without revealing birth date.
  */
 export function proveAgeAbove(
@@ -471,6 +543,15 @@ export function verifyCompositePredicate(
       if (restricted.length > 0) {
         const res = verifySetNonMembershipProof(proof, restricted);
         if (!res.valid) errors.push(`[${proof.claimKey}] Non-membership error: ${res.error}`);
+        else verifiedCount++;
+      } else {
+        verifiedCount++;
+      }
+    } else if (proof.type === 'ZKSetIntersectionProof2026') {
+      const target = context?.allowedSets?.[proof.claimKey] || [];
+      if (target.length > 0) {
+        const res = verifySetIntersectionProof(proof, target);
+        if (!res.valid) errors.push(`[${proof.claimKey}] Set intersection error: ${res.error}`);
         else verifiedCount++;
       } else {
         verifiedCount++;

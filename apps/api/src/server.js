@@ -58,7 +58,12 @@ const {
   verifySetNonMembershipProof,
   proveCompositePredicate,
   verifyCompositePredicate,
-  MultiChainLedgerAnchor
+  MultiChainLedgerAnchor,
+  SchemaValidator,
+  CryptographicAccumulator,
+  MultiRecipientJWE,
+  proveSetIntersection,
+  verifySetIntersectionProof
 } = require('@docutrust/core');
 
 const PORT = process.env.PORT || 4000;
@@ -80,6 +85,7 @@ let anchorsStore = [];
 const hashChainLedger = new TamperEvidentHashChain();
 const trustRegistry = new DecentralizedTrustRegistry();
 const mmrLedger = new MerkleMountainRange();
+const accumulatorStore = new Map();
 
 try {
   if (fs.existsSync(CREDS_FILE)) credentialsStore = JSON.parse(fs.readFileSync(CREDS_FILE, 'utf-8'));
@@ -1068,6 +1074,157 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // 35. Schema Validator Endpoints
+    if (pathname === '/api/v1/schema/validate' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { data, schema, path: jsonPath } = body;
+      if (data === undefined || !schema) {
+        return jsonResponse(400, { error: 'Missing data or schema in request.' });
+      }
+      const result = SchemaValidator.validate(data, schema, jsonPath || '$');
+      return jsonResponse(200, result);
+    }
+
+    if (pathname === '/api/v1/schema/validate-credential' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { credential, schema } = body;
+      if (!credential || !schema) {
+        return jsonResponse(400, { error: 'Missing credential or schema in request.' });
+      }
+      const result = SchemaValidator.validateCredentialSubject(credential, schema);
+      return jsonResponse(200, result);
+    }
+
+    if (pathname === '/api/v1/schema/hash' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { schema } = body;
+      if (!schema) return jsonResponse(400, { error: 'Missing schema in request.' });
+      const schemaHash = SchemaValidator.computeSchemaHash(schema);
+      return jsonResponse(200, { success: true, schemaHash });
+    }
+
+    // 36. Cryptographic Accumulator Endpoints
+    if (pathname === '/api/v1/accumulator/create' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { id, modulusHex, generatorHex } = body;
+      if (!id) return jsonResponse(400, { error: 'Missing accumulator id.' });
+      const acc = new CryptographicAccumulator(id, modulusHex, generatorHex);
+      accumulatorStore.set(id, acc);
+      return jsonResponse(200, { success: true, state: acc.exportState() });
+    }
+
+    if (pathname === '/api/v1/accumulator/add' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { id, element, elements } = body;
+      if (!id) return jsonResponse(400, { error: 'Missing accumulator id.' });
+      let acc = accumulatorStore.get(id);
+      if (!acc) {
+        acc = new CryptographicAccumulator(id);
+        accumulatorStore.set(id, acc);
+      }
+      if (Array.isArray(elements)) {
+        const res = acc.addBatch(elements);
+        return jsonResponse(200, { success: true, ...res, state: acc.exportState() });
+      } else if (element) {
+        const res = acc.add(element);
+        return jsonResponse(200, { success: true, ...res, state: acc.exportState() });
+      }
+      return jsonResponse(400, { error: 'Missing element or elements array.' });
+    }
+
+    if (pathname === '/api/v1/accumulator/delete' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { id, element } = body;
+      if (!id || !element) return jsonResponse(400, { error: 'Missing accumulator id or element.' });
+      const acc = accumulatorStore.get(id);
+      if (!acc) return jsonResponse(404, { error: `Accumulator '${id}' not found.` });
+      const res = acc.delete(element);
+      return jsonResponse(200, { success: true, ...res, state: acc.exportState() });
+    }
+
+    if (pathname === '/api/v1/accumulator/witness' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { id, element } = body;
+      if (!id || !element) return jsonResponse(400, { error: 'Missing accumulator id or element.' });
+      const acc = accumulatorStore.get(id);
+      if (!acc) return jsonResponse(404, { error: `Accumulator '${id}' not found.` });
+      try {
+        const witness = acc.createWitness(element);
+        return jsonResponse(200, { success: true, witness });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/accumulator/verify-witness' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { witness, currentAccumulatorHex, modulusHex } = body;
+      if (!witness || !currentAccumulatorHex) {
+        return jsonResponse(400, { error: 'Missing witness or currentAccumulatorHex.' });
+      }
+      const valid = CryptographicAccumulator.verifyWitness(witness, currentAccumulatorHex, modulusHex);
+      return jsonResponse(200, { valid });
+    }
+
+    // 37. Multi-Recipient JWE Endpoints
+    if (pathname === '/api/v1/jwe/generate-keys' && req.method === 'POST') {
+      const kp = MultiRecipientJWE.generateRecipientKeyPair();
+      return jsonResponse(200, { success: true, keyPair: kp });
+    }
+
+    if (pathname === '/api/v1/jwe/encrypt' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { payload, recipients, customProtectedHeader } = body;
+      if (!payload || !recipients || !Array.isArray(recipients)) {
+        return jsonResponse(400, { error: 'Missing payload or recipients array.' });
+      }
+      try {
+        const jwe = MultiRecipientJWE.encrypt(payload, recipients, customProtectedHeader);
+        return jsonResponse(200, { success: true, jwe });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/jwe/decrypt' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { jwe, recipientDid, recipientPrivateKey } = body;
+      if (!jwe || !recipientDid || !recipientPrivateKey) {
+        return jsonResponse(400, { error: 'Missing jwe, recipientDid, or recipientPrivateKey.' });
+      }
+      try {
+        const decrypted = MultiRecipientJWE.decrypt(jwe, recipientDid, recipientPrivateKey);
+        return jsonResponse(200, { success: true, ...decrypted });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // 38. ZK Set Intersection Endpoints
+    if (pathname === '/api/v1/zk/prove-intersection' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { claimKey, secretValue, salt, targetSet } = body;
+      if (!claimKey || secretValue === undefined || !salt || !targetSet || !Array.isArray(targetSet)) {
+        return jsonResponse(400, { error: 'Missing claimKey, secretValue, salt, or targetSet.' });
+      }
+      try {
+        const proof = proveSetIntersection(claimKey, secretValue, salt, targetSet);
+        return jsonResponse(200, { success: true, proof });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/zk/verify-intersection' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { proof, targetSet, expectedCommitment } = body;
+      if (!proof || !targetSet || !Array.isArray(targetSet)) {
+        return jsonResponse(400, { error: 'Missing proof or targetSet array.' });
+      }
+      const result = verifySetIntersectionProof(proof, targetSet, expectedCommitment);
+      return jsonResponse(200, result);
+    }
+
     // Default 404
     jsonResponse(404, { error: 'Route not found' });
   } catch (err) {
@@ -1077,8 +1234,9 @@ const server = http.createServer(async (req, res) => {
 
 if (require.main === module) {
   server.listen(PORT, () => {
-    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v2.2.0 running on http://localhost:${PORT}`);
+    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v2.3.0 running on http://localhost:${PORT}`);
   });
 }
 
 module.exports = { server, generateKeyPair, generatePQCKeyPair, canonicalizeJson, sha256Hex, MerkleTree };
+

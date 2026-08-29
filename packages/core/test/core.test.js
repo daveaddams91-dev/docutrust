@@ -107,7 +107,16 @@ const {
   proveCompositePredicate,
   verifyCompositePredicate,
   // MultiChain
-  MultiChainLedgerAnchor
+  MultiChainLedgerAnchor,
+  // Schema Validator
+  SchemaValidator,
+  // Cryptographic Accumulator
+  CryptographicAccumulator,
+  // Multi-Recipient JWE
+  MultiRecipientJWE,
+  // ZK Set Intersection
+  proveSetIntersection,
+  verifySetIntersectionProof
 } = require('../dist/index.js');
 
 // 1. Cryptography Tests
@@ -1190,6 +1199,164 @@ test('37. MultiChain Anchor: EVM Calldata, Bitcoin OP_RETURN, Solana Anchor inst
   assert.ok(solAnchor.instructionDataHex.startsWith('0x'));
   assert.ok(solAnchor.explorerUrl.includes('solscan.io'));
 });
+
+// 37. W3C VC JSON Schema Validation
+test('38. Schema: JSON Schema Validator, canonical digest, and credential subject validation', () => {
+  const universityDiplomaSchema = {
+    $id: 'https://schema.docutrust.org/diploma-v1.json',
+    type: 'object',
+    required: ['studentId', 'degree', 'gpa', 'graduationDate'],
+    properties: {
+      studentId: { type: 'string', pattern: '^STU-\\d{5}$' },
+      degree: { type: 'string', minLength: 3 },
+      gpa: { type: 'number', minimum: 0.0, maximum: 4.0 },
+      graduationDate: { type: 'string', format: 'date' },
+      honors: { type: 'boolean' }
+    },
+    additionalProperties: false
+  };
+
+  const schemaHash = SchemaValidator.computeSchemaHash(universityDiplomaSchema);
+  assert.equal(typeof schemaHash, 'string');
+  assert.equal(schemaHash.length, 64);
+
+  // 1. Valid subject
+  const validSubject = {
+    studentId: 'STU-12345',
+    degree: 'B.S. in Computer Science',
+    gpa: 3.85,
+    graduationDate: '2026-05-20',
+    honors: true
+  };
+  const validResult = SchemaValidator.validate(validSubject, universityDiplomaSchema);
+  assert.equal(validResult.valid, true);
+  assert.equal(validResult.errors.length, 0);
+
+  // 2. Invalid subject (failing regex and out of range GPA)
+  const invalidSubject = {
+    studentId: 'INVALID_ID',
+    degree: 'CS', // minLength 3
+    gpa: 4.5, // max 4.0
+    graduationDate: 'not-a-date',
+    unknownField: 'malicious' // additionalProperties false
+  };
+  const invalidResult = SchemaValidator.validate(invalidSubject, universityDiplomaSchema);
+  assert.equal(invalidResult.valid, false);
+  assert.ok(invalidResult.errors.length >= 4);
+
+  // 3. Credential Subject Helper
+  const credential = {
+    id: 'urn:uuid:test-cred',
+    type: ['VerifiableCredential'],
+    credentialSubject: validSubject
+  };
+  const credSubjectResult = SchemaValidator.validateCredentialSubject(credential, universityDiplomaSchema);
+  assert.equal(credSubjectResult.valid, true);
+});
+
+// 38. Dynamic Cryptographic Accumulator (O(1) Revocation Witness)
+test('39. Accumulator: Dynamic Cryptographic Accumulator add, delete, witness generation & O(1) verify', () => {
+  const acc = new CryptographicAccumulator('acc-test-01');
+
+  // Add members
+  const member1 = 'did:key:z6Mku1111111111111111111111111111111111111111111';
+  const member2 = 'did:key:z6Mku2222222222222222222222222222222222222222222';
+  const member3 = 'did:key:z6Mku3333333333333333333333333333333333333333333';
+
+  acc.add(member1);
+  acc.addBatch([member2, member3]);
+
+  const state = acc.exportState();
+  assert.equal(state.memberCount, 3);
+
+  // Create membership witness for member2
+  const witness2 = acc.createWitness(member2);
+  assert.equal(witness2.element, member2);
+
+  // Verify witness in O(1) time
+  const isValid = CryptographicAccumulator.verifyWitness(witness2, state.accumulator);
+  assert.equal(isValid, true);
+
+  // Delete member2 from accumulator
+  acc.delete(member2);
+  const updatedState = acc.exportState();
+  assert.equal(updatedState.memberCount, 2);
+
+  // Old witness for member2 should now be INVALID against updated accumulator state
+  const isInvalidAfterDelete = CryptographicAccumulator.verifyWitness(witness2, updatedState.accumulator);
+  assert.equal(isInvalidAfterDelete, false);
+
+  // Witness for member1 recreated should verify against updated state
+  const witness1 = acc.createWitness(member1);
+  const isValidMember1 = CryptographicAccumulator.verifyWitness(witness1, updatedState.accumulator);
+  assert.equal(isValidMember1, true);
+});
+
+// 39. Multi-Recipient JWE Confidential Asymmetric Encryption
+test('40. JWE: Multi-Recipient JSON Web Encryption with ECDH-ES+A256KW and AES-256-GCM', () => {
+  // Generate 2 distinct recipient identities
+  const recipient1Kp = MultiRecipientJWE.generateRecipientKeyPair();
+  const recipient2Kp = MultiRecipientJWE.generateRecipientKeyPair();
+  const outsiderKp = MultiRecipientJWE.generateRecipientKeyPair();
+
+  const confidentialPayload = {
+    auditRecordId: 'AUDIT-99201',
+    financialGrade: 'AAA+',
+    internalNote: 'Classified Sovereign Verification Record'
+  };
+
+  const recipients = [
+    { did: recipient1Kp.did, publicKey: recipient1Kp.publicKeyHex },
+    { did: recipient2Kp.did, publicKey: recipient2Kp.publicKeyHex }
+  ];
+
+  // Encrypt payload for both recipients in a single General JWE envelope
+  const jwe = MultiRecipientJWE.encrypt(confidentialPayload, recipients);
+  assert.ok(jwe.protected);
+  assert.equal(jwe.recipients.length, 2);
+  assert.ok(jwe.ciphertext);
+  assert.ok(jwe.tag);
+
+  // Recipient 1 decrypts successfully
+  const decrypted1 = MultiRecipientJWE.decrypt(jwe, recipient1Kp.did, recipient1Kp.privateKeyHex);
+  assert.deepEqual(decrypted1.parsedJson, confidentialPayload);
+
+  // Recipient 2 decrypts successfully
+  const decrypted2 = MultiRecipientJWE.decrypt(jwe, recipient2Kp.did, recipient2Kp.privateKeyHex);
+  assert.deepEqual(decrypted2.parsedJson, confidentialPayload);
+
+  // Outsider fails to decrypt
+  assert.throws(() => {
+    MultiRecipientJWE.decrypt(jwe, outsiderKp.did, outsiderKp.privateKeyHex);
+  }, /not authorized/);
+});
+
+// 40. ZK Set Intersection Predicates
+test('41. ZK Predicates: Set Intersection Proof & Composite Verification', () => {
+  const secretAccreditation = 'ACC-HEALTH-TIER-1';
+  const { salt } = createCommitment(secretAccreditation);
+  const recognizedCertifications = ['ACC-HEALTH-TIER-1', 'ACC-FINANCE-TIER-1', 'ACC-DEFENSE-TIER-1'];
+
+  // Prove intersection in zero-knowledge
+  const intersectionProof = proveSetIntersection('accreditation', secretAccreditation, salt, recognizedCertifications);
+  assert.equal(intersectionProof.type, 'ZKSetIntersectionProof2026');
+
+  const audit = verifySetIntersectionProof(intersectionProof, recognizedCertifications);
+  assert.equal(audit.valid, true);
+
+  // Fails with mismatched set
+  const otherSet = ['ACC-ACADEMIC-ONLY'];
+  const invalidAudit = verifySetIntersectionProof(intersectionProof, otherSet);
+  assert.equal(invalidAudit.valid, false);
+
+  // Verify in Composite Predicate
+  const compositeProof = proveCompositePredicate([intersectionProof]);
+  const compAudit = verifyCompositePredicate(compositeProof, {
+    allowedSets: { accreditation: recognizedCertifications }
+  });
+  assert.equal(compAudit.valid, true);
+});
+
 
 
 

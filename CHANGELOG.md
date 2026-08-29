@@ -1,5 +1,79 @@
 # 📝 DocuTrust Changelog & Release Notes
 
+## [v2.3.0] - W3C Credential JSON Schema Engine, Dynamic RSA Accumulators, Multi-Recipient General JWE & ZK Set Intersection - 2026-08-29
+
+### 🌟 Release Overview (v2.3.0)
+DocuTrust 2.3.0 introduces a comprehensive W3C VC 2.0 Credential Schema & JSON Schema validation engine with deterministic RFC 8785 canonical schema hashing, Dynamic Cryptographic Accumulators providing $O(1)$ constant-size revocation and membership witnesses, General Multi-Recipient JSON Web Encryption (JWE) with X25519 ECDH-ES and AES-256-GCM, and Zero-Knowledge Set Intersection Predicates.
+
+---
+
+### 🛡️ Core Cryptographic & Protocol Implementations (`@docutrust/core`)
+- **W3C VC 2.0 Credential Schema & JSON Schema Validation Engine (`packages/core/src/schema`)**:
+  - Implemented `SchemaValidator` supporting strict schema checks: type enforcement (string, number, integer, boolean, object, array, null), regex `pattern`, `minLength`, `maxLength`, `minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum`, `enum`, array item constraints, `additionalProperties: false`, and standard formats (`email`, `uri`, `did`, `date`, `date-time`).
+  - Implemented RFC 8785 canonical schema hash calculation (`computeSchemaHash`) for deterministic schema registration and integrity binding.
+  - Implemented `validateCredentialSubject` validating W3C VC `credentialSubject` against both embedded `credentialSchema` and external schemas.
+- **Dynamic Cryptographic Accumulator with $O(1)$ Constant-Size Witnesses (`packages/core/src/accumulator`)**:
+  - Implemented RSA-modulus dynamic cryptographic accumulator supporting arbitrary element membership and revocation.
+  - Deterministic element-to-prime mapping (`elementToPrime`) using Miller-Rabin primality testing with 25 rounds.
+  - Dynamic member addition (`add`, `addBatch`), deletion (`delete`), dynamic witness calculation (`createWitness`), and $O(1)$ constant-time witness verification (`verifyWitness`).
+- **Multi-Recipient JSON Web Encryption (General JWE) (`packages/core/src/jwe`)**:
+  - Implemented RFC 7516 General JWE with `ECDH-ES+A256KW` key wrapping and `A256GCM` content encryption.
+  - X25519 ephemeral key generation, HKDF-SHA256 Content Encryption Key (CEK) derivation, and multi-recipient key encapsulation.
+  - Supports decrypting encrypted credentials, confidential claim vectors, and payload messages for any authorized recipient DID.
+- **Zero-Knowledge Set Intersection Predicates (`packages/core/src/zk-predicates`)**:
+  - Implemented `proveSetIntersection` and `verifySetIntersectionProof` for zero-knowledge multi-credential privilege checks without exposing secret identifiers.
+  - Integrated set intersection validation into `verifyCompositePredicate`.
+
+---
+
+### 🐍 Python SDK Parity (`docutrust` v2.3.0)
+- Added `docutrust.schema` (`SchemaValidator`).
+- Added `docutrust.accumulator` (`CryptographicAccumulator`).
+- Added `docutrust.jwe` (`MultiRecipientJWE`).
+- Added `prove_set_intersection` and `verify_set_intersection_proof` in `docutrust.zk_predicates`.
+- Added client methods: `validate_schema`, `validate_credential_subject_schema`, `compute_schema_hash`, `create_accumulator`, `encrypt_jwe`, `decrypt_jwe`, `prove_set_intersection`, `verify_set_intersection`.
+- 100% test pass rate across 37 Python unit tests.
+
+---
+
+### 💻 TypeScript SDK & Developer Ecosystem (`@docutrust/sdk` v2.3.0)
+- Added `validateSchema`, `validateCredentialSubjectSchema`, `encryptJWE`, `decryptJWE`, `proveSetIntersection`, and `verifySetIntersection`.
+- Full TypeScript type definitions and dual CJS/ESM distribution.
+- 100% test pass rate.
+
+---
+
+### 🌐 REST API Endpoints (`@docutrust/api` v2.3.0)
+- Added 11 new REST API endpoints:
+  - `POST /api/v1/schema/validate`
+  - `POST /api/v1/schema/validate-credential`
+  - `POST /api/v1/schema/hash`
+  - `POST /api/v1/accumulator/create`
+  - `POST /api/v1/accumulator/add`
+  - `POST /api/v1/accumulator/delete`
+  - `POST /api/v1/accumulator/witness`
+  - `POST /api/v1/accumulator/verify-witness`
+  - `POST /api/v1/jwe/generate-keys`
+  - `POST /api/v1/jwe/encrypt`
+  - `POST /api/v1/jwe/decrypt`
+  - `POST /api/v1/zk/prove-intersection`
+  - `POST /api/v1/zk/verify-intersection`
+- 100% test pass rate across 33 API test suites.
+
+---
+
+### ⚡ CLI Tooling (`@docutrust/cli` v2.3.0)
+- Added CLI subcommands:
+  - `docutrust schema-validate --data <file> --schema <file>`
+  - `docutrust schema-hash --schema <file>`
+  - `docutrust jwe-keygen [--out <file>]`
+  - `docutrust jwe-encrypt --payload <file> --recipients <file> [--out <file>]`
+  - `docutrust jwe-decrypt --jwe <file> --did <did> --key <privHex>`
+  - `docutrust zk-intersection --val <val> --target <a,b,c> [--key <key>]`
+- 100% test pass rate across 26 CLI test suites.
+
+---
+
 ## [v2.2.0] - Ethereum EIP-712 Structured Credentials, Social Recovery Escrow, ZK Non-Membership & Multi-Chain Anchoring - 2026-08-29
 
 ### 🌟 Release Overview (v2.2.0)

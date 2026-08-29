@@ -205,7 +205,7 @@ const command = args[0];
 
 function printHelp() {
   console.log(`
-\x1b[1m\x1b[36m🛡️ DocuTrust CLI v2.2.0\x1b[0m — Open-Source Sovereign Trust Stack
+\x1b[1m\x1b[36m🛡️ DocuTrust CLI v2.3.0\x1b[0m — Open-Source Sovereign Trust Stack
 
 \x1b[1mCORE COMMANDS:\x1b[0m
   \x1b[32mdemo / wizard\x1b[0m                                 Run interactive 10-second end-to-end credential issuance & verification
@@ -1029,6 +1029,108 @@ async function main() {
     if (outFile) {
       fs.writeFileSync(outFile, outStr, 'utf-8');
       console.log(`\x1b[32m✔\x1b[0m MultiChain Anchor payload generated for ${chain}: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    return;
+  }
+
+  if (command === 'schema-validate') {
+    const dataFile = getArgValue('--data') || getArgValue('-d');
+    const schemaFile = getArgValue('--schema') || getArgValue('-s');
+    if (!dataFile || !schemaFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --data <file.json> or --schema <file.json>');
+      process.exit(1);
+    }
+    const data = JSON.parse(fs.readFileSync(dataFile, 'utf-8'));
+    const schema = JSON.parse(fs.readFileSync(schemaFile, 'utf-8'));
+    const result = core.SchemaValidator.validate(data, schema);
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m Schema validation PASSED. Schema Hash: \x1b[1m${result.schemaHash}\x1b[0m`);
+    } else {
+      console.log(`\x1b[31m✖\x1b[0m Schema validation FAILED. Errors:\n` + result.errors.map(e => `  - ${e}`).join('\n'));
+      process.exit(1);
+    }
+    return;
+  }
+
+  if (command === 'schema-hash') {
+    const schemaFile = getArgValue('--schema') || getArgValue('-s');
+    if (!schemaFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --schema <file.json>');
+      process.exit(1);
+    }
+    const schema = JSON.parse(fs.readFileSync(schemaFile, 'utf-8'));
+    const hash = core.SchemaValidator.computeSchemaHash(schema);
+    console.log(`\x1b[32m✔\x1b[0m RFC 8785 Canonical Schema Hash: \x1b[1m${hash}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'jwe-keygen') {
+    const outFile = getArgValue('--out') || getArgValue('-o');
+    const kp = core.MultiRecipientJWE.generateRecipientKeyPair();
+    const outStr = JSON.stringify(kp, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m JWE X25519 KeyPair generated and saved to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    return;
+  }
+
+  if (command === 'jwe-encrypt') {
+    const payloadFile = getArgValue('--payload') || getArgValue('-p');
+    const recipientsFile = getArgValue('--recipients') || getArgValue('-r');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+    if (!payloadFile || !recipientsFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --payload <file> or --recipients <file>');
+      process.exit(1);
+    }
+    const payload = JSON.parse(fs.readFileSync(payloadFile, 'utf-8'));
+    const recipients = JSON.parse(fs.readFileSync(recipientsFile, 'utf-8'));
+    const jwe = core.MultiRecipientJWE.encrypt(payload, recipients);
+    const outStr = JSON.stringify(jwe, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m Multi-Recipient JWE encrypted and saved to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    return;
+  }
+
+  if (command === 'jwe-decrypt') {
+    const jweFile = getArgValue('--jwe');
+    const did = getArgValue('--did');
+    const key = getArgValue('--key') || getArgValue('-k');
+    if (!jweFile || !did || !key) {
+      console.error('\x1b[31mError:\x1b[0m Missing --jwe <file>, --did <did>, or --key <privHex>');
+      process.exit(1);
+    }
+    const jwe = JSON.parse(fs.readFileSync(jweFile, 'utf-8'));
+    const decrypted = core.MultiRecipientJWE.decrypt(jwe, did, key);
+    console.log(`\x1b[32m✔\x1b[0m Decryption SUCCESS:\n`, decrypted.parsedJson || decrypted.plaintext);
+    return;
+  }
+
+  if (command === 'zk-intersection') {
+    const claimKey = getArgValue('--key') || getArgValue('-k') || 'clearance';
+    const val = getArgValue('--val') || getArgValue('-v');
+    const salt = getArgValue('--salt') || crypto.randomBytes(16).toString('hex');
+    const targetStr = getArgValue('--target') || getArgValue('-t');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!val || !targetStr) {
+      console.error('\x1b[31mError:\x1b[0m Missing --val <value> or --target <a,b,c>');
+      process.exit(1);
+    }
+    const targetSet = targetStr.split(',').map(s => s.trim());
+    const proof = core.proveSetIntersection(claimKey, val, salt, targetSet);
+    const outStr = JSON.stringify(proof, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m ZK Set Intersection Proof saved to: \x1b[1m${outFile}\x1b[0m`);
     } else {
       console.log(outStr);
     }
