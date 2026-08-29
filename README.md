@@ -4,18 +4,20 @@
 
 ### The Open-Source Sovereign Trust Stack for Verifiable Credentials, Post-Quantum Cryptography, M-of-N Multi-Signatures & Ledger Anchoring
 
-[![Version](https://img.shields.io/badge/Version-v1.2.0-blue.svg)]()
+[![Version](https://img.shields.io/badge/Version-v1.3.0-blue.svg)]()
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CI Status](https://img.shields.io/badge/CI-100%25%20Passing-brightgreen.svg)]()
-[![Post-Quantum](https://img.shields.io/badge/Quantum_Safe-NIST%20FIPS%20204%20(ML--DSA)-purple.svg)]()
+[![Post-Quantum](https://img.shields.io/badge/Quantum_Safe-NIST%20FIPS%20203%20%26%20204%20(ML--KEM%20%7C%20ML--DSA)-purple.svg)]()
+[![Fortress Encryption](https://img.shields.io/badge/Encryption-AES--256--GCM%20%2B%20HKDF-emerald.svg)]()
+[![ZK Predicates](https://img.shields.io/badge/Privacy-NIZK%20Range%20Proofs-blueviolet.svg)]()
 [![Multi-Sig](https://img.shields.io/badge/Governance-M--of--N%20Threshold-amber.svg)]()
 [![W3C VC 2.0](https://img.shields.io/badge/Standard-W3C%20VC%202.0-indigo.svg)](https://www.w3.org/TR/vc-data-model-2.0/)
-[![DIDs](https://img.shields.io/badge/Identity-did%3Akey%20%7C%20did%3Apqc%20%7C%20did%3Aweb-orange.svg)]()
+[![DIDs](https://img.shields.io/badge/Identity-did%3Akey%20%7C%20did%3Apqc%20%7C%20did%3Akem%20%7C%20did%3Aweb-orange.svg)]()
 [![Python SDK](https://img.shields.io/badge/Python-3.8+-3776AB?logo=python&logoColor=white)]()
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)]()
 
 <p align="center">
-  <b>DocuTrust</b> enables universities, enterprises, and governments to issue tamper-proof academic degrees, employment certificates, and licenses with <b>sub-50ms instant verification</b>, <b>M-of-N threshold multi-signatures</b>, <b>Post-Quantum hybrid lattice resistance</b>, and <b>cryptographic PDF 2.0 steganography</b>.
+  <b>DocuTrust</b> enables universities, enterprises, and governments to issue tamper-proof academic degrees, employment certificates, and licenses with <b>sub-50ms instant verification</b>, <b>AES-256-GCM envelope encryption</b>, <b>Zero-Knowledge Range Predicates</b>, <b>NIST ML-KEM & ML-DSA quantum armor</b>, <b>M-of-N threshold multi-signatures</b>, and <b>cryptographic PDF 2.0 steganography</b>.
 </p>
 
 [Quickstart Demo](#-10-second-quickstart-demo) • [Architecture](#-architecture) • [Security Hardening](#-defense-in-depth-security-hardening) • [CLI Toolkit](#-cli-toolkit) • [Python SDK](#-python-sdk) • [REST API](#-rest-api-endpoints)

@@ -15,6 +15,53 @@ def canonicalize_json(obj: Any) -> str:
         return '{' + ','.join(f'{json.dumps(k)}:{canonicalize_json(obj[k])}' for k in sorted_keys) + '}'
     return json.dumps(obj)
 
+BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+
+def encode_base58(buffer: bytes) -> str:
+    """Base58 encoding helper."""
+    digits = [0]
+    for byte in buffer:
+        for j in range(len(digits)):
+            digits[j] <<= 8
+        digits[0] += byte
+        carry = 0
+        for j in range(len(digits)):
+            digits[j] += carry
+            carry = digits[j] // 58
+            digits[j] %= 58
+        while carry > 0:
+            digits.append(carry % 58)
+            carry = carry // 58
+    for byte in buffer:
+        if byte == 0:
+            digits.append(0)
+        else:
+            break
+    return ''.join(BASE58_ALPHABET[d] for d in reversed(digits))
+
+def decode_base58(s: str) -> bytes:
+    """Base58 decoding helper."""
+    bytes_arr = [0]
+    for char in s:
+        value = BASE58_ALPHABET.index(char)
+        for j in range(len(bytes_arr)):
+            bytes_arr[j] *= 58
+        bytes_arr[0] += value
+        carry = 0
+        for j in range(len(bytes_arr)):
+            bytes_arr[j] += carry
+            carry = bytes_arr[j] >> 8
+            bytes_arr[j] &= 0xFF
+        while carry > 0:
+            bytes_arr.append(carry & 0xFF)
+            carry >>= 8
+    for char in s:
+        if char == '1':
+            bytes_arr.append(0)
+        else:
+            break
+    return bytes(reversed(bytes_arr))
+
 def sha256_hex(data: Union[str, bytes]) -> str:
     if isinstance(data, str):
         data = data.encode('utf-8')

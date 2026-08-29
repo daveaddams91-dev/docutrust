@@ -172,4 +172,93 @@ test('API Server Suite', async (t) => {
     const anchorRes = await makeRequest('POST', '/api/v1/vault/auto-anchor');
     assert.equal(anchorRes.status, 200);
   });
+
+  let encryptedPayload;
+  await t.test('10. POST /api/v1/vault/encrypt & /decrypt (Envelope Encryption)', async () => {
+    const encRes = await makeRequest('POST', '/api/v1/vault/encrypt', {
+      data: { secret: 'Fortress Vault Top Secret 2026' },
+      passphrase: 'VaultPassword123!'
+    });
+    assert.equal(encRes.status, 200);
+    assert.equal(encRes.body.success, true);
+    assert.equal(encRes.body.encrypted.algorithm, 'AES-256-GCM');
+    encryptedPayload = encRes.body.encrypted;
+
+    const decRes = await makeRequest('POST', '/api/v1/vault/decrypt', {
+      encrypted: encryptedPayload,
+      passphrase: 'VaultPassword123!'
+    });
+    assert.equal(decRes.status, 200);
+    assert.equal(decRes.body.success, true);
+    assert.equal(decRes.body.decrypted.secret, 'Fortress Vault Top Secret 2026');
+  });
+
+  let zkRangeProof;
+  await t.test('11. POST /api/v1/credentials/zk-predicate/prove & /verify', async () => {
+    const proveRes = await makeRequest('POST', '/api/v1/credentials/zk-predicate/prove', {
+      predicateType: 'range',
+      claimKey: 'gpa',
+      actualValue: 3.95,
+      min: 3.5,
+      max: 4.0
+    });
+    assert.equal(proveRes.status, 200);
+    assert.equal(proveRes.body.success, true);
+    zkRangeProof = proveRes.body.proof;
+
+    const verifyRes = await makeRequest('POST', '/api/v1/credentials/zk-predicate/verify', {
+      proof: zkRangeProof
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.valid, true);
+  });
+
+  let kemKeys, encapsulation;
+  await t.test('12. POST /api/v1/kem/generate-keys, /encapsulate, & /decapsulate', async () => {
+    const keyRes = await makeRequest('POST', '/api/v1/kem/generate-keys');
+    assert.equal(keyRes.status, 200);
+    assert.ok(keyRes.body.keys.hybridRecipientId.startsWith('did:kem:z'));
+    kemKeys = keyRes.body.keys;
+
+    const encRes = await makeRequest('POST', '/api/v1/kem/encapsulate', {
+      recipientPublicKey: kemKeys
+    });
+    assert.equal(encRes.status, 200);
+    assert.ok(encRes.body.sharedSecretHex.length === 64);
+    encapsulation = encRes.body.encapsulation;
+
+    const decRes = await makeRequest('POST', '/api/v1/kem/decapsulate', {
+      encapsulation,
+      recipientKeys: kemKeys
+    });
+    assert.equal(decRes.status, 200);
+    assert.equal(decRes.body.sharedSecretHex, encRes.body.sharedSecretHex);
+  });
+
+  await t.test('13. POST /api/v1/credentials/pop/challenge & /verify', async () => {
+    const chalRes = await makeRequest('POST', '/api/v1/credentials/pop/challenge', {
+      audience: 'did:web:employer.com'
+    });
+    assert.equal(chalRes.status, 200);
+    assert.ok(chalRes.body.challenge.challengeId.startsWith('pop_'));
+
+    // Create holder presentation using core protocol
+    const { ProofOfPossessionProtocol } = require('@docutrust/core');
+    const presentation = ProofOfPossessionProtocol.createPresentation(issuedCredential, chalRes.body.challenge, classicalKeys);
+
+    const verifyRes = await makeRequest('POST', '/api/v1/credentials/pop/verify', {
+      presentation,
+      expectedAudience: 'did:web:employer.com'
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.valid, true);
+    assert.equal(verifyRes.body.holderPossessionValid, true);
+  });
+
+  await t.test('14. GET /api/v1/ledger/hashchain', async () => {
+    const chainRes = await makeRequest('GET', '/api/v1/ledger/hashchain');
+    assert.equal(chainRes.status, 200);
+    assert.equal(chainRes.body.success, true);
+    assert.equal(chainRes.body.integrity.valid, true);
+  });
 });

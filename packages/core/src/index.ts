@@ -36,3 +36,18 @@ export * from './pdf';
 
 // Export Persistent Vault & Multi-Tenant Registry
 export * from './db';
+
+// Export Fortress Encryption (AES-256-GCM, HKDF-SHA512, Zeroization)
+export * from './encryption';
+
+// Export Zero-Knowledge Predicates & Range Proofs
+export * from './zk-predicates';
+
+// Export Post-Quantum Key Encapsulation (ML-KEM-768 / Kyber)
+export * from './kem';
+
+// Export Proof of Possession & Challenge-Response Protocol
+export * from './possession';
+
+// Export Tamper-Evident Hash Chain Audit Ledger
+export * from './chain';

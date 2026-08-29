@@ -9,6 +9,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from docutrust.crypto import canonicalize_json, sha256_hex, MerkleTree
 from docutrust.pqc import generate_pqc_hybrid_keys, shake256_sponge_hex
 from docutrust.client import DocuTrustClient
+from docutrust.encryption import encrypt_aes_gcm, decrypt_aes_gcm
+from docutrust.zk_predicates import prove_range, verify_range_proof, create_commitment
+from docutrust.kem import generate_kem_keypair
 
 class TestDocuTrustPython(unittest.TestCase):
     def test_canonicalize_json(self):
@@ -47,6 +50,30 @@ class TestDocuTrustPython(unittest.TestCase):
     def test_shake256_sponge(self):
         h = shake256_sponge_hex("test", 32)
         self.assertEqual(len(h), 64)
+
+    def test_aes_gcm_envelope_encryption(self):
+        secret = "Diplomatic Grade Secret VC 2026"
+        passphrase = "UltraVaultPassphrase2026!"
+        encrypted = encrypt_aes_gcm(secret, passphrase)
+        self.assertEqual(encrypted["algorithm"], "AES-256-GCM")
+        self.assertEqual(len(encrypted["authTag"]), 32)
+
+        decrypted = decrypt_aes_gcm(encrypted, passphrase)
+        self.assertEqual(decrypted.decode('utf-8'), secret)
+
+    def test_zk_range_proof(self):
+        actual_gpa = 3.92
+        comm = create_commitment(actual_gpa)
+        proof = prove_range("gpa", actual_gpa, comm["salt"], 3.5, 4.0)
+        self.assertEqual(proof["type"], "ZKRangePredicateProof2026")
+
+        audit = verify_range_proof(proof, comm["commitment"])
+        self.assertTrue(audit["valid"])
+
+    def test_kem_key_generation(self):
+        keys = generate_kem_keypair()
+        self.assertTrue(keys["hybridRecipientId"].startswith("did:kem:z"))
+        self.assertEqual(len(keys["publicKeyHex"]), 64)
 
     @patch('requests.Session.post')
     def test_client_issue(self, mock_post):
@@ -105,6 +132,29 @@ class TestDocuTrustPython(unittest.TestCase):
         result = client.generate_selective_disclosure({"credentialSubject": {"name": "Alice"}}, ["name"])
         self.assertTrue(result["success"])
 
+    @patch('requests.Session.post')
+    def test_client_encrypt_decrypt(self, mock_post):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"success": True, "encrypted": {"ciphertext": "abc"}}
+        mock_resp.raise_for_status.return_value = None
+        mock_post.return_value = mock_resp
+
+        client = DocuTrustClient()
+        res = client.encrypt_data({"secret": 123}, "pass")
+        self.assertTrue(res["success"])
+
+    @patch('requests.Session.post')
+    def test_client_zk_and_pop(self, mock_post):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"success": True, "challenge": {"challengeId": "pop_123"}}
+        mock_resp.raise_for_status.return_value = None
+        mock_post.return_value = mock_resp
+
+        client = DocuTrustClient()
+        res = client.create_pop_challenge()
+        self.assertTrue(res["success"])
+
 if __name__ == '__main__':
     unittest.main()
+
 

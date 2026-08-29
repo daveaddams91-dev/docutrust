@@ -78,4 +78,47 @@ test('CLI Suite', async (t) => {
     assert.ok(out.includes('10-Second Quickstart Demo Wizard'));
     assert.ok(out.includes('100% CRYPTOGRAPHICALLY AUTHENTIC'));
   });
+
+  const encFile = path.join(tempDir, 'encrypted.json');
+  const decFile = path.join(tempDir, 'decrypted.json');
+  await t.test('7. docutrust encrypt and decrypt with AES-256-GCM', () => {
+    const outEnc = execSync(`node "${cliPath}" encrypt --in "${subjectFile}" --pass "TestSecretPass123!" --out "${encFile}"`).toString();
+    assert.ok(outEnc.includes('File encrypted with AES-256-GCM'));
+    assert.ok(fs.existsSync(encFile));
+
+    const outDec = execSync(`node "${cliPath}" decrypt --in "${encFile}" --pass "TestSecretPass123!" --out "${decFile}"`).toString();
+    assert.ok(outDec.includes('File decrypted and saved'));
+    assert.ok(fs.existsSync(decFile));
+
+    const orig = JSON.parse(fs.readFileSync(subjectFile, 'utf-8'));
+    const dec = JSON.parse(fs.readFileSync(decFile, 'utf-8'));
+    assert.deepEqual(orig, dec);
+  });
+
+  const zkFile = path.join(tempDir, 'zk-proof.json');
+  await t.test('8. docutrust zk-range generates Zero-Knowledge Range Proof', () => {
+    const out = execSync(`node "${cliPath}" zk-range --key gpa --val 3.92 --min 3.5 --max 4.0 --out "${zkFile}"`).toString();
+    assert.ok(out.includes('ZK Range Proof generated'));
+    assert.ok(fs.existsSync(zkFile));
+    const proof = JSON.parse(fs.readFileSync(zkFile, 'utf-8'));
+    assert.equal(proof.type, 'ZKRangePredicateProof2026');
+  });
+
+  const kemFile = path.join(tempDir, 'kem-keys.json');
+  await t.test('9. docutrust kem-keygen generates ML-KEM-768 hybrid keypair', () => {
+    const out = execSync(`node "${cliPath}" kem-keygen --out "${kemFile}"`).toString();
+    assert.ok(out.includes('ML-KEM-768 KeyPair generated'));
+    assert.ok(fs.existsSync(kemFile));
+    const kemKeys = JSON.parse(fs.readFileSync(kemFile, 'utf-8'));
+    assert.ok(kemKeys.hybridRecipientId.startsWith('did:kem:z'));
+  });
+
+  const popFile = path.join(tempDir, 'pop-challenge.json');
+  await t.test('10. docutrust pop-challenge creates challenge nonce', () => {
+    const out = execSync(`node "${cliPath}" pop-challenge --audience did:web:verifier.com --out "${popFile}"`).toString();
+    assert.ok(out.includes('Proof-of-Possession challenge created'));
+    assert.ok(fs.existsSync(popFile));
+    const chal = JSON.parse(fs.readFileSync(popFile, 'utf-8'));
+    assert.ok(chal.challengeId.startsWith('pop_'));
+  });
 });

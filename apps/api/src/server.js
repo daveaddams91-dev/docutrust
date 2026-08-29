@@ -4,6 +4,23 @@ const zlib = require('zlib');
 const fs = require('fs');
 const path = require('path');
 
+const {
+  encryptAESGCM,
+  decryptAESGCM,
+  proveRange,
+  verifyRangeProof,
+  proveSetMembership,
+  verifySetMembershipProof,
+  createCommitment,
+  generateKEMKeyPair,
+  encapsulateSecret,
+  decapsulateSecret,
+  sealCredentialForRecipient,
+  unsealCredential,
+  ProofOfPossessionProtocol,
+  TamperEvidentHashChain
+} = require('@docutrust/core');
+
 const PORT = process.env.PORT || 4000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '../data');
 
@@ -20,6 +37,7 @@ const ANCHORS_FILE = path.join(DATA_DIR, 'anchors.json');
 let credentialsStore = [];
 let apiKeysStore = [];
 let anchorsStore = [];
+const hashChainLedger = new TamperEvidentHashChain();
 
 try {
   if (fs.existsSync(CREDS_FILE)) credentialsStore = JSON.parse(fs.readFileSync(CREDS_FILE, 'utf-8'));
@@ -828,10 +846,133 @@ const server = http.createServer(async (req, res) => {
       anchorsStore.push(receipt);
       persistAll();
 
+      hashChainLedger.appendBlock(receipt.rootHash, receipt.leafCount, systemKeyPair.did, (hash) => signData(hash, systemKeyPair));
+
       return jsonResponse(200, {
         success: true,
         anchoredCount: unanchored.length,
         anchorReceipt: receipt
+      });
+    }
+
+    // 11. Vault Encryption (AES-256-GCM + HKDF)
+    if (pathname === '/api/v1/vault/encrypt' && req.method === 'POST') {
+      const body = await readJsonBody();
+      if (!body.data || !body.passphrase) {
+        return jsonResponse(400, { error: 'Missing data or passphrase' });
+      }
+      const encrypted = encryptAESGCM(typeof body.data === 'object' ? JSON.stringify(body.data) : body.data, body.passphrase, true);
+      return jsonResponse(200, { success: true, encrypted });
+    }
+
+    // 12. Vault Decryption
+    if (pathname === '/api/v1/vault/decrypt' && req.method === 'POST') {
+      const body = await readJsonBody();
+      if (!body.encrypted || !body.passphrase) {
+        return jsonResponse(400, { error: 'Missing encrypted payload or passphrase' });
+      }
+      try {
+        const decryptedBuf = decryptAESGCM(body.encrypted, body.passphrase);
+        let decrypted = decryptedBuf.toString('utf-8');
+        try { decrypted = JSON.parse(decrypted); } catch (e) {}
+        return jsonResponse(200, { success: true, decrypted });
+      } catch (err) {
+        return jsonResponse(401, { error: 'Decryption failed: invalid passphrase or corrupted auth tag' });
+      }
+    }
+
+    // 13. ZK Predicate Prove
+    if (pathname === '/api/v1/credentials/zk-predicate/prove' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { predicateType, claimKey, actualValue, salt, min, max, allowedSet } = body;
+      
+      if (predicateType === 'range') {
+        const proof = proveRange(claimKey, actualValue, salt || crypto.randomBytes(16).toString('hex'), min, max);
+        return jsonResponse(200, { success: true, proof });
+      } else if (predicateType === 'membership') {
+        const proof = proveSetMembership(claimKey, actualValue, salt || crypto.randomBytes(16).toString('hex'), allowedSet);
+        return jsonResponse(200, { success: true, proof });
+      }
+      return jsonResponse(400, { error: 'Invalid predicateType. Must be range or membership.' });
+    }
+
+    // 14. ZK Predicate Verify
+    if (pathname === '/api/v1/credentials/zk-predicate/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { proof, expectedCommitment, allowedSet } = body;
+      if (!proof) return jsonResponse(400, { error: 'Missing proof in request' });
+
+      if (proof.type === 'ZKRangePredicateProof2026') {
+        const result = verifyRangeProof(proof, expectedCommitment);
+        return jsonResponse(200, result);
+      } else if (proof.type === 'ZKSetMembershipProof2026') {
+        const result = verifySetMembershipProof(proof, allowedSet, expectedCommitment);
+        return jsonResponse(200, result);
+      }
+      return jsonResponse(400, { error: 'Unsupported proof type' });
+    }
+
+    // 15. KEM Key Generation
+    if (pathname === '/api/v1/kem/generate-keys' && req.method === 'POST') {
+      const keys = generateKEMKeyPair();
+      return jsonResponse(200, { success: true, keys });
+    }
+
+    // 16. KEM Encapsulate
+    if (pathname === '/api/v1/kem/encapsulate' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { recipientPublicKey } = body;
+      if (!recipientPublicKey) return jsonResponse(400, { error: 'Missing recipientPublicKey' });
+      const result = encapsulateSecret(recipientPublicKey);
+      return jsonResponse(200, {
+        success: true,
+        encapsulation: result.encapsulation,
+        sharedSecretHex: result.sharedSecret.toString('hex')
+      });
+    }
+
+    // 17. KEM Decapsulate
+    if (pathname === '/api/v1/kem/decapsulate' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { encapsulation, recipientKeys } = body;
+      if (!encapsulation || !recipientKeys) return jsonResponse(400, { error: 'Missing encapsulation or recipientKeys' });
+      try {
+        const sharedSecret = decapsulateSecret(encapsulation, recipientKeys);
+        return jsonResponse(200, {
+          success: true,
+          sharedSecretHex: sharedSecret.toString('hex')
+        });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // 18. PoP Create Challenge
+    if (pathname === '/api/v1/credentials/pop/challenge' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const audience = body.audience || 'did:web:docutrust.org';
+      const challenge = ProofOfPossessionProtocol.createChallenge(audience);
+      return jsonResponse(200, { success: true, challenge });
+    }
+
+    // 19. PoP Verify Presentation
+    if (pathname === '/api/v1/credentials/pop/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { presentation, expectedAudience } = body;
+      if (!presentation) return jsonResponse(400, { error: 'Missing presentation in request' });
+      const result = await ProofOfPossessionProtocol.verifyPresentation(presentation, expectedAudience);
+      return jsonResponse(200, result);
+    }
+
+    // 20. Tamper-Evident HashChain Inspection
+    if (pathname === '/api/v1/ledger/hashchain' && req.method === 'GET') {
+      const chain = hashChainLedger.getChain();
+      const integrity = hashChainLedger.verifyChainIntegrity();
+      return jsonResponse(200, {
+        success: true,
+        chainLength: chain.length,
+        integrity,
+        chain
       });
     }
 

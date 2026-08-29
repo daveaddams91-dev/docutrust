@@ -45,7 +45,29 @@ const {
   verifyPdfDocument,
   extractVerifiablePdfProof,
   // DB
-  CredentialVault
+  CredentialVault,
+  // Encryption
+  encryptAESGCM,
+  decryptAESGCM,
+  deriveKeyHKDF,
+  deriveKeyPBKDF2,
+  zeroizeBuffer,
+  // ZK Predicates
+  proveRange,
+  verifyRangeProof,
+  proveSetMembership,
+  verifySetMembershipProof,
+  createCommitment,
+  // KEM
+  generateKEMKeyPair,
+  encapsulateSecret,
+  decapsulateSecret,
+  sealCredentialForRecipient,
+  unsealCredential,
+  // PoP
+  ProofOfPossessionProtocol,
+  // HashChain
+  TamperEvidentHashChain
 } = require('../dist/index.js');
 
 // 1. Cryptography Tests
@@ -348,3 +370,161 @@ test('12. Vault: Storage, Search, API Keys, Metrics, and Auto-Batch Anchoring', 
   // Cleanup temp vault directory
   fs.rmSync(tempDir, { recursive: true, force: true });
 });
+
+// 12. Fortress Authenticated Envelope Encryption Tests
+test('13. Encryption: AES-256-GCM authenticated envelope encryption & tamper resistance', () => {
+  const secretData = 'Confidential Diplomatic Credential Payload: Grade A+';
+  const passphrase = 'SuperSecretVaultMasterPassphrase2026!';
+
+  const encrypted = encryptAESGCM(secretData, passphrase, true);
+  assert.equal(encrypted.algorithm, 'AES-256-GCM');
+  assert.equal(encrypted.keyDerivation, 'PBKDF2-SHA512');
+  assert.ok(encrypted.ciphertext.length > 0);
+  assert.ok(encrypted.authTag.length === 32);
+
+  const decrypted = decryptAESGCM(encrypted, passphrase);
+  assert.equal(decrypted.toString('utf-8'), secretData);
+
+  // Tamper test: Alter 1 character of ciphertext
+  const tampered = { ...encrypted, ciphertext: encrypted.ciphertext.substring(0, 4) + 'AAAA' + encrypted.ciphertext.substring(8) };
+  assert.throws(() => {
+    decryptAESGCM(tampered, passphrase);
+  }, /Decryption or cryptographic authentication tag verification failed/);
+
+  // Wrong key test
+  assert.throws(() => {
+    decryptAESGCM(encrypted, 'WrongPassphrase!');
+  }, /Decryption or cryptographic authentication tag verification failed/);
+});
+
+// 13. Zero-Knowledge Range & Membership Predicates
+test('14. ZK Predicates: Zero-Knowledge Range Proofs and Set Membership Verification', () => {
+  const actualGPA = 3.92;
+  const { commitment, salt } = createCommitment(actualGPA);
+
+  // Prove GPA >= 3.5 and GPA <= 4.0 without revealing 3.92
+  const rangeProof = proveRange('gpa', actualGPA, salt, 3.5, 4.0);
+  assert.equal(rangeProof.type, 'ZKRangePredicateProof2026');
+
+  const rangeAudit = verifyRangeProof(rangeProof, commitment);
+  assert.equal(rangeAudit.valid, true);
+
+  // Fail when actual value outside range
+  assert.throws(() => {
+    proveRange('gpa', 3.2, salt, 3.5, 4.0);
+  }, /outside range/);
+
+  // ZK Set Membership: Prove university is accredited without revealing exact name
+  const secretUniversity = 'Stanford University';
+  const { commitment: uniCommitment, salt: uniSalt } = createCommitment(secretUniversity);
+  const accreditedList = ['MIT', 'Stanford University', 'Harvard University', 'Oxford', 'Cambridge'];
+
+  const memberProof = proveSetMembership('university', secretUniversity, uniSalt, accreditedList);
+  assert.equal(memberProof.type, 'ZKSetMembershipProof2026');
+
+  const memberAudit = verifySetMembershipProof(memberProof, accreditedList, uniCommitment);
+  assert.equal(memberAudit.valid, true);
+
+  // Verification fails if set changed
+  const wrongList = ['MIT', 'Harvard University', 'Oxford'];
+  const wrongAudit = verifySetMembershipProof(memberProof, wrongList, uniCommitment);
+  assert.equal(wrongAudit.valid, false);
+});
+
+// 14. Post-Quantum Key Encapsulation (ML-KEM-768 / Kyber)
+test('15. PQC KEM: NIST ML-KEM-768 + X25519 Hybrid Key Encapsulation & Sealed Delivery', () => {
+  const recipientKeys = generateKEMKeyPair();
+  assert.ok(recipientKeys.hybridRecipientId.startsWith('did:kem:z'));
+  assert.equal(recipientKeys.x25519PublicKeyHex.length, 64);
+  assert.equal(recipientKeys.publicKeyHex.length, 64);
+
+  // Sender encapsulates secret
+  const { sharedSecret: senderSecret, encapsulation } = encapsulateSecret(recipientKeys);
+  assert.equal(senderSecret.length, 32);
+  assert.ok(encapsulation.ciphertext.includes(':'));
+
+  // Recipient decapsulates secret
+  const recipientSecret = decapsulateSecret(encapsulation, recipientKeys);
+  assert.equal(recipientSecret.length, 32);
+  assert.deepEqual(senderSecret, recipientSecret);
+
+  // End-to-end Quantum-Sealed Credential Delivery
+  const confidentialCredential = {
+    id: 'urn:uuid:quantum-sealed-vc-001',
+    type: ['VerifiableCredential', 'GovernmentSecurityClearance'],
+    credentialSubject: { clearanceLevel: 'TOP-SECRET-PQC' }
+  };
+
+  const sealed = sealCredentialForRecipient(confidentialCredential, recipientKeys);
+  assert.ok(sealed.encryptedPayload.ciphertext.length > 0);
+
+  const unsealed = unsealCredential(sealed, recipientKeys);
+  assert.equal(unsealed.id, confidentialCredential.id);
+  assert.equal(unsealed.credentialSubject.clearanceLevel, 'TOP-SECRET-PQC');
+});
+
+// 15. Proof of Possession Challenge-Response Protocol
+test('16. Proof-of-Possession: Dynamic Challenge-Response Holder Binding', async () => {
+  const issuerKp = generateKeyPair();
+  const holderKp = generateKeyPair();
+
+  const { credential } = VerifiableCredentialsEngine.issue({
+    type: ['UniversityDegreeCredential'],
+    issuer: { id: issuerKp.did, name: 'MIT' },
+    credentialSubject: {
+      id: holderKp.did, // Bound to Holder's sovereign DID
+      name: 'Alex Rivera',
+      degree: 'M.Sc. CS'
+    },
+    keyPair: issuerKp
+  });
+
+  // Verifier creates challenge
+  const challenge = ProofOfPossessionProtocol.createChallenge('did:web:employer.com');
+  assert.ok(challenge.challengeId.startsWith('pop_'));
+  assert.equal(challenge.nonce.length, 64);
+
+  // Holder creates presentation with private key signature
+  const presentation = ProofOfPossessionProtocol.createPresentation(credential, challenge, holderKp);
+  assert.equal(presentation.holderDid, holderKp.did);
+  assert.ok(presentation.holderSignature.length === 128);
+
+  // Verifier confirms both credential and holder ownership
+  const audit = await ProofOfPossessionProtocol.verifyPresentation(presentation, 'did:web:employer.com');
+  assert.equal(audit.valid, true);
+  assert.equal(audit.credentialValid, true);
+  assert.equal(audit.holderPossessionValid, true);
+
+  // Thief tries to present stolen credential with thief's key
+  const thiefKp = generateKeyPair();
+  const thiefPresentation = ProofOfPossessionProtocol.createPresentation(credential, challenge, thiefKp);
+  const thiefAudit = await ProofOfPossessionProtocol.verifyPresentation(thiefPresentation, 'did:web:employer.com');
+  assert.equal(thiefAudit.valid, false);
+  assert.ok(thiefAudit.errors.some(e => e.includes('Holder DID mismatch')));
+});
+
+// 16. Tamper-Evident Hash Chain Audit Ledger
+test('17. HashChain: Tamper-Evident Forward-Secure Cryptographic Ledger', () => {
+  const ledger = new TamperEvidentHashChain();
+  const validatorKp = generateKeyPair();
+
+  const signerFn = (hash) => signData(hash, validatorKp);
+
+  const block1 = ledger.appendBlock('0x1111111111111111111111111111111111111111111111111111111111111111', 10, validatorKp.did, signerFn);
+  const block2 = ledger.appendBlock('0x2222222222222222222222222222222222222222222222222222222222222222', 25, validatorKp.did, signerFn);
+  const block3 = ledger.appendBlock('0x3333333333333333333333333333333333333333333333333333333333333333', 50, validatorKp.did, signerFn);
+
+  assert.equal(ledger.getChain().length, 3);
+  assert.equal(block2.previousBlockHash, block1.blockHash);
+  assert.equal(block3.previousBlockHash, block2.blockHash);
+
+  const integrity = ledger.verifyChainIntegrity((data, sig, did) => verifySignature(data, sig, did));
+  assert.equal(integrity.valid, true);
+
+  // Tamper detection: Modifying block data breaks the hash chain
+  block2.leafCount = 999;
+  const tamperedAudit = ledger.verifyChainIntegrity();
+  assert.equal(tamperedAudit.valid, false);
+  assert.equal(tamperedAudit.brokenIndex, 1);
+});
+

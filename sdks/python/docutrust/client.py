@@ -79,3 +79,61 @@ class DocuTrustClient:
         res = self.session.post(url, json=payload)
         res.raise_for_status()
         return res.json()
+
+    def encrypt_data(self, data: Any, passphrase: str) -> Dict[str, Any]:
+        """Encrypts data with AES-256-GCM via API vault."""
+        url = f"{self.api_url}/vault/encrypt"
+        res = self.session.post(url, json={"data": data, "passphrase": passphrase})
+        res.raise_for_status()
+        return res.json()
+
+    def decrypt_data(self, encrypted_payload: Dict[str, Any], passphrase: str) -> Dict[str, Any]:
+        """Decrypts AES-256-GCM payload via API vault."""
+        url = f"{self.api_url}/vault/decrypt"
+        res = self.session.post(url, json={"encrypted": encrypted_payload, "passphrase": passphrase})
+        res.raise_for_status()
+        return res.json()
+
+    def prove_zk_range(
+        self,
+        claim_key: str,
+        actual_value: float,
+        min_val: float,
+        max_val: float,
+        salt: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Generates a Zero-Knowledge Range Proof."""
+        url = f"{self.api_url}/credentials/zk-predicate/prove"
+        payload = {
+            "predicateType": "range",
+            "claimKey": claim_key,
+            "actualValue": actual_value,
+            "salt": salt,
+            "min": min_val,
+            "max": max_val
+        }
+        res = self.session.post(url, json=payload)
+        res.raise_for_status()
+        return res.json()
+
+    def verify_zk_predicate(self, proof: Dict[str, Any], expected_commitment: Optional[str] = None) -> Dict[str, Any]:
+        """Verifies a Zero-Knowledge Predicate Proof."""
+        url = f"{self.api_url}/credentials/zk-predicate/verify"
+        res = self.session.post(url, json={"proof": proof, "expectedCommitment": expected_commitment})
+        res.raise_for_status()
+        return res.json()
+
+    def kem_generate_keys(self) -> Dict[str, Any]:
+        """Generates Post-Quantum ML-KEM-768 hybrid keys."""
+        url = f"{self.api_url}/kem/generate-keys"
+        res = self.session.post(url, json={})
+        res.raise_for_status()
+        return res.json()
+
+    def create_pop_challenge(self, audience: str = "did:web:docutrust.org") -> Dict[str, Any]:
+        """Creates an ephemeral Proof-of-Possession challenge."""
+        url = f"{self.api_url}/credentials/pop/challenge"
+        res = self.session.post(url, json={"audience": audience})
+        res.raise_for_status()
+        return res.json()
+

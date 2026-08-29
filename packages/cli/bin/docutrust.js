@@ -4,6 +4,11 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
+let core;
+try {
+  core = require('@docutrust/core');
+} catch (e) {}
+
 // Base58 Alphabet
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
@@ -524,6 +529,95 @@ async function main() {
       console.log(`Ledger Anchor:   \x1b[32m✔ Confirmed on ${proof.anchorReceipt.network} (${proof.anchorReceipt.txHash.slice(0, 16)}...)\x1b[0m`);
     }
     console.log(`---------------------------\n`);
+    return;
+  }
+
+  if (command === 'encrypt') {
+    const inFile = getArgValue('--in') || getArgValue('-i');
+    const pass = getArgValue('--pass') || getArgValue('-p');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!inFile || !pass) {
+      console.error('\x1b[31mError:\x1b[0m Missing --in <file> or --pass <passphrase>');
+      process.exit(1);
+    }
+    const data = fs.readFileSync(inFile, 'utf-8');
+    const encrypted = core.encryptAESGCM(data, pass, true);
+    const outStr = JSON.stringify(encrypted, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m File encrypted with AES-256-GCM and saved to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    return;
+  }
+
+  if (command === 'decrypt') {
+    const inFile = getArgValue('--in') || getArgValue('-i');
+    const pass = getArgValue('--pass') || getArgValue('-p');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!inFile || !pass) {
+      console.error('\x1b[31mError:\x1b[0m Missing --in <file> or --pass <passphrase>');
+      process.exit(1);
+    }
+    const payload = JSON.parse(fs.readFileSync(inFile, 'utf-8'));
+    const decryptedBuf = core.decryptAESGCM(payload, pass);
+    const decStr = decryptedBuf.toString('utf-8');
+    if (outFile) {
+      fs.writeFileSync(outFile, decStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m File decrypted and saved to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(decStr);
+    }
+    return;
+  }
+
+  if (command === 'zk-range') {
+    const key = getArgValue('--key') || 'gpa';
+    const val = parseFloat(getArgValue('--val') || '3.9');
+    const min = parseFloat(getArgValue('--min') || '3.5');
+    const max = parseFloat(getArgValue('--max') || '4.0');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    const salt = crypto.randomBytes(16).toString('hex');
+    const proof = core.proveRange(key, val, salt, min, max);
+    const outStr = JSON.stringify(proof, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m ZK Range Proof generated and saved to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    return;
+  }
+
+  if (command === 'kem-keygen') {
+    const outFile = getArgValue('--out') || getArgValue('-o');
+    const kp = core.generateKEMKeyPair();
+    const outStr = JSON.stringify(kp, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m Post-Quantum ML-KEM-768 KeyPair generated and saved to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    console.log(`\x1b[34mKEM Recipient DID:\x1b[0m ${kp.hybridRecipientId}`);
+    return;
+  }
+
+  if (command === 'pop-challenge') {
+    const audience = getArgValue('--audience') || getArgValue('-a') || 'did:web:docutrust.org';
+    const outFile = getArgValue('--out') || getArgValue('-o');
+    const chal = core.ProofOfPossessionProtocol.createChallenge(audience);
+    const outStr = JSON.stringify(chal, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m Proof-of-Possession challenge created and saved to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
     return;
   }
 

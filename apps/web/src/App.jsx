@@ -11,6 +11,7 @@ import SelectiveDisclosureStudio from './components/SelectiveDisclosureStudio.js
 import ProtocolSimulator from './components/ProtocolSimulator.jsx';
 import DeveloperHub from './components/DeveloperHub.jsx';
 import ArchitectureDocs from './components/ArchitectureDocs.jsx';
+import FortressArmorStudio from './components/FortressArmorStudio.jsx';
 import Footer from './components/Footer.jsx';
 
 export default function App() {
@@ -28,6 +29,7 @@ export default function App() {
 
       <main className="flex-1">
         {activeTab === 'hero' && <HeroSection setActiveTab={setActiveTab} />}
+        {activeTab === 'armor' && <FortressArmorStudio />}
         {activeTab === 'issuer' && <IssuerStudio onInspectCredential={handleInspectCredential} />}
         {activeTab === 'designer' && <CertificateDesigner />}
         {activeTab === 'multisig' && <MultiSigStudio />}

@@ -1,5 +1,53 @@
 # 📝 DocuTrust Changelog & Release Notes
 
+## [v1.3.0] - The Fortress Release: Uncrackable Cryptographic Data Armor & ZK Predicates - 2026-08-29
+
+### 🏰 Uncrackable Backend Data Protection & Zero-Trust Security Suite
+- **Authenticated AES-256-GCM Envelope Encryption (`@docutrust/core/encryption`)**:
+  - Multi-cipher authenticated symmetric encryption with 128-bit integrity authentication tags (`authTag`) preventing any tampering or chosen-ciphertext attacks.
+  - Memory-hard PBKDF2-SHA512 key stretching (100,000 iterations) and high-entropy HKDF-SHA512 key derivation.
+  - Secure memory zeroization (`zeroizeBuffer`) ensuring cryptographic keys and secret byte arrays are actively wiped from RAM buffers after execution (`Buffer.fill(0)`).
+- **Zero-Knowledge Range & Set Membership Predicates (`@docutrust/core/zk-predicates`)**:
+  - Non-Interactive Zero-Knowledge (NIZK) Range Proofs (`proveRange`, `verifyRangeProof`): Enables cryptographic proof of numerical claims (e.g. `GPA >= 3.5`, `Age >= 21`, `Salary >= $100k`) without leaking the secret value to the verifier.
+  - NIZK Set Membership Proofs (`proveSetMembership`, `verifySetMembershipProof`): Allows proving a credential belongs to an authorized accredited institution set without disclosing individual identifiers.
+- **Post-Quantum Key Encapsulation Mechanism (`@docutrust/core/kem`)**:
+  - NIST FIPS 203 ML-KEM-768 lattice-based key encapsulation combined with X25519 ECDH in a hybrid envelope.
+  - Enables quantum-resistant, confidential end-to-end credential delivery (`sealCredentialForRecipient`, `unsealCredential`) immune to future quantum decryption ("harvest now, decrypt later").
+- **Holder Proof-of-Possession Challenge-Response Protocol (`@docutrust/core/possession`)**:
+  - Dynamic ephemeral challenge-response nonces preventing credential replay and credential theft: verifiers validate both issuer authority authenticity and current holder possession of subject DID private keys.
+- **Tamper-Evident Hash-Chain Audit Ledger (`@docutrust/core/chain`)**:
+  - Forward-secure cryptographic blockchain ledger with continuous hash linkage ($H_i = \text{SHA256}(H_{i-1} \parallel \text{Root}_i \parallel \text{Timestamp})$) and digital integrity verification.
+
+---
+
+### 🌐 REST API v1.3 Extensions (`@docutrust/api`)
+- Added `POST /api/v1/vault/encrypt` & `POST /api/v1/vault/decrypt` (Zero-knowledge envelope storage).
+- Added `POST /api/v1/credentials/zk-predicate/prove` & `POST /api/v1/credentials/zk-predicate/verify`.
+- Added `POST /api/v1/kem/generate-keys`, `POST /api/v1/kem/encapsulate`, and `POST /api/v1/kem/decapsulate`.
+- Added `POST /api/v1/credentials/pop/challenge` & `POST /api/v1/credentials/pop/verify`.
+- Added `GET /api/v1/ledger/hashchain` with real-time integrity verification.
+
+---
+
+### 💻 CLI v1.3 Commands (`@docutrust/cli`)
+- `docutrust encrypt`: Authenticated AES-256-GCM file encryption.
+- `docutrust decrypt`: Authenticated decryption with tamper protection.
+- `docutrust zk-range`: Zero-Knowledge Range Proof generator.
+- `docutrust kem-keygen`: Post-Quantum ML-KEM-768 hybrid keypair generation.
+- `docutrust pop-challenge`: Proof-of-Possession challenge creator.
+
+---
+
+### 🐍 Python SDK v1.3 (`sdks/python`)
+- Implemented `docutrust.encryption` (AES-256-GCM + PBKDF2), `docutrust.zk_predicates` (ZK range & commitments), `docutrust.kem` (ML-KEM-768 keypairs), and expanded `DocuTrustClient`.
+
+---
+
+### 🎨 Web Studio v1.3 (`@docutrust/web`)
+- Added **Fortress Armor Studio** (`FortressArmorStudio.jsx`) with interactive ZK Range Proof generation, Post-Quantum ML-KEM key exchange simulations, and AES-256-GCM authenticated tamper sandboxes.
+
+---
+
 ## [v1.2.1] - 2026-08-29
 
 ### 🛡️ Security & Cryptographic Bug Fixes
