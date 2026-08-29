@@ -40,6 +40,12 @@ export interface VaultMetrics {
   lastAnchorTimestamp?: number;
 }
 
+function atomicWriteFileSync(filePath: string, data: string): void {
+  const tmpPath = `${filePath}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
+  fs.writeFileSync(tmpPath, data, 'utf-8');
+  fs.renameSync(tmpPath, filePath);
+}
+
 /**
  * Persistent Vault & Index Registry for Multi-Tenant Credentials.
  */
@@ -91,32 +97,32 @@ export class CredentialVault {
   private persistCredentials(): void {
     try {
       const records = Array.from(this.credentialsMap.values());
-      fs.writeFileSync(this.credentialsFile, JSON.stringify(records, null, 2), 'utf-8');
+      atomicWriteFileSync(this.credentialsFile, JSON.stringify(records, null, 2));
     } catch (e) {}
   }
 
   private persistApiKeys(): void {
     try {
       const records = Array.from(this.apiKeysMap.values());
-      fs.writeFileSync(this.apiKeysFile, JSON.stringify(records, null, 2), 'utf-8');
+      atomicWriteFileSync(this.apiKeysFile, JSON.stringify(records, null, 2));
     } catch (e) {}
   }
 
   private persistAnchors(): void {
     try {
-      fs.writeFileSync(this.anchorsFile, JSON.stringify(this.anchorsList, null, 2), 'utf-8');
+      atomicWriteFileSync(this.anchorsFile, JSON.stringify(this.anchorsList, null, 2));
     } catch (e) {}
   }
 
   public saveCredential(vc: VerifiableCredential): StoredCredentialRecord {
-    const issuerId = typeof vc.issuer === 'string' ? vc.issuer : vc.issuer.id;
+    const issuerId = typeof vc.issuer === 'string' ? vc.issuer : (vc.issuer?.id || 'did:key:unknown');
     const issuerName = typeof vc.issuer === 'object' ? vc.issuer.name || 'Authority' : 'Authority';
     const recipientName = vc.credentialSubject?.name || 'Recipient';
     const recipientId = vc.credentialSubject?.id || 'did:key:unknown';
 
     const record: StoredCredentialRecord = {
       id: vc.id,
-      type: vc.type,
+      type: Array.isArray(vc.type) ? vc.type : [vc.type || 'VerifiableCredential'],
       issuerId,
       issuerName,
       recipientName,
@@ -156,9 +162,9 @@ export class CredentialVault {
     if (options.search) {
       const q = options.search.toLowerCase();
       list = list.filter(r =>
-        r.recipientName.toLowerCase().includes(q) ||
-        r.id.toLowerCase().includes(q) ||
-        r.type.some(t => t.toLowerCase().includes(q))
+        (r.recipientName || '').toLowerCase().includes(q) ||
+        (r.id || '').toLowerCase().includes(q) ||
+        (Array.isArray(r.type) ? r.type : []).some(t => (t || '').toLowerCase().includes(q))
       );
     }
 

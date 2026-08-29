@@ -73,44 +73,30 @@ ET`;
 
   const streamLength = Buffer.byteLength(streamContent, 'utf-8');
 
-  // Minimal valid PDF-1.7 structure with embedded metadata and visual vector layout
-  const pdfBody = `%PDF-1.7
-1 0 obj
-<< /Type /Catalog /Pages 2 0 R /DocuTrustProof << /Type /VerifiableCredential /Payload (${vcBase64}) >> >>
-endobj
-2 0 obj
-<< /Type /Pages /Kids [3 0 R] /Count 1 >>
-endobj
-3 0 obj
-<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>
-endobj
-4 0 obj
-<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
-endobj
-5 0 obj
-<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
-endobj
-6 0 obj
-<< /Length ${streamLength} >>
-stream
-${streamContent}
-endstream
-endobj
-xref
-0 7
-0000000000 65535 f 
-0000000009 00000 n 
-0000000120 00000 n 
-0000000179 00000 n 
-0000000300 00000 n 
-0000000375 00000 n 
-0000000446 00000 n 
-trailer
-<< /Size 7 /Root 1 0 R >>
-startxref
-1250
-%%EOF`;
+  // Modular objects for exact byte offset calculation
+  const header = '%PDF-1.7\n';
+  const obj1 = `1 0 obj\n<< /Type /Catalog /Pages 2 0 R /DocuTrustProof << /Type /VerifiableCredential /Payload (${vcBase64}) >> >>\nendobj\n`;
+  const obj2 = `2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n`;
+  const obj3 = `3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>\nendobj\n`;
+  const obj4 = `4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\nendobj\n`;
+  const obj5 = `5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n`;
+  const obj6 = `6 0 obj\n<< /Length ${streamLength} >>\nstream\n${streamContent}\nendstream\nendobj\n`;
 
+  const offset1 = Buffer.byteLength(header, 'utf-8');
+  const offset2 = offset1 + Buffer.byteLength(obj1, 'utf-8');
+  const offset3 = offset2 + Buffer.byteLength(obj2, 'utf-8');
+  const offset4 = offset3 + Buffer.byteLength(obj3, 'utf-8');
+  const offset5 = offset4 + Buffer.byteLength(obj4, 'utf-8');
+  const offset6 = offset5 + Buffer.byteLength(obj5, 'utf-8');
+
+  const formatOffset = (offset: number) => String(offset).padStart(10, '0');
+
+  const objectsBody = header + obj1 + obj2 + obj3 + obj4 + obj5 + obj6;
+  const startXref = Buffer.byteLength(objectsBody, 'utf-8');
+
+  const xrefSection = `xref\n0 7\n0000000000 65535 f \n${formatOffset(offset1)} 00000 n \n${formatOffset(offset2)} 00000 n \n${formatOffset(offset3)} 00000 n \n${formatOffset(offset4)} 00000 n \n${formatOffset(offset5)} 00000 n \n${formatOffset(offset6)} 00000 n \ntrailer\n<< /Size 7 /Root 1 0 R >>\nstartxref\n${startXref}\n%%EOF`;
+
+  const pdfBody = objectsBody + xrefSection;
   const pdfBuffer = Buffer.from(pdfBody, 'utf-8');
   const documentHash = sha256Hex(pdfBuffer);
 

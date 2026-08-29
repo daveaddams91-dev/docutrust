@@ -855,6 +855,119 @@ test('26. Security: SVG XML and PDF String Escaping for Special Characters', () 
   assert.equal(extracted.credentialSubject.name, 'Alice & Bob <script>alert("xss")</script>');
 });
 
+// 26. Cryptography: RFC 8785 Undefined Property Canonicalization and Base58 Edge Cases
+test('27. Cryptography: RFC 8785 undefined property omission & Base58 empty buffer', () => {
+  // Undefined property omission
+  const objWithUndefined = { a: 1, b: undefined, c: 'hello' };
+  const objWithoutUndefined = { a: 1, c: 'hello' };
+  assert.equal(canonicalizeJson(objWithUndefined), canonicalizeJson(objWithoutUndefined));
+  assert.equal(canonicalizeJson(objWithUndefined), '{"a":1,"c":"hello"}');
+
+  // Base58 empty buffer and roundtrip
+  assert.equal(encodeBase58(Buffer.alloc(0)), '');
+  assert.deepEqual(decodeBase58(''), Buffer.alloc(0));
+
+  const sampleBuf = Buffer.from('DocuTrust-v2.1.0-Sovereign', 'utf-8');
+  assert.deepEqual(decodeBase58(encodeBase58(sampleBuf)), sampleBuf);
+});
+
+// 27. PDF: ISO 32000-1 Dynamic xref byte offset correctness
+test('28. PDF: ISO 32000-1 dynamic xref table byte offset accuracy', () => {
+  const kp = generateKeyPair();
+  const { credential } = VerifiableCredentialsEngine.issue({
+    keyPair: kp,
+    issuer: { id: kp.did, name: 'DocuTrust ISO Test Authority' },
+    credentialSubject: {
+      id: 'did:key:z6Mstudent123',
+      name: 'Dynamic Length Recipient Name with Extra Padding To Test Variable Offsets',
+      degree: 'Master of Science in Cryptography'
+    },
+    type: ['DiplomaCredential']
+  });
+
+  const pdfResult = generateVerifiablePdf(credential);
+  const pdfStr = pdfResult.pdfBuffer.toString('utf-8');
+
+  // Verify xref table format and trailer
+  assert.ok(pdfStr.includes('xref\n0 7\n0000000000 65535 f \n'));
+  assert.ok(pdfStr.includes('trailer\n<< /Size 7 /Root 1 0 R >>\nstartxref\n'));
+
+  // Extract startxref offset and verify it points directly to "xref"
+  const startXrefMatch = pdfStr.match(/startxref\s+(\d+)\s+%%EOF/);
+  assert.ok(startXrefMatch, 'startxref offset exists');
+  const startXrefPos = parseInt(startXrefMatch[1], 10);
+  const xrefSubstring = pdfResult.pdfBuffer.subarray(startXrefPos, startXrefPos + 4).toString('utf-8');
+  assert.equal(xrefSubstring, 'xref');
+});
+
+// 28. Verifiable Credentials: MultiSigThresholdSignature2026 Auto-Verification
+test('29. Verifiable Credentials: Auto-verification of MultiSigThresholdSignature2026', async () => {
+  const dean = generateKeyPair();
+  const chancellor = generateKeyPair();
+  const registrar = generateKeyPair();
+
+  const policy = {
+    requiredSignatures: 2,
+    totalAuthorizedSigners: 3,
+    authorizedSigners: [
+      { did: dean.did, role: 'Dean', publicKeyHex: dean.publicKeyHex },
+      { did: chancellor.did, role: 'Chancellor', publicKeyHex: chancellor.publicKeyHex },
+      { did: registrar.did, role: 'Registrar', publicKeyHex: registrar.publicKeyHex }
+    ]
+  };
+
+  const unsigned = {
+    '@context': ['https://www.w3.org/ns/credentials/v2'],
+    id: 'urn:uuid:multisig-vc-001',
+    type: ['VerifiableCredential', 'UniversityDegreeCredential'],
+    issuer: dean.did,
+    validFrom: new Date().toISOString(),
+    credentialSubject: {
+      id: 'did:key:z6MstudentX',
+      name: 'Student MultiSig Test',
+      degree: 'B.Sc. Computer Engineering'
+    }
+  };
+
+  const { canonicalHash } = MultiSigEngine.createMultiSigDraft(unsigned, policy);
+  const sigDean = MultiSigEngine.signAsAuthority(canonicalHash, policy.authorizedSigners[0], dean);
+  const sigChancellor = MultiSigEngine.signAsAuthority(canonicalHash, policy.authorizedSigners[1], chancellor);
+
+  const multiSigVc = MultiSigEngine.assembleMultiSigCredential(unsigned, policy, [sigDean, sigChancellor]);
+  assert.equal(multiSigVc.proof.type, 'MultiSigThresholdSignature2026');
+
+  // Verify through general VerifiableCredentialsEngine.verify
+  const result = await VerifiableCredentialsEngine.verify(multiSigVc);
+  assert.equal(result.valid, true);
+  assert.equal(result.signatureValid, true);
+  assert.equal(result.errors.length, 0);
+});
+
+// 29. Credential Vault: Atomic persistence and sparse record searching
+test('30. DB: CredentialVault atomic persistence and sparse record searching', () => {
+  const tempDir = path.join(__dirname, 'vault-test-' + Date.now());
+  const vault = new CredentialVault(tempDir);
+
+  const kp = generateKeyPair();
+  const { credential } = VerifiableCredentialsEngine.issue({
+    keyPair: kp,
+    issuer: { id: kp.did, name: 'Vault Org' },
+    credentialSubject: { id: 'did:key:z6Mrec', name: 'Vault Recipient' },
+    type: ['VaultCredential']
+  });
+
+  const record = vault.saveCredential(credential);
+  assert.equal(record.id, credential.id);
+
+  // Search by partial name
+  const searchRes = vault.listCredentials({ search: 'recipient' });
+  assert.equal(searchRes.total, 1);
+  assert.equal(searchRes.records[0].recipientName, 'Vault Recipient');
+
+  // Clean up
+  fs.rmSync(tempDir, { recursive: true, force: true });
+});
+
 
 
 

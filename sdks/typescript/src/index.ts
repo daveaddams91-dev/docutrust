@@ -55,6 +55,13 @@ export interface ZKDateProveOptions {
   salt?: string;
 }
 
+export interface ZKMembershipProveOptions {
+  claimKey: string;
+  actualValue: string;
+  allowedSet: string[];
+  salt?: string;
+}
+
 export interface DIDCommPackOptions {
   message: Record<string, any>;
   recipientPublicKeyHex: string;
@@ -269,6 +276,30 @@ export class DocuTrustClient {
   public async verifyZKDate(proof: Record<string, any>, expectedCommitment?: string): Promise<any> {
     return this.request('/credentials/zk-predicate/verify-date', 'POST', {
       proof,
+      expectedCommitment
+    });
+  }
+
+  /**
+   * Generates a Zero-Knowledge Set Membership Proof.
+   */
+  public async proveZKMembership(options: ZKMembershipProveOptions): Promise<any> {
+    return this.request('/credentials/zk-predicate/prove', 'POST', {
+      predicateType: 'membership',
+      claimKey: options.claimKey,
+      actualValue: options.actualValue,
+      allowedSet: options.allowedSet,
+      salt: options.salt
+    });
+  }
+
+  /**
+   * Verifies a Zero-Knowledge Set Membership Proof.
+   */
+  public async verifyZKMembership(proof: Record<string, any>, allowedSet: string[], expectedCommitment?: string): Promise<any> {
+    return this.request('/credentials/zk-predicate/verify', 'POST', {
+      proof,
+      allowedSet,
       expectedCommitment
     });
   }

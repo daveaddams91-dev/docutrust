@@ -19,6 +19,8 @@ BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 
 def encode_base58(buffer: bytes) -> str:
     """Base58 encoding helper."""
+    if not buffer:
+        return ""
     digits = [0]
     for byte in buffer:
         for j in range(len(digits)):
@@ -41,6 +43,8 @@ def encode_base58(buffer: bytes) -> str:
 
 def decode_base58(s: str) -> bytes:
     """Base58 decoding helper."""
+    if not s:
+        return b""
     bytes_arr = [0]
     for char in s:
         value = BASE58_ALPHABET.index(char)

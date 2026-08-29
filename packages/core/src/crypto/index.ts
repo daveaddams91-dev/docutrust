@@ -9,9 +9,11 @@ export function canonicalizeJson(obj: any): string {
     return JSON.stringify(obj);
   }
   if (Array.isArray(obj)) {
-    return '[' + obj.map(canonicalizeJson).join(',') + ']';
+    return '[' + obj.map(x => (x === undefined || typeof x === 'function' || typeof x === 'symbol' ? 'null' : canonicalizeJson(x))).join(',') + ']';
   }
-  const keys = Object.keys(obj).sort();
+  const keys = Object.keys(obj)
+    .filter(k => obj[k] !== undefined && typeof obj[k] !== 'function' && typeof obj[k] !== 'symbol')
+    .sort();
   const pairs = keys.map(k => `${JSON.stringify(k)}:${canonicalizeJson(obj[k])}`);
   return '{' + pairs.join(',') + '}';
 }
@@ -55,6 +57,7 @@ export interface KeyPair {
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
 export function encodeBase58(buffer: Buffer): string {
+  if (!buffer || buffer.length === 0) return '';
   const digits = [0];
   for (let i = 0; i < buffer.length; i++) {
     for (let j = 0; j < digits.length; j++) digits[j] <<= 8;
@@ -75,6 +78,7 @@ export function encodeBase58(buffer: Buffer): string {
 }
 
 export function decodeBase58(str: string): Buffer {
+  if (!str || str.length === 0) return Buffer.alloc(0);
   const bytes = [0];
   for (let i = 0; i < str.length; i++) {
     const c = str[i];

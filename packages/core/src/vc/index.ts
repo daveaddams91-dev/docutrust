@@ -304,33 +304,61 @@ export class VerifiableCredentialsEngine {
 
     // 3. Resolve Issuer Public Key & Verify Signature
     try {
-      let pubKey = expectedPublicKeyHex;
-      if (!pubKey) {
-        const didDoc = await DIDResolver.resolve(issuerId);
-        const vm = didDoc.verificationMethod[0];
-        pubKey = vm?.publicKeyHex || vm?.publicKeyMultibase;
-      }
-
-      if (!pubKey) {
-        errors.push(`Unable to resolve public key for issuer: ${issuerId}`);
-      } else {
-        // Reconstruct canonical unsigned payload
+      if (credential.proof.type === 'MultiSigThresholdSignature2026') {
+        const multiProof = credential.proof as any;
+        const signatures = multiProof.signatures || [];
+        const required = multiProof.threshold?.required || 1;
         const { proof, ...unsigned } = credential;
         const canonicalPayload = canonicalizeJson({
           ...unsigned,
           ...(proof.claimsRoot ? { claimsRoot: proof.claimsRoot } : {})
         });
+        const computedHash = multiProof.jcsCanonicalHash || sha256Hex(canonicalPayload);
 
-        const computedHash = sha256Hex(canonicalPayload);
-        signatureValid = verifySignature(computedHash, proof.proofValue, pubKey);
-
+        let validSigCount = 0;
+        for (const sigEntry of signatures) {
+          try {
+            const didDoc = await DIDResolver.resolve(sigEntry.signerDid);
+            const vm = didDoc.verificationMethod[0];
+            const sigPubKey = vm?.publicKeyHex || vm?.publicKeyMultibase;
+            if (sigPubKey && verifySignature(computedHash, sigEntry.signature, sigPubKey)) {
+              validSigCount++;
+            }
+          } catch (_) {}
+        }
+        signatureValid = validSigCount >= required;
         if (!signatureValid) {
-          // Also try direct canonical string verification for compatibility
-          signatureValid = verifySignature(canonicalPayload, proof.proofValue, pubKey);
+          errors.push(`MultiSig threshold not met: verified ${validSigCount} of ${required} required signatures.`);
+        }
+      } else {
+        let pubKey = expectedPublicKeyHex;
+        if (!pubKey) {
+          const didDoc = await DIDResolver.resolve(issuerId);
+          const vm = didDoc.verificationMethod[0];
+          pubKey = vm?.publicKeyHex || vm?.publicKeyMultibase;
         }
 
-        if (!signatureValid) {
-          errors.push('Cryptographic signature verification failed. Document has been altered or tampered with.');
+        if (!pubKey) {
+          errors.push(`Unable to resolve public key for issuer: ${issuerId}`);
+        } else {
+          // Reconstruct canonical unsigned payload
+          const { proof, ...unsigned } = credential;
+          const canonicalPayload = canonicalizeJson({
+            ...unsigned,
+            ...(proof.claimsRoot ? { claimsRoot: proof.claimsRoot } : {})
+          });
+
+          const computedHash = sha256Hex(canonicalPayload);
+          signatureValid = verifySignature(computedHash, proof.proofValue, pubKey);
+
+          if (!signatureValid) {
+            // Also try direct canonical string verification for compatibility
+            signatureValid = verifySignature(canonicalPayload, proof.proofValue, pubKey);
+          }
+
+          if (!signatureValid) {
+            errors.push('Cryptographic signature verification failed. Document has been altered or tampered with.');
+          }
         }
       }
     } catch (err: any) {

@@ -6,7 +6,7 @@ import os
 import json
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from docutrust.crypto import canonicalize_json, sha256_hex, MerkleTree
+from docutrust.crypto import canonicalize_json, sha256_hex, MerkleTree, encode_base58, decode_base58
 from docutrust.pqc import generate_pqc_hybrid_keys, shake256_sponge_hex
 from docutrust.client import DocuTrustClient
 from docutrust.encryption import encrypt_aes_gcm, decrypt_aes_gcm
@@ -17,7 +17,9 @@ from docutrust.zk_predicates import (
     prove_age_above,
     verify_age_proof,
     prove_date_range,
-    verify_date_range_proof
+    verify_date_range_proof,
+    prove_set_membership,
+    verify_set_membership_proof
 )
 from docutrust.kem import generate_kem_keypair
 from docutrust.shamir import split_secret, combine_shares
@@ -275,6 +277,31 @@ class TestDocuTrustPython(unittest.TestCase):
         self.assertTrue(client.verify_zk_age({})["success"])
         self.assertTrue(client.prove_zk_date("2024-06-15", "2020-01-01", "2026-12-31")["success"])
         self.assertTrue(client.verify_zk_date({})["success"])
+        self.assertTrue(client.prove_zk_membership("degree", "Computer Science", ["Computer Science", "Physics"])["success"])
+        self.assertTrue(client.verify_zk_membership({}, ["Computer Science", "Physics"])["success"])
+
+    def test_zk_set_membership_proof(self):
+        allowed = ["Stanford", "MIT", "Oxford", "Cambridge"]
+        secret = "MIT"
+        salt = os.urandom(16).hex()
+        proof = prove_set_membership("university", secret, salt, allowed)
+        self.assertEqual(proof["type"], "ZKSetMembershipProof2026")
+        audit = verify_set_membership_proof(proof, allowed, proof["commitment"])
+        self.assertTrue(audit["valid"])
+
+        # Secret not in allowed set
+        with self.assertRaises(ValueError):
+            prove_set_membership("university", "Harvard", salt, allowed)
+
+        # Mismatched allowed set during verification
+        audit_tampered = verify_set_membership_proof(proof, ["Stanford", "MIT"])
+        self.assertFalse(audit_tampered["valid"])
+
+    def test_base58_edge_cases(self):
+        self.assertEqual(encode_base58(b""), "")
+        self.assertEqual(decode_base58(""), b"")
+        raw = b"DocuTrust 2026"
+        self.assertEqual(decode_base58(encode_base58(raw)), raw)
 
     @patch('requests.Session.get')
     def test_client_get_endpoints(self, mock_get):

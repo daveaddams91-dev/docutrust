@@ -123,6 +123,42 @@ class DocuTrustClient:
         res.raise_for_status()
         return res.json()
 
+    def prove_zk_membership(
+        self,
+        claim_key: str,
+        secret_value: str,
+        allowed_set: List[str],
+        salt: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Generates a Zero-Knowledge Set Membership Proof."""
+        url = f"{self.api_url}/credentials/zk-predicate/prove"
+        payload = {
+            "predicateType": "membership",
+            "claimKey": claim_key,
+            "actualValue": secret_value,
+            "allowedSet": allowed_set,
+            "salt": salt
+        }
+        res = self.session.post(url, json=payload)
+        res.raise_for_status()
+        return res.json()
+
+    def verify_zk_membership(
+        self,
+        proof: Dict[str, Any],
+        allowed_set: List[str],
+        expected_commitment: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Verifies a Zero-Knowledge Set Membership Proof."""
+        url = f"{self.api_url}/credentials/zk-predicate/verify"
+        res = self.session.post(url, json={
+            "proof": proof,
+            "allowedSet": allowed_set,
+            "expectedCommitment": expected_commitment
+        })
+        res.raise_for_status()
+        return res.json()
+
     def prove_zk_age(
         self,
         birth_date: str,

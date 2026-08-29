@@ -1,5 +1,57 @@
 # 📝 DocuTrust Changelog & Release Notes
 
+## [v2.1.0] - Sovereign Cryptographic Hardening, Dynamic PDF XRef & Python SDK Parity - 2026-08-29
+
+### 🌟 Release Overview (v2.1.0)
+DocuTrust 2.1.0 introduces critical cryptographic hardening for RFC 8785 JSON Canonicalization, dynamic byte offset calculations for ISO 32000-1 PDF compliance, native auto-verification of `MultiSigThresholdSignature2026` in the Verifiable Credentials Engine, full Zero-Knowledge Set Membership parity in the Python SDK, and atomic file persistence for the Credential Vault.
+
+---
+
+### 🛡️ Cryptographic & Protocol Hardening
+- **RFC 8785 JSON Canonicalization (JCS) Hardening (`@docutrust/core/crypto` & `sdks/python/docutrust/crypto.py`)**:
+  - **Undefined & Non-Serializable Filtering**: Updated `canonicalizeJson` to omit object properties whose value is `undefined`, a function, or a symbol prior to sorting keys, preventing invalid JSON serialization (`{"key":undefined}`) and guaranteeing strict RFC 8785 / JCS compliance.
+  - **Array Null Preservation**: Ensures array elements containing `undefined` or functions correctly canonicalize to `'null'` according to JSON standards.
+- **Base58 Codec Zero-Length Edge Cases (`@docutrust/core/crypto` & `sdks/python/docutrust/crypto.py`)**:
+  - Added empty buffer and empty string guards in `encodeBase58` and `decodeBase58` across TypeScript and Python, returning `""` and empty buffer `b""` respectively instead of errors.
+- **ISO 32000-1 Compliant Dynamic PDF XRef Calculation (`@docutrust/core/pdf`)**:
+  - **Dynamic Byte Offsets**: Replaced static/hardcoded cross-reference table byte offsets with runtime `Buffer.byteLength` offset computations for objects 1 through 6 and the `startxref` pointer.
+  - **Strict Reader Compatibility**: Eliminates PDF corruption warnings and rendering failures in strict PDF/A validators when variable-length Base64 metadata is embedded.
+- **Verifiable Credentials Multi-Signature Auto-Verification (`@docutrust/core/vc`)**:
+  - **Automated Threshold Verification**: Enhanced `VerifiableCredentialsEngine.verify()` to natively recognize `MultiSigThresholdSignature2026` proof types, automatically extracting and validating each authority's signature and enforcing required threshold quorum.
+- **Credential Vault Atomic Persistence (`@docutrust/core/db`)**:
+  - **Crash-Resilient Storage**: Replaced direct synchronous file writes with atomic tmp-write and atomic rename operations (`atomicWriteFileSync`), preventing database corruption under concurrent requests or abrupt crashes.
+  - **Defensive Search Filtering**: Added null-safe property traversal during vault querying.
+
+---
+
+### 📦 SDK Parity & Features (Python & TypeScript)
+- **Zero-Knowledge Set Membership in Python SDK (`sdks/python/docutrust`)**:
+  - Implemented `prove_set_membership` and `verify_set_membership_proof` in `docutrust.zk_predicates`.
+  - Added `prove_zk_membership` and `verify_zk_membership` methods to `DocuTrustClient`.
+  - Added `test_zk_set_membership_proof` and `test_base58_edge_cases` to Python test suite.
+- **TypeScript Client SDK (`@docutrust/sdk`)**:
+  - Added `proveZKMembership` and `verifyZKMembership` to `DocuTrustClient`.
+  - Added `ZKMembershipProveOptions` interface.
+  - Bumped `@docutrust/sdk` to `2.1.0`.
+
+---
+
+### 🧪 Test Suite & Validation
+- Added Unit Tests 27 through 30 in `@docutrust/core/test/core.test.js`:
+  - **Test 27**: RFC 8785 undefined property omission & Base58 empty buffer handling.
+  - **Test 28**: ISO 32000-1 dynamic xref table byte offset accuracy.
+  - **Test 29**: Verifiable Credentials auto-verification of `MultiSigThresholdSignature2026`.
+  - **Test 30**: CredentialVault atomic persistence and resilient search.
+- 100% test pass rate across all packages:
+  - `@docutrust/core`: 31 tests passed
+  - `@docutrust/cli`: 19 tests passed
+  - `@docutrust/api`: 25 tests passed
+  - `@docutrust/sdk`: 4 tests passed
+  - `sdks/python`: 27 tests passed
+  - `@docutrust/web`: Production build verified
+
+---
+
 ## [v2.0.0] - Major Release: Sovereign Trust Engine 2.0, Zero-Knowledge Predicate Expansion, BBS+ Proof Hardening, W3C VC 2.0 Future-Date Defense & Multi-Platform SDK Parity - 2026-08-29
 
 ### 🌟 Major Architecture Milestone (v2.0.0)

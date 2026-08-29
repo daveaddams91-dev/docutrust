@@ -215,7 +215,7 @@ const server = http.createServer(async (req, res) => {
       return jsonResponse(200, {
         status: 'healthy',
         service: 'DocuTrust Sovereign Verifiable Credentials Engine',
-        version: '2.0.0',
+        version: '2.1.0',
         features: [
           'W3C VC 2.0',
           'DID Key Ed25519',

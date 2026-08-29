@@ -158,3 +158,40 @@ def verify_date_range_proof(proof: Dict[str, Any], expected_commitment: Optional
         return {"valid": False, "error": "Invalid proof bitstring."}
     return {"valid": True}
 
+def prove_set_membership(
+    claim_key: str,
+    secret_value: str,
+    salt: str,
+    allowed_set: List[str]
+) -> Dict[str, Any]:
+    if secret_value not in allowed_set:
+        raise ValueError("Cannot prove membership: secret_value is not in allowed_set.")
+
+    comm = create_commitment(secret_value, salt)
+    canonical_set = sorted(allowed_set)
+    allowed_set_hash = sha256_hex(canonicalize_json(canonical_set))
+    membership_proof_value = sha256_hex(f"{salt}::membership::{allowed_set_hash}::{secret_value}")
+
+    return {
+        "type": "ZKSetMembershipProof2026",
+        "claimKey": claim_key,
+        "commitment": comm["commitment"],
+        "allowedSetHash": allowed_set_hash,
+        "membershipProofValue": membership_proof_value,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+def verify_set_membership_proof(
+    proof: Dict[str, Any],
+    allowed_set: List[str],
+    expected_commitment: Optional[str] = None
+) -> Dict[str, Any]:
+    if proof.get("type") != "ZKSetMembershipProof2026":
+        return {"valid": False, "error": "Invalid membership proof type."}
+    if expected_commitment and proof.get("commitment") != expected_commitment:
+        return {"valid": False, "error": "Commitment mismatch."}
+    computed_set_hash = sha256_hex(canonicalize_json(sorted(allowed_set)))
+    if computed_set_hash != proof.get("allowedSetHash"):
+        return {"valid": False, "error": "Allowed set does not match the proof target set hash."}
+    return {"valid": True}
+
