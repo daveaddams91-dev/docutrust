@@ -20,6 +20,10 @@ const {
   verifyRangeProof,
   proveSetMembership,
   verifySetMembershipProof,
+  proveAgeAbove,
+  verifyAgeProof,
+  proveDateRange,
+  verifyDateRangeProof,
   createCommitment,
   generateKEMKeyPair,
   encapsulateSecret,
@@ -211,11 +215,13 @@ const server = http.createServer(async (req, res) => {
       return jsonResponse(200, {
         status: 'healthy',
         service: 'DocuTrust Sovereign Verifiable Credentials Engine',
-        version: '1.1.0',
+        version: '2.0.0',
         features: [
           'W3C VC 2.0',
           'DID Key Ed25519',
           'Post-Quantum ML-DSA Hybrid Dual Signing',
+          'Zero-Knowledge Predicates & Range Proofs',
+          'BBS+ Unlinkable Multi-Message Signatures',
           'Verifiable PDF 2.0 with Steganographic Metadata',
           'Persistent Vault & Auto-Batch Anchoring Worker',
           'StatusList2021 Bitstrings'
@@ -677,22 +683,32 @@ const server = http.createServer(async (req, res) => {
     }
 
     // 13. ZK Predicate Prove
-    if (pathname === '/api/v1/credentials/zk-predicate/prove' && req.method === 'POST') {
+    if ((pathname === '/api/v1/credentials/zk-predicate/prove' || pathname === '/api/v1/credentials/zk-predicate/prove-age' || pathname === '/api/v1/credentials/zk-predicate/prove-date') && req.method === 'POST') {
       const body = await readJsonBody();
-      const { predicateType, claimKey, actualValue, salt, min, max, allowedSet } = body;
+      const { predicateType, claimKey, actualValue, salt, min, max, allowedSet, birthDate, minimumAgeYears, referenceDate, actualDate, minDate, maxDate } = body;
       
-      if (predicateType === 'range') {
-        const proof = proveRange(claimKey, actualValue, salt || crypto.randomBytes(16).toString('hex'), min, max);
-        return jsonResponse(200, { success: true, proof });
-      } else if (predicateType === 'membership') {
-        const proof = proveSetMembership(claimKey, actualValue, salt || crypto.randomBytes(16).toString('hex'), allowedSet);
-        return jsonResponse(200, { success: true, proof });
+      try {
+        if (pathname === '/api/v1/credentials/zk-predicate/prove-age' || predicateType === 'age') {
+          const proof = proveAgeAbove(claimKey || 'birthDate', birthDate || actualValue, Number(minimumAgeYears || min || 18), salt, referenceDate);
+          return jsonResponse(200, { success: true, proof });
+        } else if (pathname === '/api/v1/credentials/zk-predicate/prove-date' || predicateType === 'date') {
+          const proof = proveDateRange(claimKey || 'date', actualDate || actualValue, minDate || min, maxDate || max, salt);
+          return jsonResponse(200, { success: true, proof });
+        } else if (predicateType === 'range') {
+          const proof = proveRange(claimKey, Number(actualValue), salt || crypto.randomBytes(16).toString('hex'), Number(min), Number(max));
+          return jsonResponse(200, { success: true, proof });
+        } else if (predicateType === 'membership') {
+          const proof = proveSetMembership(claimKey, actualValue, salt || crypto.randomBytes(16).toString('hex'), allowedSet);
+          return jsonResponse(200, { success: true, proof });
+        }
+        return jsonResponse(400, { error: 'Invalid predicateType. Must be range, membership, age, or date.' });
+      } catch (err) {
+        return jsonResponse(400, { error: err.message });
       }
-      return jsonResponse(400, { error: 'Invalid predicateType. Must be range or membership.' });
     }
 
     // 14. ZK Predicate Verify
-    if (pathname === '/api/v1/credentials/zk-predicate/verify' && req.method === 'POST') {
+    if ((pathname === '/api/v1/credentials/zk-predicate/verify' || pathname === '/api/v1/credentials/zk-predicate/verify-age' || pathname === '/api/v1/credentials/zk-predicate/verify-date') && req.method === 'POST') {
       const body = await readJsonBody();
       const { proof, expectedCommitment, allowedSet } = body;
       if (!proof) return jsonResponse(400, { error: 'Missing proof in request' });
@@ -702,6 +718,12 @@ const server = http.createServer(async (req, res) => {
         return jsonResponse(200, result);
       } else if (proof.type === 'ZKSetMembershipProof2026') {
         const result = verifySetMembershipProof(proof, allowedSet, expectedCommitment);
+        return jsonResponse(200, result);
+      } else if (proof.type === 'ZKAgePredicateProof2026') {
+        const result = verifyAgeProof(proof, expectedCommitment);
+        return jsonResponse(200, result);
+      } else if (proof.type === 'ZKDatePredicateProof2026') {
+        const result = verifyDateRangeProof(proof, expectedCommitment);
         return jsonResponse(200, result);
       }
       return jsonResponse(400, { error: 'Unsupported proof type' });

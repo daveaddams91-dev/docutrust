@@ -39,6 +39,22 @@ export interface ZKRangeProveOptions {
   salt?: string;
 }
 
+export interface ZKAgeProveOptions {
+  claimKey?: string;
+  birthDate: string;
+  minimumAgeYears: number;
+  salt?: string;
+  referenceDate?: string;
+}
+
+export interface ZKDateProveOptions {
+  claimKey?: string;
+  actualDate: string;
+  minDate: string;
+  maxDate: string;
+  salt?: string;
+}
+
 export interface DIDCommPackOptions {
   message: Record<string, any>;
   recipientPublicKeyHex: string;
@@ -202,10 +218,56 @@ export class DocuTrustClient {
   }
 
   /**
+   * Generates a Zero-Knowledge Age Predicate Proof (e.g. Age >= 18 or Age >= 21).
+   */
+  public async proveZKAge(options: ZKAgeProveOptions): Promise<any> {
+    return this.request('/credentials/zk-predicate/prove-age', 'POST', {
+      claimKey: options.claimKey || 'birthDate',
+      birthDate: options.birthDate,
+      minimumAgeYears: options.minimumAgeYears,
+      salt: options.salt,
+      referenceDate: options.referenceDate
+    });
+  }
+
+  /**
+   * Generates a Zero-Knowledge Date Range Proof.
+   */
+  public async proveZKDate(options: ZKDateProveOptions): Promise<any> {
+    return this.request('/credentials/zk-predicate/prove-date', 'POST', {
+      claimKey: options.claimKey || 'date',
+      actualDate: options.actualDate,
+      minDate: options.minDate,
+      maxDate: options.maxDate,
+      salt: options.salt
+    });
+  }
+
+  /**
    * Verifies a Zero-Knowledge Predicate Proof.
    */
   public async verifyZKPredicate(proof: Record<string, any>, expectedCommitment?: string): Promise<any> {
     return this.request('/credentials/zk-predicate/verify', 'POST', {
+      proof,
+      expectedCommitment
+    });
+  }
+
+  /**
+   * Verifies a Zero-Knowledge Age Proof.
+   */
+  public async verifyZKAge(proof: Record<string, any>, expectedCommitment?: string): Promise<any> {
+    return this.request('/credentials/zk-predicate/verify-age', 'POST', {
+      proof,
+      expectedCommitment
+    });
+  }
+
+  /**
+   * Verifies a Zero-Knowledge Date Proof.
+   */
+  public async verifyZKDate(proof: Record<string, any>, expectedCommitment?: string): Promise<any> {
+    return this.request('/credentials/zk-predicate/verify-date', 'POST', {
       proof,
       expectedCommitment
     });

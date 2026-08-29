@@ -52,7 +52,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
           <div>
             <div className="flex items-center gap-1.5">
               <span className="font-bold text-lg tracking-tight text-white font-sans">DocuTrust</span>
-              <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">v1.6</span>
+              <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">v2.0</span>
             </div>
             <span className="text-[10px] text-gray-400 tracking-wide block font-mono">Sovereign Trust Stack</span>
           </div>

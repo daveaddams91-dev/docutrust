@@ -60,6 +60,7 @@ test('API Server Suite', async (t) => {
     const res = await makeRequest('GET', '/api/v1/health');
     assert.equal(res.status, 200);
     assert.equal(res.body.status, 'healthy');
+    assert.equal(res.body.version, '2.0.0');
     assert.ok(Array.isArray(res.body.features));
     assert.ok(res.body.systemDid.startsWith('did:key:z6M'));
   });
@@ -434,4 +435,41 @@ test('API Server Suite', async (t) => {
     assert.equal(verifyRes.status, 200);
     assert.equal(verifyRes.body.valid, true);
   });
+
+  await t.test('23. POST /api/v1/credentials/zk-predicate/prove-age & /verify-age', async () => {
+    const proveRes = await makeRequest('POST', '/api/v1/credentials/zk-predicate/prove-age', {
+      claimKey: 'birthDate',
+      birthDate: '1998-05-20',
+      minimumAgeYears: 21,
+      referenceDate: '2026-08-29'
+    });
+    assert.equal(proveRes.status, 200);
+    assert.equal(proveRes.body.success, true);
+    assert.equal(proveRes.body.proof.type, 'ZKAgePredicateProof2026');
+
+    const verifyRes = await makeRequest('POST', '/api/v1/credentials/zk-predicate/verify-age', {
+      proof: proveRes.body.proof
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.valid, true);
+  });
+
+  await t.test('24. POST /api/v1/credentials/zk-predicate/prove-date & /verify-date', async () => {
+    const proveRes = await makeRequest('POST', '/api/v1/credentials/zk-predicate/prove-date', {
+      claimKey: 'graduationDate',
+      actualDate: '2024-06-15',
+      minDate: '2020-01-01',
+      maxDate: '2026-12-31'
+    });
+    assert.equal(proveRes.status, 200);
+    assert.equal(proveRes.body.success, true);
+    assert.equal(proveRes.body.proof.type, 'ZKDatePredicateProof2026');
+
+    const verifyRes = await makeRequest('POST', '/api/v1/credentials/zk-predicate/verify-date', {
+      proof: proveRes.body.proof
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.valid, true);
+  });
 });
+

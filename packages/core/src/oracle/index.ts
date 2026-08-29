@@ -3,7 +3,7 @@ import { KeyPair, signData, verifySignature, sha256Hex, canonicalizeJson } from 
 
 export interface TimestampToken {
   type: 'DocuTrustTimestampToken2026';
-  version: '1.5.0';
+  version: '2.0.0' | string;
   targetDataHash: string;
   timestamp: string;
   unixTimeSeconds: number;
@@ -42,7 +42,7 @@ export class CryptographicTSAOracle {
 
     const tokenPayload = canonicalizeJson({
       type: 'DocuTrustTimestampToken2026',
-      version: '1.5.0',
+      version: '2.0.0',
       targetDataHash,
       timestamp,
       unixTimeSeconds,
@@ -54,7 +54,7 @@ export class CryptographicTSAOracle {
 
     return {
       type: 'DocuTrustTimestampToken2026',
-      version: '1.5.0',
+      version: '2.0.0',
       targetDataHash,
       timestamp,
       unixTimeSeconds,

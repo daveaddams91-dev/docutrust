@@ -211,4 +211,26 @@ test('CLI Suite', async (t) => {
     assert.ok(outMMR.includes('Merkle Mountain Range element appended'));
     assert.ok(fs.existsSync(mmrFile));
   });
+
+  const zkAgeFile = path.join(tempDir, 'zk-age-proof.json');
+  await t.test('17. docutrust zk-age generates Zero-Knowledge Age Predicate Proof', () => {
+    const out = execSync(`node "${cliPath}" zk-age --dob 2000-01-01 --min-age 21 --ref-date 2026-08-29 --out "${zkAgeFile}"`).toString();
+    assert.ok(out.includes('ZK Age Predicate Proof generated'));
+    assert.ok(fs.existsSync(zkAgeFile));
+    const proof = JSON.parse(fs.readFileSync(zkAgeFile, 'utf-8'));
+    assert.equal(proof.type, 'ZKAgePredicateProof2026');
+    assert.equal(proof.minimumAgeYears, 21);
+  });
+
+  const zkDateFile = path.join(tempDir, 'zk-date-proof.json');
+  await t.test('18. docutrust zk-date generates Zero-Knowledge Date Range Proof', () => {
+    const out = execSync(`node "${cliPath}" zk-date --date 2024-06-15 --min 2020-01-01 --max 2026-12-31 --out "${zkDateFile}"`).toString();
+    assert.ok(out.includes('ZK Date Range Proof generated'));
+    assert.ok(fs.existsSync(zkDateFile));
+    const proof = JSON.parse(fs.readFileSync(zkDateFile, 'utf-8'));
+    assert.equal(proof.type, 'ZKDatePredicateProof2026');
+    assert.equal(proof.minDate, '2020-01-01');
+    assert.equal(proof.maxDate, '2026-12-31');
+  });
 });
+

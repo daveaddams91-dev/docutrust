@@ -3,7 +3,15 @@ from .client import DocuTrustClient
 from .crypto import canonicalize_json, sha256_hex, MerkleTree
 from .pqc import generate_pqc_hybrid_keys
 from .encryption import encrypt_aes_gcm, decrypt_aes_gcm
-from .zk_predicates import prove_range, verify_range_proof, create_commitment
+from .zk_predicates import (
+    prove_range,
+    verify_range_proof,
+    create_commitment,
+    prove_age_above,
+    verify_age_proof,
+    prove_date_range,
+    verify_date_range_proof
+)
 from .kem import generate_kem_keypair
 from .shamir import split_secret, combine_shares
 from .bbs import generate_bbs_keypair, sign_bbs, derive_bbs_proof, verify_bbs_proof
@@ -11,7 +19,7 @@ from .oracle import issue_timestamp_token, verify_timestamp_token
 from .didcomm import pack_didcomm_message, unpack_didcomm_message
 from .mmr import MerkleMountainRange
 
-__version__ = "1.6.0"
+__version__ = "2.0.0"
 __all__ = [
     "DocuTrustClient",
     "canonicalize_json",
@@ -23,6 +31,10 @@ __all__ = [
     "prove_range",
     "verify_range_proof",
     "create_commitment",
+    "prove_age_above",
+    "verify_age_proof",
+    "prove_date_range",
+    "verify_date_range_proof",
     "generate_kem_keypair",
     "split_secret",
     "combine_shares",

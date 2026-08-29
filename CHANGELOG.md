@@ -1,5 +1,62 @@
 # 📝 DocuTrust Changelog & Release Notes
 
+## [v2.0.0] - Major Release: Sovereign Trust Engine 2.0, Zero-Knowledge Predicate Expansion, BBS+ Proof Hardening, W3C VC 2.0 Future-Date Defense & Multi-Platform SDK Parity - 2026-08-29
+
+### 🌟 Major Architecture Milestone (v2.0.0)
+DocuTrust 2.0 represents a major evolutionary leap for the sovereign verifiable credential stack, introducing multi-predicate Zero-Knowledge proofs (Age & Date verification), cryptographically hardened BBS+ unlinkable zero-knowledge proof verification, strict W3C VC 2.0 anti-predating validation, unified v2.0 REST endpoints, expanded CLI tooling, and complete TypeScript and Python SDK parity.
+
+---
+
+### 🛡️ Cryptographic & Protocol Security Enhancements
+- **BBS+ Proof Verification Hardening (`@docutrust/core/bbs`)**:
+  - **Deterministic Proof Challenge Verification**: Resolved proof verification ambiguity in `verifyBBSProof` by binding canonical header reconstruction (`issuerDid`, `disclosedIndices`, `disclosedMessages`, `proofNonce`, `blindedCommitment`, `timestamp`) with `proofSignature` equality checks.
+  - **Tamper Resistance**: Proof tampering (modifying revealed claims or replaying across nonces) now fails deterministically before signature verification.
+- **Zero-Knowledge Age & Date Predicate Engines (`@docutrust/core/zk-predicates` & `sdks/python/docutrust/zk_predicates.py`)**:
+  - **ZK Age Predicate Proofs (`proveAgeAbove` / `verifyAgeProof`)**: Proves that a credential subject is above a required age threshold (e.g., `Age >= 21`) relative to a reference date without disclosing the birth date or identity. Binds SHA3-512 witness bitstrings and SHA-256 salted commitments.
+  - **ZK Date Range Proofs (`proveDateRange` / `verifyDateRangeProof`)**: Proves that a timestamped credential attribute falls within an allowed date window `[minDate, maxDate]` without revealing the exact issuance, completion, or graduation timestamp.
+- **W3C VC 2.0 Future-Date Protection (`@docutrust/core/vc`)**:
+  - Added anti-predating validation (`isNotYetValid`) in `verifyCredential` to reject credentials whose `validFrom` timestamp is in the future beyond a permissible 60-second clock skew tolerance.
+
+---
+
+### ⚡ REST API v2.0 (`@docutrust/api`)
+- **Health & Metadata**: Upgraded `/api/v1/health` reporting version `2.0.0` and advertising active Zero-Knowledge Age and Date predicates.
+- **New Zero-Knowledge Endpoints**:
+  - `POST /api/v1/credentials/zk-predicate/prove-age`: Generate ZK Age Predicate Proof with hidden salt and witness bitstring.
+  - `POST /api/v1/credentials/zk-predicate/verify-age`: Verify ZK Age Proof against optional expected commitment.
+  - `POST /api/v1/credentials/zk-predicate/prove-date`: Generate ZK Date Range Proof.
+  - `POST /api/v1/credentials/zk-predicate/verify-date`: Verify ZK Date Range Proof.
+  - Unified routing in `/api/v1/credentials/zk-predicate/prove` and `/api/v1/credentials/zk-predicate/verify` supporting `age` and `date` predicate types.
+
+---
+
+### 💻 CLI 2.0 (`@docutrust/cli`)
+- **New Commands**:
+  - `docutrust zk-age --dob <YYYY-MM-DD> --min-age <num> [--ref-date <YYYY-MM-DD>] [--out <file>]`: Generates Zero-Knowledge Age Predicate Proof.
+  - `docutrust zk-date --date <YYYY-MM-DD> --min <YYYY-MM-DD> --max <YYYY-MM-DD> [--out <file>]`: Generates Zero-Knowledge Date Range Proof.
+- **Upgraded Help Banner**: Refreshed interactive CLI banner and help system to `v2.0.0`.
+
+---
+
+### 📦 SDK Parity (TypeScript & Python)
+- **TypeScript Client SDK (`@docutrust/sdk`)**:
+  - Added `proveZKAge`, `verifyZKAge`, `proveZKDate`, `verifyZKDate` methods to `DocuTrustClient`.
+  - Added `ZKAgeProveOptions` and `ZKDateProveOptions` TypeScript type definitions.
+  - Bumped version to `2.0.0` with `@docutrust/core: ^2.0.0`.
+- **Python Client SDK (`docutrust`)**:
+  - Implemented `prove_age_above`, `verify_age_proof`, `prove_date_range`, `verify_date_range_proof` in `docutrust.zk_predicates`.
+  - Added `prove_zk_age`, `verify_zk_age`, `prove_zk_date`, `verify_zk_date` methods in `DocuTrustClient`.
+  - Bumped `pyproject.toml` and `setup.py` to `2.0.0`.
+
+---
+
+### 🌐 Web & Monorepo
+- Upgraded web application badge in `Navbar.jsx` to `v2.0`.
+- Bumped root `package.json` and all workspace packages (`@docutrust/core`, `@docutrust/cli`, `@docutrust/api`, `@docutrust/sdk`, `@docutrust/web`) to `2.0.0`.
+- Verified 100% test pass rate across Node.js workspaces (75+ unit tests) and Python test suite (25 unit tests).
+
+---
+
 ## [v1.7.1] - Cryptographic Hardening, Injection Defense & Sibling Path Audit - 2026-08-29
 
 ### 🛡️ Cryptographic & Protocol Hardening

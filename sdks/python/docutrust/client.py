@@ -123,6 +123,62 @@ class DocuTrustClient:
         res.raise_for_status()
         return res.json()
 
+    def prove_zk_age(
+        self,
+        birth_date: str,
+        minimum_age_years: int = 18,
+        claim_key: str = "birthDate",
+        salt: Optional[str] = None,
+        reference_date: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Generates a Zero-Knowledge Age Predicate Proof."""
+        url = f"{self.api_url}/credentials/zk-predicate/prove-age"
+        payload = {
+            "claimKey": claim_key,
+            "birthDate": birth_date,
+            "minimumAgeYears": minimum_age_years,
+            "salt": salt,
+            "referenceDate": reference_date
+        }
+        res = self.session.post(url, json=payload)
+        res.raise_for_status()
+        return res.json()
+
+    def verify_zk_age(self, proof: Dict[str, Any], expected_commitment: Optional[str] = None) -> Dict[str, Any]:
+        """Verifies a Zero-Knowledge Age Proof."""
+        url = f"{self.api_url}/credentials/zk-predicate/verify-age"
+        res = self.session.post(url, json={"proof": proof, "expectedCommitment": expected_commitment})
+        res.raise_for_status()
+        return res.json()
+
+    def prove_zk_date(
+        self,
+        actual_date: str,
+        min_date: str,
+        max_date: str,
+        claim_key: str = "date",
+        salt: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Generates a Zero-Knowledge Date Range Proof."""
+        url = f"{self.api_url}/credentials/zk-predicate/prove-date"
+        payload = {
+            "claimKey": claim_key,
+            "actualDate": actual_date,
+            "minDate": min_date,
+            "maxDate": max_date,
+            "salt": salt
+        }
+        res = self.session.post(url, json=payload)
+        res.raise_for_status()
+        return res.json()
+
+    def verify_zk_date(self, proof: Dict[str, Any], expected_commitment: Optional[str] = None) -> Dict[str, Any]:
+        """Verifies a Zero-Knowledge Date Range Proof."""
+        url = f"{self.api_url}/credentials/zk-predicate/verify-date"
+        res = self.session.post(url, json={"proof": proof, "expectedCommitment": expected_commitment})
+        res.raise_for_status()
+        return res.json()
+
     def kem_generate_keys(self) -> Dict[str, Any]:
         """Generates Post-Quantum ML-KEM-768 hybrid keys."""
         url = f"{self.api_url}/kem/generate-keys"

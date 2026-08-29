@@ -115,14 +115,17 @@ export function deriveBBSProof(
     .update(`${signature.signatureHex}:${blindingFactor}:${nonce}:${signature.messagesCommitment}`)
     .digest('hex');
 
+  const timestamp = new Date().toISOString();
+  const sortedIndices = disclosedIndices.slice().sort((a, b) => a - b);
+
   // Proof challenge signature
   const proofHeader = canonicalizeJson({
     issuerDid: signature.issuerDid,
-    disclosedIndices: disclosedIndices.slice().sort((a, b) => a - b),
+    disclosedIndices: sortedIndices,
     disclosedMessages,
     proofNonce: nonce,
     blindedCommitment,
-    timestamp: new Date().toISOString()
+    timestamp
   });
 
   const proofSignature = crypto.createHash('sha256').update(proofHeader).digest('hex');
@@ -130,12 +133,12 @@ export function deriveBBSProof(
   return {
     type: 'BBSPlusZKProof2026',
     issuerDid: signature.issuerDid,
-    disclosedIndices: disclosedIndices.slice().sort((a, b) => a - b),
+    disclosedIndices: sortedIndices,
     disclosedMessages,
     proofNonce: nonce,
     blindedCommitment,
     proofSignature,
-    timestamp: new Date().toISOString()
+    timestamp
   };
 }
 
@@ -154,8 +157,23 @@ export function verifyBBSProof(
     return { valid: false, disclosedMessages: {}, error: 'Invalid proof type.' };
   }
 
-  if (!proof.blindedCommitment || !proof.proofSignature) {
+  if (!proof.blindedCommitment || !proof.proofSignature || !proof.timestamp || !proof.disclosedIndices) {
     return { valid: false, disclosedMessages: {}, error: 'Missing cryptographic proof parameters.' };
+  }
+
+  // Verify proof header cryptographic integrity
+  const proofHeader = canonicalizeJson({
+    issuerDid: proof.issuerDid,
+    disclosedIndices: proof.disclosedIndices.slice().sort((a, b) => a - b),
+    disclosedMessages: proof.disclosedMessages,
+    proofNonce: proof.proofNonce,
+    blindedCommitment: proof.blindedCommitment,
+    timestamp: proof.timestamp
+  });
+
+  const expectedProofSignature = crypto.createHash('sha256').update(proofHeader).digest('hex');
+  if (proof.proofSignature !== expectedProofSignature) {
+    return { valid: false, disclosedMessages: {}, error: 'Cryptographic proof signature mismatch or proof tampered.' };
   }
 
   return {
@@ -163,3 +181,4 @@ export function verifyBBSProof(
     disclosedMessages: proof.disclosedMessages
   };
 }
+

@@ -10,7 +10,15 @@ from docutrust.crypto import canonicalize_json, sha256_hex, MerkleTree
 from docutrust.pqc import generate_pqc_hybrid_keys, shake256_sponge_hex
 from docutrust.client import DocuTrustClient
 from docutrust.encryption import encrypt_aes_gcm, decrypt_aes_gcm
-from docutrust.zk_predicates import prove_range, verify_range_proof, create_commitment
+from docutrust.zk_predicates import (
+    prove_range,
+    verify_range_proof,
+    create_commitment,
+    prove_age_above,
+    verify_age_proof,
+    prove_date_range,
+    verify_date_range_proof
+)
 from docutrust.kem import generate_kem_keypair
 from docutrust.shamir import split_secret, combine_shares
 from docutrust.bbs import generate_bbs_keypair, sign_bbs, derive_bbs_proof, verify_bbs_proof
@@ -133,6 +141,25 @@ class TestDocuTrustPython(unittest.TestCase):
         audit = verify_range_proof(proof, comm["commitment"])
         self.assertTrue(audit["valid"])
 
+    def test_zk_age_proof(self):
+        proof = prove_age_above("birthDate", "2000-01-01", 21, reference_date_str="2026-08-29")
+        self.assertEqual(proof["type"], "ZKAgePredicateProof2026")
+        self.assertEqual(proof["minimumAgeYears"], 21)
+        audit = verify_age_proof(proof, proof["commitment"])
+        self.assertTrue(audit["valid"])
+
+        with self.assertRaises(ValueError):
+            prove_age_above("birthDate", "2015-01-01", 21, reference_date_str="2026-08-29")
+
+    def test_zk_date_range_proof(self):
+        proof = prove_date_range("graduationDate", "2024-06-15", "2020-01-01", "2026-12-31")
+        self.assertEqual(proof["type"], "ZKDatePredicateProof2026")
+        audit = verify_date_range_proof(proof, proof["commitment"])
+        self.assertTrue(audit["valid"])
+
+        with self.assertRaises(ValueError):
+            prove_date_range("graduationDate", "2019-01-01", "2020-01-01", "2026-12-31")
+
     def test_kem_key_generation(self):
         keys = generate_kem_keypair()
         self.assertTrue(keys["hybridRecipientId"].startswith("did:kem:z"))
@@ -244,6 +271,10 @@ class TestDocuTrustPython(unittest.TestCase):
         self.assertTrue(client.mmr_get_proof(0)["success"])
         self.assertTrue(client.mmr_verify_proof({})["success"])
         self.assertTrue(client.auto_anchor_vault()["success"])
+        self.assertTrue(client.prove_zk_age("2000-01-01", 18)["success"])
+        self.assertTrue(client.verify_zk_age({})["success"])
+        self.assertTrue(client.prove_zk_date("2024-06-15", "2020-01-01", "2026-12-31")["success"])
+        self.assertTrue(client.verify_zk_date({})["success"])
 
     @patch('requests.Session.get')
     def test_client_get_endpoints(self, mock_get):

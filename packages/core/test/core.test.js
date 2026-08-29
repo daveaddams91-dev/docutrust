@@ -57,6 +57,10 @@ const {
   verifyRangeProof,
   proveSetMembership,
   verifySetMembershipProof,
+  proveAgeAbove,
+  verifyAgeProof,
+  proveDateRange,
+  verifyDateRangeProof,
   createCommitment,
   // KEM
   generateKEMKeyPair,
@@ -690,6 +694,44 @@ test('22. BBS+: Sign message vector, derive unlinkable ZK proof, and verify', ()
   assert.equal(audit.disclosedMessages[2], 'Ph.D. Computer Science');
   assert.equal(audit.disclosedMessages[0], undefined);
   assert.equal(audit.disclosedMessages[3], undefined);
+
+  // Tampering with disclosed messages must fail proof verification
+  const tamperedProof = {
+    ...proof,
+    disclosedMessages: { ...proof.disclosedMessages, 1: 'Harvard University' }
+  };
+  const tamperedAudit = verifyBBSProof(tamperedProof, bbsKp.did);
+  assert.equal(tamperedAudit.valid, false);
+});
+
+// 22a. ZK Age & Date Predicates
+test('22b. ZK Predicates: Prove Age Above & Date Range without leaking raw dates', () => {
+  // Test Age Above Proof (e.g. Born 2000-01-15, proving Age >= 21 relative to 2026-08-29)
+  const ageProof = proveAgeAbove('birthDate', '2000-01-15', 21, undefined, '2026-08-29');
+  assert.equal(ageProof.type, 'ZKAgePredicateProof2026');
+  assert.equal(ageProof.minimumAgeYears, 21);
+
+  const ageAudit = verifyAgeProof(ageProof);
+  assert.equal(ageAudit.valid, true);
+
+  // Failure when under required age
+  assert.throws(() => {
+    proveAgeAbove('birthDate', '2015-01-15', 21, undefined, '2026-08-29');
+  }, /Subject does not meet age predicate/);
+
+  // Test Date Range Proof
+  const dateProof = proveDateRange('graduationDate', '2024-06-15', '2020-01-01', '2025-12-31');
+  assert.equal(dateProof.type, 'ZKDatePredicateProof2026');
+  assert.equal(dateProof.minDate, '2020-01-01');
+  assert.equal(dateProof.maxDate, '2025-12-31');
+
+  const dateAudit = verifyDateRangeProof(dateProof);
+  assert.equal(dateAudit.valid, true);
+
+  // Date outside range throws error
+  assert.throws(() => {
+    proveDateRange('graduationDate', '2028-06-15', '2020-01-01', '2025-12-31');
+  }, /outside range/);
 });
 
 // 22. Cryptographic TSA Timestamp Authority & Multi-Oracle Quorum
@@ -701,7 +743,7 @@ test('23. Oracle: Issue RFC 3161 timestamp token and verify multi-oracle quorum'
   const token = oracle.issueTimestampToken(documentData, 'client-nonce-001');
 
   assert.equal(token.type, 'DocuTrustTimestampToken2026');
-  assert.equal(token.version, '1.5.0');
+  assert.equal(token.version, '2.0.0');
   assert.ok(token.unixTimeSeconds > 0);
 
   const audit = CryptographicTSAOracle.verifyTimestampToken(token, documentData);

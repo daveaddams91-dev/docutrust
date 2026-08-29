@@ -104,6 +104,7 @@ export interface VerificationResult {
   issuanceDate: string;
   expirationDate?: string;
   isExpired: boolean;
+  isNotYetValid?: boolean;
   isRevoked: boolean;
   signatureValid: boolean;
   merkleProofValid?: boolean;
@@ -261,6 +262,7 @@ export class VerifiableCredentialsEngine {
   ): Promise<VerificationResult> {
     const errors: string[] = [];
     let isExpired = false;
+    let isNotYetValid = false;
     let isRevoked = false;
     let signatureValid = false;
     let merkleProofValid: boolean | undefined;
@@ -273,6 +275,7 @@ export class VerifiableCredentialsEngine {
         issuer: 'unknown',
         issuanceDate: 'unknown',
         isExpired: false,
+        isNotYetValid: false,
         isRevoked: false,
         signatureValid: false,
         errors: ['Invalid credential structure. Missing proof or issuer.']
@@ -281,7 +284,16 @@ export class VerifiableCredentialsEngine {
 
     const issuerId = typeof credential.issuer === 'string' ? credential.issuer : credential.issuer.id;
 
-    // 2. Expiration check
+    // 2a. Future-dated (anti-predating) check (allow 60s clock skew)
+    if (credential.validFrom) {
+      const fromTime = new Date(credential.validFrom).getTime();
+      if (!isNaN(fromTime) && fromTime > Date.now() + 60000) {
+        isNotYetValid = true;
+        errors.push(`Credential is not yet valid (validFrom is in the future: ${credential.validFrom})`);
+      }
+    }
+
+    // 2b. Expiration check
     if (credential.validUntil) {
       const exp = new Date(credential.validUntil).getTime();
       if (Date.now() > exp) {
@@ -349,7 +361,7 @@ export class VerifiableCredentialsEngine {
       }
     }
 
-    const valid = signatureValid && !isExpired && !isRevoked && (merkleProofValid !== false) && (anchorValid !== false);
+    const valid = signatureValid && !isExpired && !isNotYetValid && !isRevoked && (merkleProofValid !== false) && (anchorValid !== false);
 
     return {
       valid,
@@ -357,6 +369,7 @@ export class VerifiableCredentialsEngine {
       issuanceDate: credential.validFrom,
       expirationDate: credential.validUntil,
       isExpired,
+      isNotYetValid,
       isRevoked,
       signatureValid,
       merkleProofValid,

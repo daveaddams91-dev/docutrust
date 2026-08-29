@@ -205,7 +205,7 @@ const command = args[0];
 
 function printHelp() {
   console.log(`
-\x1b[1m\x1b[36m🛡️ DocuTrust CLI v1.6.0\x1b[0m — Open-Source Sovereign Trust Stack
+\x1b[1m\x1b[36m🛡️ DocuTrust CLI v2.0.0\x1b[0m — Open-Source Sovereign Trust Stack
 
 \x1b[1mCORE COMMANDS:\x1b[0m
   \x1b[32mdemo / wizard\x1b[0m                                 Run interactive 10-second end-to-end credential issuance & verification
@@ -220,6 +220,8 @@ function printHelp() {
   \x1b[32mencrypt\x1b[0m --data <str> --pass <pass>             Encrypt data with AES-256-GCM authenticated envelope
   \x1b[32mdecrypt\x1b[0m --payload <file> --pass <pass>         Decrypt AES-256-GCM envelope payload
   \x1b[32mzk-range\x1b[0m --val <num> --min <num> --max <num>   Generate ZK Range Proof with hidden commitment
+  \x1b[32mzk-age\x1b[0m --dob <YYYY-MM-DD> --min-age <num>     Generate ZK Age Predicate Proof (e.g. Age >= 21)
+  \x1b[32mzk-date\x1b[0m --date <str> --min <str> --max <str>  Generate ZK Date Range Proof
   \x1b[32mto-sd-jwt\x1b[0m --claims <file> --key <keyfile>      Issue IETF SD-JWT with salted disclosures
   \x1b[32mverify-sd-jwt\x1b[0m --presentation <str>            Verify SD-JWT presentation against issuer public key
   \x1b[32mbbs-issue\x1b[0m --messages <msg1,msg2>               Issue BBS+ multi-message signature
@@ -609,6 +611,42 @@ async function main() {
     if (outFile) {
       fs.writeFileSync(outFile, outStr, 'utf-8');
       console.log(`\x1b[32m✔\x1b[0m ZK Range Proof generated and saved to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    return;
+  }
+
+  if (command === 'zk-age') {
+    const key = getArgValue('--key') || 'birthDate';
+    const dob = getArgValue('--dob') || getArgValue('--birthdate') || '2000-01-01';
+    const minAge = parseInt(getArgValue('--min-age') || getArgValue('--min') || '18');
+    const refDate = getArgValue('--ref-date') || undefined;
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    const proof = core.proveAgeAbove(key, dob, minAge, undefined, refDate);
+    const outStr = JSON.stringify(proof, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m ZK Age Predicate Proof generated and saved to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    return;
+  }
+
+  if (command === 'zk-date') {
+    const key = getArgValue('--key') || 'graduationDate';
+    const date = getArgValue('--date') || '2024-06-15';
+    const minDate = getArgValue('--min-date') || getArgValue('--min') || '2020-01-01';
+    const maxDate = getArgValue('--max-date') || getArgValue('--max') || '2026-12-31';
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    const proof = core.proveDateRange(key, date, minDate, maxDate);
+    const outStr = JSON.stringify(proof, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m ZK Date Range Proof generated and saved to: \x1b[1m${outFile}\x1b[0m`);
     } else {
       console.log(outStr);
     }

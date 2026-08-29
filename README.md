@@ -4,7 +4,7 @@
 
 ### The Open-Source Sovereign Trust Stack for Verifiable Credentials, Post-Quantum Cryptography, M-of-N Multi-Signatures & Ledger Anchoring
 
-[![Version](https://img.shields.io/badge/Version-v1.6.0-blue.svg)]()
+[![Version](https://img.shields.io/badge/Version-v2.0.0-blue.svg)]()
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CI Status](https://img.shields.io/badge/CI-100%25%20Passing-brightgreen.svg)]()
 [![Post-Quantum](https://img.shields.io/badge/Quantum_Safe-NIST%20FIPS%20203%20%26%20204%20(ML--KEM%20%7C%20ML--DSA)-purple.svg)]()
