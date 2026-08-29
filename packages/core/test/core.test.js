@@ -67,7 +67,18 @@ const {
   // PoP
   ProofOfPossessionProtocol,
   // HashChain
-  TamperEvidentHashChain
+  TamperEvidentHashChain,
+  // Shamir
+  splitSecret,
+  combineShares,
+  // SD-JWT
+  issueSDJWT,
+  createSDJWTPresentation,
+  verifySDJWTPresentation,
+  // Trust Registry
+  DecentralizedTrustRegistry,
+  // Bloom Filter
+  RevocationBloomFilter
 } = require('../dist/index.js');
 
 // 1. Cryptography Tests
@@ -527,4 +538,116 @@ test('17. HashChain: Tamper-Evident Forward-Secure Cryptographic Ledger', () => 
   assert.equal(tamperedAudit.valid, false);
   assert.equal(tamperedAudit.brokenIndex, 1);
 });
+
+// 17. Shamir's Secret Sharing (K-of-N Threshold Key Slicing)
+test('18. Shamir: Split secret into 5 shares with threshold 3, and reconstruct from any 3 shares', () => {
+  const masterKey = 'ed25519-priv-key-secret-99482710492817492817498172948712';
+  const shares = splitSecret(masterKey, 5, 3);
+  assert.equal(shares.length, 5);
+  assert.equal(shares[0].threshold, 3);
+  assert.equal(shares[0].totalShares, 5);
+
+  // Reconstruct with shares [0, 2, 4] (3 shares)
+  const reconstructed1 = combineShares([shares[0], shares[2], shares[4]]);
+  assert.equal(reconstructed1.toString('utf-8'), masterKey);
+
+  // Reconstruct with shares [1, 3, 4] (different 3 shares)
+  const reconstructed2 = combineShares([shares[1], shares[3], shares[4]]);
+  assert.equal(reconstructed2.toString('utf-8'), masterKey);
+
+  // Fail if only 2 shares are provided (below threshold 3)
+  assert.throws(() => {
+    combineShares([shares[0], shares[1]]);
+  }, /Insufficient shares/);
+});
+
+// 18. IETF SD-JWT Selective Disclosure Verification
+test('19. SD-JWT: Issue SD-JWT with salted disclosures, selectively disclose claims, and verify', () => {
+  const issuerKp = generateKeyPair();
+  const claims = {
+    given_name: 'Elena',
+    family_name: 'Rostova',
+    degree: 'Ph.D. in Computer Science',
+    gpa: '3.98',
+    national_id: 'US-992-019-338'
+  };
+
+  const sdPackage = issueSDJWT(claims, issuerKp, 'did:key:zSubject123');
+  assert.ok(sdPackage.issuerJwt.startsWith('eyJ'));
+  assert.equal(sdPackage.disclosures.length, 5);
+  assert.ok(sdPackage.combinedSdJwt.includes('~'));
+
+  // Holder selectively discloses only given_name and degree (hides GPA and national_id)
+  const presentation = createSDJWTPresentation(sdPackage, ['given_name', 'degree']);
+  
+  const audit = verifySDJWTPresentation(presentation);
+  assert.equal(audit.valid, true);
+  assert.equal(audit.issuerDid, issuerKp.did);
+  assert.equal(audit.disclosedClaims.given_name, 'Elena');
+  assert.equal(audit.disclosedClaims.degree, 'Ph.D. in Computer Science');
+  assert.equal(audit.disclosedClaims.gpa, undefined);
+  assert.equal(audit.disclosedClaims.national_id, undefined);
+});
+
+// 19. Decentralized Trust Registry & Issuer Governance
+test('20. Trust Registry: Issue authority accreditation and verify schema authorizations', () => {
+  const govKp = generateKeyPair();
+  const stanfordKp = generateKeyPair();
+  const rogueKp = generateKeyPair();
+
+  const registry = new DecentralizedTrustRegistry();
+
+  // Government Authority issues accreditation to Stanford
+  const stanfordAccreditation = DecentralizedTrustRegistry.issueAccreditation(
+    stanfordKp.did,
+    'Stanford University',
+    'US-CA',
+    ['UniversityDegreeCredential', 'HonoraryDegreeCredential'],
+    365,
+    'TIER_1_ACCREDITED',
+    govKp
+  );
+
+  registry.registerAccreditation(stanfordAccreditation);
+
+  // Verify Stanford is authorized to issue UniversityDegreeCredential
+  const check1 = registry.verifyIssuerAuthorization(stanfordKp.did, 'UniversityDegreeCredential');
+  assert.equal(check1.authorized, true);
+  assert.equal(check1.accreditation.issuerName, 'Stanford University');
+
+  // Verify Stanford is NOT authorized to issue MedicalLicenseCredential
+  const check2 = registry.verifyIssuerAuthorization(stanfordKp.did, 'MedicalLicenseCredential');
+  assert.equal(check2.authorized, false);
+  assert.ok(check2.reason.includes('not authorized to issue schema'));
+
+  // Rogue issuer is not registered
+  const check3 = registry.verifyIssuerAuthorization(rogueKp.did, 'UniversityDegreeCredential');
+  assert.equal(check3.authorized, false);
+  assert.ok(check3.reason.includes('not registered'));
+});
+
+// 20. Space-Efficient Revocation Bloom Filter
+test('21. Bloom Filter: High-speed revocation accumulator with cryptographic signature', () => {
+  const issuerKp = generateKeyPair();
+  const filter = new RevocationBloomFilter(4096, 5);
+
+  filter.add('urn:uuid:revoked-degree-001');
+  filter.add('urn:uuid:revoked-degree-002');
+  filter.add('urn:uuid:revoked-license-009');
+
+  const signedFilter = filter.sign(issuerKp);
+  assert.equal(signedFilter.type, 'SignedRevocationBloomFilter2026');
+  assert.equal(signedFilter.revokedCount, 3);
+
+  // Check revoked credential
+  const audit1 = RevocationBloomFilter.verifyAndCheck(signedFilter, 'urn:uuid:revoked-degree-001');
+  assert.equal(audit1.signatureValid, true);
+  assert.equal(audit1.isRevoked, true);
+
+  // Check valid non-revoked credential
+  const audit2 = RevocationBloomFilter.verifyAndCheck(signedFilter, 'urn:uuid:active-degree-888');
+  assert.equal(audit2.signatureValid, true);
+  assert.equal(audit2.isRevoked, false);
+});
+
 

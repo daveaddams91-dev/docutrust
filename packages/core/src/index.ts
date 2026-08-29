@@ -51,3 +51,15 @@ export * from './possession';
 
 // Export Tamper-Evident Hash Chain Audit Ledger
 export * from './chain';
+
+// Export Shamir's Secret Sharing (K-of-N Key Recovery)
+export * from './shamir';
+
+// Export IETF SD-JWT (Selective Disclosure JWT for Mobile Wallets)
+export * from './sd-jwt';
+
+// Export Decentralized Trust Registry & Issuer Governance
+export * from './trust-registry';
+
+// Export Space-Efficient Revocation Bloom Filter
+export * from './bloom';

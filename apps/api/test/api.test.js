@@ -261,4 +261,74 @@ test('API Server Suite', async (t) => {
     assert.equal(chainRes.body.success, true);
     assert.equal(chainRes.body.integrity.valid, true);
   });
+
+  let shamirShares;
+  await t.test('15. POST /api/v1/keys/shamir/split & /combine', async () => {
+    const splitRes = await makeRequest('POST', '/api/v1/keys/shamir/split', {
+      secret: 'super-root-recovery-key-2026',
+      totalShares: 5,
+      threshold: 3
+    });
+    assert.equal(splitRes.status, 200);
+    assert.equal(splitRes.body.success, true);
+    assert.equal(splitRes.body.shares.length, 5);
+    shamirShares = splitRes.body.shares;
+
+    const combineRes = await makeRequest('POST', '/api/v1/keys/shamir/combine', {
+      shares: [shamirShares[0], shamirShares[2], shamirShares[4]]
+    });
+    assert.equal(combineRes.status, 200);
+    assert.equal(combineRes.body.success, true);
+    assert.equal(combineRes.body.secret, 'super-root-recovery-key-2026');
+  });
+
+  let sdPackage;
+  await t.test('16. POST /api/v1/credentials/sd-jwt/issue & /verify', async () => {
+    const issueRes = await makeRequest('POST', '/api/v1/credentials/sd-jwt/issue', {
+      claims: { name: 'Elena', role: 'Security Architect', level: 5 },
+      keyPair: classicalKeys
+    });
+    assert.equal(issueRes.status, 200);
+    assert.equal(issueRes.body.success, true);
+    sdPackage = issueRes.body.sdPackage;
+
+    const verifyRes = await makeRequest('POST', '/api/v1/credentials/sd-jwt/verify', {
+      presentation: sdPackage.combinedSdJwt
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.valid, true);
+    assert.equal(verifyRes.body.disclosedClaims.name, 'Elena');
+  });
+
+  await t.test('17. POST /api/v1/trust/verify-issuer', async () => {
+    const trustRes = await makeRequest('POST', '/api/v1/trust/verify-issuer', {
+      issuerDid: 'did:key:zUnknownIssuer999',
+      schemaType: 'UniversityDegreeCredential'
+    });
+    assert.equal(trustRes.status, 200);
+    assert.equal(trustRes.body.authorized, false);
+  });
+
+  await t.test('18. POST /api/v1/revocation/bloom/create & /check', async () => {
+    const createRes = await makeRequest('POST', '/api/v1/revocation/bloom/create', {
+      revokedIds: ['urn:uuid:revoked-credential-100', 'urn:uuid:revoked-credential-200']
+    });
+    assert.equal(createRes.status, 200);
+    assert.equal(createRes.body.success, true);
+    const signedFilter = createRes.body.signedFilter;
+
+    const checkRevoked = await makeRequest('POST', '/api/v1/revocation/bloom/check', {
+      signedFilter,
+      credentialId: 'urn:uuid:revoked-credential-100'
+    });
+    assert.equal(checkRevoked.status, 200);
+    assert.equal(checkRevoked.body.isRevoked, true);
+
+    const checkActive = await makeRequest('POST', '/api/v1/revocation/bloom/check', {
+      signedFilter,
+      credentialId: 'urn:uuid:active-credential-999'
+    });
+    assert.equal(checkActive.status, 200);
+    assert.equal(checkActive.body.isRevoked, false);
+  });
 });

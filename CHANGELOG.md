@@ -1,5 +1,58 @@
 # 📝 DocuTrust Changelog & Release Notes
 
+## [v1.4.0] - The Sovereign Interoperability, Trust Mesh & Key Recovery Release - 2026-08-29
+
+### 🔑 Shamir's Secret Sharing (K-of-N Threshold Key Slicing & Recovery)
+- **`@docutrust/core/shamir` & `sdks/python/docutrust/shamir`**:
+  - Industrial implementation of Shamir's Secret Sharing scheme over Galois Field GF($2^8$) with irreducible polynomial $x^8 + x^4 + x^3 + x^2 + 1$ (0x11d).
+  - Securely divides institutional master private keys into $N$ custodian shares with polynomial threshold $K$ (`splitSecret` / `split_secret`).
+  - Perfect Lagrange polynomial interpolation (`combineShares` / `combine_shares`) with SHA-256 checksum integrity verification. Prevents total key loss or rogue administrator compromise.
+
+---
+
+### 📱 IETF SD-JWT Mobile Wallet Interoperability
+- **`@docutrust/core/sd-jwt`**:
+  - Implements the IETF Selective Disclosure JSON Web Token (SD-JWT) draft standard (`issueSDJWT`, `createSDJWTPresentation`, `verifySDJWTPresentation`).
+  - Converts W3C Verifiable Credentials to salted claim disclosures (`~hash`) for direct compatibility with Apple Wallet, Google Wallet, and EU Digital Identity Wallet (eIDAS 2.0).
+
+---
+
+### 🏛️ Decentralized Trust Registry & Issuer Governance
+- **`@docutrust/core/trust-registry`**:
+  - Decentralized institutional accreditation registry (`DecentralizedTrustRegistry`).
+  - Verifies whether an Issuer DID is legally authorized and accredited to issue specific credential schemas (`UniversityDegreeCredential`, `MedicalLicenseCredential`, `SecurityClearanceCredential`).
+  - Validates governance anchor signatures, validity date windows, and tiered trust levels (`TIER_1_ACCREDITED`).
+
+---
+
+### ⚡ Sub-Microsecond Revocation Bloom Filters
+- **`@docutrust/core/bloom`**:
+  - Space-efficient cryptographic Revocation Bloom Filter (`RevocationBloomFilter`) with SHA-512 multi-probe dispersion.
+  - Signed by issuer authorities for $O(1)$ sub-microsecond offline revocation checks without downloading massive revocation registries.
+
+---
+
+### 🌐 REST API v1.4 Extensions (`@docutrust/api`)
+- Added `POST /api/v1/keys/shamir/split` & `POST /api/v1/keys/shamir/combine`.
+- Added `POST /api/v1/credentials/sd-jwt/issue` & `POST /api/v1/credentials/sd-jwt/verify`.
+- Added `POST /api/v1/trust/verify-issuer`.
+- Added `POST /api/v1/revocation/bloom/create` & `POST /api/v1/revocation/bloom/check`.
+
+---
+
+### 💻 CLI v1.4 Commands (`@docutrust/cli`)
+- `docutrust shamir-split --key <file> --shares <n> --threshold <k> --out <dir>`
+- `docutrust shamir-combine --shares-dir <dir> --out <file>`
+- `docutrust to-sd-jwt --claims <file> --key <keyfile> --out <file>`
+- `docutrust verify-sd-jwt --sd-jwt <file>`
+
+---
+
+### 🎨 Web Studio v1.4 (`@docutrust/web`)
+- Added **Trust Mesh & Recovery Studio** (`TrustRecoveryStudio.jsx`) with interactive Shamir (K-of-N) key slicing and reconstruction, IETF SD-JWT generation, and decentralized trust registry audits.
+
+---
+
 ## [v1.3.0] - The Fortress Release: Uncrackable Cryptographic Data Armor & ZK Predicates - 2026-08-29
 
 ### 🏰 Uncrackable Backend Data Protection & Zero-Trust Security Suite

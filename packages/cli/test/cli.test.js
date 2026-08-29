@@ -121,4 +121,37 @@ test('CLI Suite', async (t) => {
     const chal = JSON.parse(fs.readFileSync(popFile, 'utf-8'));
     assert.ok(chal.challengeId.startsWith('pop_'));
   });
+
+  const sharesDir = path.join(tempDir, 'shares-test');
+  const reconstructedKeyFile = path.join(tempDir, 'reconstructed-key.txt');
+  await t.test('11. docutrust shamir-split and shamir-combine', () => {
+    const secretFile = path.join(tempDir, 'secret-to-split.txt');
+    fs.writeFileSync(secretFile, 'MasterVaultRootKeyPassphrase2026!', 'utf-8');
+
+    const outSplit = execSync(`node "${cliPath}" shamir-split --key "${secretFile}" --shares 5 --threshold 3 --out "${sharesDir}"`).toString();
+    assert.ok(outSplit.includes('Secret split into'));
+    assert.ok(fs.existsSync(path.join(sharesDir, 'share-1.json')));
+
+    // Delete 2 shares (shares 4 and 5) to test threshold 3 recovery
+    fs.unlinkSync(path.join(sharesDir, 'share-4.json'));
+    fs.unlinkSync(path.join(sharesDir, 'share-5.json'));
+
+    const outCombine = execSync(`node "${cliPath}" shamir-combine --shares-dir "${sharesDir}" --out "${reconstructedKeyFile}"`).toString();
+    assert.ok(outCombine.includes('Secret reconstructed and saved'));
+    assert.equal(fs.readFileSync(reconstructedKeyFile, 'utf-8'), 'MasterVaultRootKeyPassphrase2026!');
+  });
+
+  const sdJwtFile = path.join(tempDir, 'sd-jwt.json');
+  await t.test('12. docutrust to-sd-jwt and verify-sd-jwt', () => {
+    const claimsFile = path.join(tempDir, 'claims-sd.json');
+    fs.writeFileSync(claimsFile, JSON.stringify({ name: 'Elena Rostova', title: 'Director of Security' }), 'utf-8');
+
+    const outIssue = execSync(`node "${cliPath}" to-sd-jwt --claims "${claimsFile}" --key "${keysFile}" --out "${sdJwtFile}"`).toString();
+    assert.ok(outIssue.includes('IETF SD-JWT issued and saved'));
+    assert.ok(fs.existsSync(sdJwtFile));
+
+    const outVerify = execSync(`node "${cliPath}" verify-sd-jwt --sd-jwt "${sdJwtFile}"`).toString();
+    assert.ok(outVerify.includes('VALID'));
+    assert.ok(outVerify.includes('Elena Rostova'));
+  });
 });

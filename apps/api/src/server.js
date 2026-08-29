@@ -18,7 +18,14 @@ const {
   sealCredentialForRecipient,
   unsealCredential,
   ProofOfPossessionProtocol,
-  TamperEvidentHashChain
+  TamperEvidentHashChain,
+  splitSecret,
+  combineShares,
+  issueSDJWT,
+  createSDJWTPresentation,
+  verifySDJWTPresentation,
+  DecentralizedTrustRegistry,
+  RevocationBloomFilter
 } = require('@docutrust/core');
 
 const PORT = process.env.PORT || 4000;
@@ -38,6 +45,7 @@ let credentialsStore = [];
 let apiKeysStore = [];
 let anchorsStore = [];
 const hashChainLedger = new TamperEvidentHashChain();
+const trustRegistry = new DecentralizedTrustRegistry();
 
 try {
   if (fs.existsSync(CREDS_FILE)) credentialsStore = JSON.parse(fs.readFileSync(CREDS_FILE, 'utf-8'));
@@ -974,6 +982,84 @@ const server = http.createServer(async (req, res) => {
         integrity,
         chain
       });
+    }
+
+    // 21. Shamir Split Secret
+    if (pathname === '/api/v1/keys/shamir/split' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { secret, totalShares, threshold } = body;
+      if (!secret || !totalShares || !threshold) {
+        return jsonResponse(400, { error: 'Missing secret, totalShares, or threshold.' });
+      }
+      try {
+        const shares = splitSecret(secret, parseInt(totalShares), parseInt(threshold));
+        return jsonResponse(200, { success: true, shares });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // 22. Shamir Combine Shares
+    if (pathname === '/api/v1/keys/shamir/combine' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { shares } = body;
+      if (!shares || !Array.isArray(shares)) {
+        return jsonResponse(400, { error: 'Missing shares array in request.' });
+      }
+      try {
+        const reconstructed = combineShares(shares);
+        return jsonResponse(200, { success: true, secret: reconstructed.toString('utf-8') });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // 23. SD-JWT Issue
+    if (pathname === '/api/v1/credentials/sd-jwt/issue' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { claims, keyPair, subjectDid } = body;
+      if (!claims) return jsonResponse(400, { error: 'Missing claims.' });
+      const kp = keyPair ? (keyPair.privateKeyPem ? keyPair : systemKeyPair) : systemKeyPair;
+      const sdPackage = issueSDJWT(claims, kp, subjectDid);
+      return jsonResponse(200, { success: true, sdPackage });
+    }
+
+    // 24. SD-JWT Verify
+    if (pathname === '/api/v1/credentials/sd-jwt/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { presentation } = body;
+      if (!presentation) return jsonResponse(400, { error: 'Missing presentation string.' });
+      const result = verifySDJWTPresentation(presentation);
+      return jsonResponse(200, result);
+    }
+
+    // 25. Trust Registry Verify Issuer
+    if (pathname === '/api/v1/trust/verify-issuer' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { issuerDid, schemaType } = body;
+      if (!issuerDid || !schemaType) return jsonResponse(400, { error: 'Missing issuerDid or schemaType.' });
+      const result = trustRegistry.verifyIssuerAuthorization(issuerDid, schemaType);
+      return jsonResponse(200, result);
+    }
+
+    // 26. Bloom Filter Create & Check
+    if (pathname === '/api/v1/revocation/bloom/create' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { revokedIds, sizeBits, hashCount } = body;
+      const filter = new RevocationBloomFilter(sizeBits || 8192, hashCount || 5);
+      if (Array.isArray(revokedIds)) {
+        revokedIds.forEach(id => filter.add(id));
+      }
+      const signedFilter = filter.sign(systemKeyPair);
+      return jsonResponse(200, { success: true, signedFilter });
+    }
+
+    if (pathname === '/api/v1/revocation/bloom/check' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { signedFilter, credentialId } = body;
+      if (!signedFilter || !credentialId) return jsonResponse(400, { error: 'Missing signedFilter or credentialId.' });
+      const result = RevocationBloomFilter.verifyAndCheck(signedFilter, credentialId);
+      return jsonResponse(200, result);
     }
 
     // Default 404

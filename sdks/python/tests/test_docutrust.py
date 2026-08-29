@@ -12,8 +12,20 @@ from docutrust.client import DocuTrustClient
 from docutrust.encryption import encrypt_aes_gcm, decrypt_aes_gcm
 from docutrust.zk_predicates import prove_range, verify_range_proof, create_commitment
 from docutrust.kem import generate_kem_keypair
+from docutrust.shamir import split_secret, combine_shares
 
 class TestDocuTrustPython(unittest.TestCase):
+    def test_shamir_secret_sharing(self):
+        secret = "MasterSecretKeyForPythonSDK2026!"
+        shares = split_secret(secret, 5, 3)
+        self.assertEqual(len(shares), 5)
+        self.assertEqual(shares[0]["threshold"], 3)
+
+        reconstructed = combine_shares([shares[0], shares[2], shares[4]])
+        self.assertEqual(reconstructed.decode('utf-8'), secret)
+
+        with self.assertRaises(ValueError):
+            combine_shares([shares[0], shares[1]])
     def test_canonicalize_json(self):
         obj1 = {"z": 10, "a": "hello", "m": [3, 2, 1]}
         obj2 = {"a": "hello", "m": [3, 2, 1], "z": 10}

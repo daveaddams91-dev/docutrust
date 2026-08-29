@@ -621,6 +621,93 @@ async function main() {
     return;
   }
 
+  if (command === 'shamir-split') {
+    const keyFile = getArgValue('--key') || getArgValue('-k');
+    const totalShares = parseInt(getArgValue('--shares') || getArgValue('-n') || '5');
+    const threshold = parseInt(getArgValue('--threshold') || getArgValue('-t') || '3');
+    const outDir = getArgValue('--out-dir') || getArgValue('--out') || getArgValue('-o') || './shares';
+
+    if (!keyFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --key <file>');
+      process.exit(1);
+    }
+    const secret = fs.readFileSync(keyFile, 'utf-8');
+    const shares = core.splitSecret(secret, totalShares, threshold);
+    if (!fs.existsSync(outDir)) {
+      fs.mkdirSync(outDir, { recursive: true });
+    }
+    shares.forEach(s => {
+      fs.writeFileSync(path.join(outDir, `share-${s.index}.json`), JSON.stringify(s, null, 2), 'utf-8');
+    });
+    console.log(`\x1b[32m✔\x1b[0m Secret split into \x1b[1m${totalShares} shares\x1b[0m (threshold: ${threshold}) in: \x1b[1m${outDir}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'shamir-combine') {
+    const sharesDir = getArgValue('--shares-dir') || getArgValue('-d') || './shares';
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!fs.existsSync(sharesDir)) {
+      console.error(`\x1b[31mError:\x1b[0m Shares directory not found: ${sharesDir}`);
+      process.exit(1);
+    }
+    const files = fs.readdirSync(sharesDir).filter(f => f.endsWith('.json'));
+    const shares = files.map(f => JSON.parse(fs.readFileSync(path.join(sharesDir, f), 'utf-8')));
+    const reconstructed = core.combineShares(shares);
+    const resultStr = reconstructed.toString('utf-8');
+    if (outFile) {
+      fs.writeFileSync(outFile, resultStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m Secret reconstructed and saved to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(resultStr);
+    }
+    return;
+  }
+
+  if (command === 'to-sd-jwt') {
+    const claimsFile = getArgValue('--claims') || getArgValue('-c');
+    const keyFile = getArgValue('--key') || getArgValue('-k');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!claimsFile || !keyFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --claims <file> or --key <file>');
+      process.exit(1);
+    }
+    const claims = JSON.parse(fs.readFileSync(claimsFile, 'utf-8'));
+    const keyPair = JSON.parse(fs.readFileSync(keyFile, 'utf-8'));
+    const sdPackage = core.issueSDJWT(claims, keyPair);
+    const outStr = JSON.stringify(sdPackage, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m IETF SD-JWT issued and saved to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    return;
+  }
+
+  if (command === 'verify-sd-jwt') {
+    const sdjwtFile = getArgValue('--sd-jwt') || getArgValue('-s');
+    if (!sdjwtFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --sd-jwt <file>');
+      process.exit(1);
+    }
+    const content = fs.readFileSync(sdjwtFile, 'utf-8').trim();
+    let presentationStr = content;
+    try {
+      const parsed = JSON.parse(content);
+      if (parsed.combinedSdJwt) presentationStr = parsed.combinedSdJwt;
+    } catch (e) {}
+
+    const result = core.verifySDJWTPresentation(presentationStr);
+    console.log(`\n\x1b[1m--- SD-JWT VERIFICATION REPORT ---\x1b[0m`);
+    console.log(`Issuer DID:        ${result.issuerDid}`);
+    console.log(`Signature Status:  ${result.valid ? '\x1b[32m✔ VALID\x1b[0m' : '\x1b[31m✖ INVALID\x1b[0m'}`);
+    console.log(`Disclosed Claims:  ${JSON.stringify(result.disclosedClaims)}`);
+    console.log(`----------------------------------\n`);
+    return;
+  }
+
   console.log(`Unknown command: ${command}. Run 'docutrust help' for usage.`);
 }
 
