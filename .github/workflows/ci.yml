@@ -21,13 +21,19 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
 
-    - name: Run Core Cryptographic Tests
-      run: |
-        node --test packages/core/test/core.test.js
+    - name: Install Monorepo Dependencies
+      run: npm install
+
+    - name: Build All Workspaces
+      run: npm run build
+
+    - name: Run Monorepo Test Suites (@docutrust/core, @docutrust/cli, @docutrust/api, @docutrust/web)
+      run: npm test
 
     - name: Test CLI Keygen & Verification
       run: |
         node packages/cli/bin/docutrust.js keygen --out test-keys.json
+        node packages/cli/bin/docutrust.js demo
         node packages/cli/bin/docutrust.js verify --vc examples/certificates/stanford-degree-vc.json
 
   python-sdk-tests:

@@ -1,37 +1,39 @@
-# Changelog
+# 📝 DocuTrust Changelog & Release Notes
 
-All notable changes to this project will be documented in this file.
+## [v1.2.1] - 2026-08-29
 
-## [1.2.0] - 2026-08-28
+### 🛡️ Security & Cryptographic Bug Fixes
+- **`@docutrust/core/vc`**: Fixed missing `crypto` module import causing `ReferenceError: crypto is not defined` when generating fallback UUIDs in `VerifiableCredentialsEngine.issue()`.
+- **`@docutrust/core/selective-disclosure`**: Resolved domain separation bug in `verifySelectiveDisclosurePresentation`. Raw claim hashes are now correctly passed as `rawLeafData` to `MerkleTree.verifyProof()` to enforce RFC 6962 leaf domain separation (`0x00 || hash`).
+- **`@docutrust/core/crypto`**: Added native support for `did:pqc:z...` hybrid DID identifiers in `verifySignature()`, automatically extracting the raw classical Ed25519 public key bytes for standard SPKI derivation.
+- **`@docutrust/core/did`**: Extended `DIDResolver` with `resolveDidPqc()`, enabling offline deterministic resolution of Post-Quantum Hybrid ML-DSA-65 identifiers (`did:pqc:`).
+- **`@docutrust/core/pqc`**: Enhanced `verifyPQCHybrid()` signature binding and validation against NIST FIPS 204 specifications.
+- **`@docutrust/core/db`**: Fixed `crypto` import in `CredentialVault` for API key and UUID generation.
 
-### Usability & User Experience
-- **Interactive 10-Second Quickstart Wizard (`docutrust demo`)**:
-  - Direct 1-command end-to-end issuance, signing, ledger anchoring, and verification walkthrough.
-- **Threshold Multi-Signature Studio (`MultiSigStudio.jsx`)**:
-  - Interactive UI for M-of-N institutional governance (Dean + Chancellor + Registrar).
-- **Streamlined Web Navigation**:
-  - Added Multi-Sig tab and simplified quick-fill workflows.
+---
 
-### Security Hardening ("Uncrackable" Defense-in-Depth)
-- **Constant-Time Verification**:
-  - Added `crypto.timingSafeEqual` comparison with length zero-padding to completely eliminate side-channel timing attacks on signatures and hashes.
-- **Anti-Replay & Timestamp Drift Guard (`AntiReplayGuard`)**:
-  - Cryptographic single-use nonce tracking and maximum 5-minute timestamp drift window.
-- **Deep Prototype Pollution & Injection Defense (`sanitizeJsonPayload`)**:
-  - Recursive sanitation purging `__proto__`, `constructor`, and circular references prior to canonical serialization.
-- **Shannon Entropy Enforcer**:
-  - Automated entropy validation ($\ge 3.8\text{ bits/byte}$) for keys and salts, blocking weak or predictable randomness.
-- **M-of-N Multi-Signature Threshold Engine (`packages/core/src/multisig`)**:
-  - Institutional threshold scheme requiring $M$ out of $N$ authorized key signatures.
+### ⚡ Feature Enhancements & API Extensions
+- **`@docutrust/api`**:
+  - Implemented `POST /api/v1/credentials/issue-batch`: Batch issuance of W3C Verifiable Credentials with domain-separated Merkle Tree construction and automated Polygon ledger anchor receipts.
+  - Implemented `POST /api/v1/credentials/selective-disclosure`: Zero-Knowledge salted claim presentation generator revealing selected claims with individual Merkle inclusion proofs.
+  - Added modular module export and conditional `server.listen()` execution for programmatic and test embedding.
+- **`@docutrust/cli`**:
+  - Added `docutrust batch` command supporting CSV parsing, batch cryptographic signing, Merkle tree root generation, and directory output.
+  - Updated CLI command dispatch and error handling.
+- **`sdks/python`**:
+  - Expanded Python SDK test coverage in `test_docutrust.py` with mock verification of `DocuTrustClient` (single issuance, batch issuance, selective disclosure, and PDF verification).
 
-### Documentation
-- Completely revamped `README.md` with full ASCII architecture diagrams, defense-in-depth security breakdowns, CLI guides, and REST API cheat sheets.
+---
 
-## [1.1.0] - 2026-08-28
-- Post-Quantum ML-DSA Hybrid dual signing.
-- Verifiable PDF 2.0 with embedded `/DocuTrustProof` metadata.
-- Persistent Vault and Auto-Batch Anchoring worker.
-- WYSIWYG Visual Certificate Studio & WebRTC Camera Scanner.
-
-## [1.0.0] - 2026-08-28
-- Initial release of DocuTrust open-source sovereign trust stack.
+### 🏗️ Monorepo Build System & Testing Overhaul
+- **Standardized Monorepo Scripts**:
+  - Configured `"build"` and `"test"` across `@docutrust/core`, `@docutrust/cli`, `@docutrust/api`, and `@docutrust/web`.
+  - Added TypeScript compilation (`"build": "tsc"`) and typing definitions (`@types/node`) to `@docutrust/core`.
+  - Upgraded root `npm run build` and `npm test` to run cleanly across all monorepo workspaces simultaneously.
+- **Comprehensive Test Suites**:
+  - `packages/core/test/core.test.js`: 12 comprehensive unit test suites validating all modules against compiled `dist/`.
+  - `apps/api/test/api.test.js`: 10 integration test suites verifying all REST API endpoints on dynamic test ports.
+  - `packages/cli/test/cli.test.js`: 7 automated CLI subprocess test suites verifying all command lines (`keygen`, `pqc-keygen`, `issue`, `batch`, `verify`, `demo`).
+  - `sdks/python/tests/test_docutrust.py`: 11 Python test suites with 100% pass rate.
+- **CI / CD Pipeline**:
+  - Updated `.github/workflows/ci.yml` to automatically build all monorepo workspaces and run all test suites across Node.js (18.x, 20.x, 22.x) and Python (3.8, 3.10, 3.12).

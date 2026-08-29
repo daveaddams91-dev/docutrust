@@ -117,11 +117,8 @@ export function verifySelectiveDisclosurePresentation(
   for (const disclosed of presentation.disclosedClaims) {
     const recomputedHash = computeBlindedClaimHash(disclosed.key, disclosed.value, disclosed.salt);
     const isProofValid = MerkleTree.verifyProof(
-      null,
-      {
-        ...disclosed.proof,
-        leafHash: recomputedHash
-      },
+      recomputedHash,
+      disclosed.proof,
       targetRoot
     );
 

@@ -185,6 +185,13 @@ export function verifySignature(
       const spkiHeader = Buffer.from('302a300506032b6570032100', 'hex');
       const fullDer = Buffer.concat([spkiHeader, rawPub]);
       keyObject = crypto.createPublicKey({ key: fullDer, format: 'der', type: 'spki' });
+    } else if (typeof publicKey === 'string' && publicKey.startsWith('did:pqc:z')) {
+      const multibase = publicKey.replace('did:pqc:z', '').split('#')[0];
+      const decoded = decodeBase58(multibase);
+      const rawClassicalPub = decoded.subarray(2, 34);
+      const spkiHeader = Buffer.from('302a300506032b6570032100', 'hex');
+      const fullDer = Buffer.concat([spkiHeader, rawClassicalPub]);
+      keyObject = crypto.createPublicKey({ key: fullDer, format: 'der', type: 'spki' });
     } else if (typeof publicKey === 'string' && /^[0-9a-fA-F]{64}$/.test(publicKey)) {
       const spkiHeader = Buffer.from('302a300506032b6570032100', 'hex');
       const fullDer = Buffer.concat([spkiHeader, Buffer.from(publicKey, 'hex')]);

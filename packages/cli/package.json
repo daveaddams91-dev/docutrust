@@ -6,7 +6,9 @@
     "docutrust": "./bin/docutrust.js"
   },
   "scripts": {
-    "start": "node bin/docutrust.js"
+    "start": "node bin/docutrust.js",
+    "build": "node -e \"console.log('CLI build OK')\"",
+    "test": "node --test test/cli.test.js"
   },
   "dependencies": {},
   "license": "Apache-2.0"

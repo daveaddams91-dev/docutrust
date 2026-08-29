@@ -5,7 +5,9 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node src/server.js"
+    "dev": "node src/server.js",
+    "build": "node -e \"console.log('API build OK')\"",
+    "test": "node --test test/api.test.js"
   },
   "dependencies": {
     "express": "^4.19.2",

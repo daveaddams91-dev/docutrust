@@ -4,11 +4,20 @@
   "description": "Core cryptographic, Post-Quantum, Multi-Sig, Merkle, and Verifiable Credentials engine",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "scripts": {
-    "test": "node --test test/core.test.js"
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "test": "npm run build && node --test test/core.test.js"
   },
   "dependencies": {},
   "devDependencies": {
+    "@types/node": "^20.14.9",
     "typescript": "^5.4.0"
   },
   "license": "Apache-2.0"

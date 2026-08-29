@@ -1,3 +1,4 @@
+import * as crypto from 'crypto';
 import {
   KeyPair,
   canonicalizeJson,
@@ -171,7 +172,14 @@ export class VerifiableCredentialsEngine {
     const signatureHex = signData(canonicalHash, keyPair);
 
     const credential: VerifiableCredential = {
-      ...unsignedCredential,
+      '@context': unsignedCredential['@context'],
+      id: unsignedCredential.id,
+      type: unsignedCredential.type,
+      issuer: unsignedCredential.issuer,
+      validFrom: unsignedCredential.validFrom,
+      ...(unsignedCredential.validUntil ? { validUntil: unsignedCredential.validUntil } : {}),
+      credentialSubject: unsignedCredential.credentialSubject,
+      ...(unsignedCredential.credentialStatus ? { credentialStatus: unsignedCredential.credentialStatus } : {}),
       proof: {
         type: 'Ed25519Signature2020',
         created: new Date().toISOString(),

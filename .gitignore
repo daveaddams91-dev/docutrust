@@ -25,6 +25,8 @@ venv/
 .env.production.local
 *.pem
 *private-keys*.json
+data/
+**/data/
 
 # Logs
 npm-debug.log*

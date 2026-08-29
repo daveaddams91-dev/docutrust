@@ -94,7 +94,14 @@ export class MultiSigEngine {
     };
 
     return {
-      ...unsignedCredential,
+      '@context': unsignedCredential['@context'],
+      id: unsignedCredential.id,
+      type: unsignedCredential.type,
+      issuer: unsignedCredential.issuer,
+      validFrom: unsignedCredential.validFrom,
+      ...(unsignedCredential.validUntil ? { validUntil: unsignedCredential.validUntil } : {}),
+      credentialSubject: unsignedCredential.credentialSubject,
+      ...(unsignedCredential.credentialStatus ? { credentialStatus: unsignedCredential.credentialStatus } : {}),
       proof: proof as any
     };
   }

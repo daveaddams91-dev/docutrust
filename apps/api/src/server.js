@@ -494,6 +494,149 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
+    // 4b. Issue Batch Credentials with Merkle Tree Anchor
+    if (pathname === '/api/v1/credentials/issue-batch' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const records = body.records || [];
+      const kp = body.keyPair || systemKeyPair;
+      const type = body.type || ['VerifiableCredential', 'UniversityDegreeCredential'];
+      const anchorToLedger = body.anchorToLedger !== false;
+
+      if (!records || records.length === 0) {
+        return jsonResponse(400, { error: 'Missing records in batch issuance request' });
+      }
+
+      const credentials = records.map(record => {
+        const id = record.id || `urn:uuid:${crypto.randomUUID()}`;
+        const unsigned = {
+          '@context': [
+            'https://www.w3.org/ns/credentials/v2',
+            'https://w3id.org/security/suites/ed25519-2020/v1'
+          ],
+          id,
+          type,
+          issuer: body.issuer || {
+            id: kp.did,
+            name: body.issuerName || 'DocuTrust Authority'
+          },
+          validFrom: record.validFrom || new Date().toISOString(),
+          ...(record.validUntil ? { validUntil: record.validUntil } : {}),
+          credentialSubject: record.credentialSubject || {}
+        };
+
+        const canonicalPayload = canonicalizeJson(unsigned);
+        const canonicalHash = sha256Hex(canonicalPayload);
+        const signatureHex = signData(canonicalHash, kp);
+
+        return {
+          ...unsigned,
+          proof: {
+            type: 'Ed25519Signature2020',
+            created: new Date().toISOString(),
+            verificationMethod: kp.keyId,
+            proofPurpose: 'assertionMethod',
+            proofValue: signatureHex,
+            jcsCanonicalHash: canonicalHash
+          }
+        };
+      });
+
+      const leaves = credentials.map(c => c.proof.jcsCanonicalHash);
+      const tree = new MerkleTree(leaves);
+      const merkleRoot = tree.getRoot();
+
+      let anchorReceipt;
+      if (anchorToLedger) {
+        const timestamp = Date.now();
+        anchorReceipt = {
+          rootHash: merkleRoot,
+          network: 'polygon',
+          txHash: '0x' + sha256Hex(`tx:${merkleRoot}:${timestamp}`),
+          blockNumber: 54890250 + Math.floor(Math.random() * 50),
+          contractAddress: '0x71C8A185676f18167341829e9241b777a83B3d34',
+          timestamp,
+          confirmed: true,
+          leafCount: credentials.length
+        };
+      }
+
+      credentials.forEach((cred, idx) => {
+        cred.proof.merkleProof = tree.getProof(idx);
+        if (anchorReceipt) cred.proof.anchorReceipt = anchorReceipt;
+
+        credentialsStore.push({
+          id: cred.id,
+          type: cred.type,
+          issuerId: typeof cred.issuer === 'string' ? cred.issuer : cred.issuer.id,
+          issuerName: typeof cred.issuer === 'object' ? cred.issuer.name : 'Authority',
+          recipientName: cred.credentialSubject?.name || 'Recipient',
+          recipientId: cred.credentialSubject?.id || 'did:key:unknown',
+          issuanceDate: cred.validFrom,
+          status: 'valid',
+          anchored: Boolean(anchorReceipt),
+          anchorReceipt,
+          rawCredential: cred
+        });
+      });
+      persistAll();
+
+      return jsonResponse(200, {
+        success: true,
+        credentials,
+        merkleRoot,
+        anchorReceipt,
+        totalIssued: credentials.length
+      });
+    }
+
+    // 4c. Generate Selective Disclosure Presentation
+    if (pathname === '/api/v1/credentials/selective-disclosure' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const credential = body.credential;
+      const revealKeys = body.revealKeys || [];
+
+      if (!credential || !credential.credentialSubject) {
+        return jsonResponse(400, { error: 'Missing credential with credentialSubject' });
+      }
+
+      const keys = Object.keys(credential.credentialSubject).sort();
+      const blindedClaims = keys.map(k => {
+        const salt = crypto.randomBytes(16).toString('hex');
+        const value = credential.credentialSubject[k];
+        const blindedHash = sha256Hex(`${salt}::${k}::${canonicalizeJson(value)}`);
+        return { key: k, value, salt, blindedHash };
+      });
+
+      const tree = new MerkleTree(blindedClaims.map(b => b.blindedHash));
+      const claimsRoot = tree.getRoot();
+
+      const revealSet = new Set(revealKeys);
+      const disclosedClaims = [];
+      const hiddenClaimHashes = {};
+
+      for (let i = 0; i < blindedClaims.length; i++) {
+        const c = blindedClaims[i];
+        if (revealSet.has(c.key)) {
+          disclosedClaims.push({
+            key: c.key,
+            value: c.value,
+            salt: c.salt,
+            proof: tree.getProof(i)
+          });
+        } else {
+          hiddenClaimHashes[i] = c.blindedHash;
+        }
+      }
+
+      return jsonResponse(200, {
+        success: true,
+        claimsRoot,
+        disclosedClaims,
+        hiddenClaimHashes,
+        totalClaims: blindedClaims.length
+      });
+    }
+
     // 5. Generate Verifiable PDF 2.0
     if (pathname === '/api/v1/credentials/render-pdf' && req.method === 'POST') {
       const body = await readJsonBody();
@@ -699,6 +842,10 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`\x1b[32m✔\x1b[0m DocuTrust API v1.1.0 running on http://localhost:${PORT}`);
-});
+if (require.main === module) {
+  server.listen(PORT, () => {
+    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v1.1.0 running on http://localhost:${PORT}`);
+  });
+}
+
+module.exports = { server, generateKeyPair, generatePQCKeyPair, canonicalizeJson, sha256Hex, MerkleTree };
