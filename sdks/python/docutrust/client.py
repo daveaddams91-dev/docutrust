@@ -1209,3 +1209,58 @@ class DocuTrustClient:
         """Verifies the integrity and authenticity of an SVG badge."""
         from .badge import BadgeEngine
         return BadgeEngine.verify_badge_svg(svg_content)
+
+    # ==========================================
+    # v9.0.0 Sovereign Policy-as-Proof & did:peer
+    # ==========================================
+
+    def evaluate_policy(
+        self,
+        payload: Dict[str, Any],
+        policy: Dict[str, Any],
+        evaluator_keypair: Optional[Any] = None
+    ) -> Dict[str, Any]:
+        """Evaluates a verifiable credential or presentation against an AST policy."""
+        from .policy import PolicyEngine
+        return PolicyEngine.evaluate(payload, policy, evaluator_keypair=evaluator_keypair)
+
+    def verify_policy_receipt(
+        self,
+        receipt: Dict[str, Any],
+        expected_evaluator_public_key_hex: Optional[str] = None
+    ) -> bool:
+        """Cryptographically verifies a DocuTrustPolicyReceipt2026."""
+        from .policy import PolicyEngine
+        return PolicyEngine.verify_receipt(receipt, expected_evaluator_public_key_hex=expected_evaluator_public_key_hex)
+
+    def create_did_peer_0(self, public_key_hex: str) -> str:
+        """Creates a W3C did:peer:0 inception key URI."""
+        from .did import create_did_peer_0
+        return create_did_peer_0(public_key_hex)
+
+    def create_did_peer_2(
+        self,
+        verification_key_hex: str,
+        encryption_key_hex: Optional[str] = None,
+        service_endpoint: Optional[str] = None
+    ) -> str:
+        """Creates a W3C did:peer:2 multi-key and service endpoint URI."""
+        from .did import create_did_peer_2
+        return create_did_peer_2(
+            verification_key_hex=verification_key_hex,
+            encryption_key_hex=encryption_key_hex,
+            service_endpoint=service_endpoint
+        )
+
+    def generate_solidity_registry(
+        self,
+        contract_name: str = "DocuTrustRegistry",
+        solidity_version: str = "^0.8.20"
+    ) -> str:
+        """Generates a multi-issuer Sovereign Trust Registry smart contract for on-chain accreditation."""
+        from .solidity import SolidityEngine
+        return SolidityEngine.generate_registry_contract(
+            contract_name=contract_name,
+            solidity_version=solidity_version
+        )
+

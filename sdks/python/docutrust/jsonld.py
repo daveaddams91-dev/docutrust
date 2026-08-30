@@ -160,11 +160,30 @@ class JsonLdCanonicalizationEngine:
             errors.append(f"Canonical RDF digest mismatch: expected {proof['canonicalRdfDigest']}, computed {computed_digest}")
 
         pub_hex = expected_public_key_hex
-        if not pub_hex and proof.get("verificationMethod", "").startswith("did:key:"):
-            did_key = proof["verificationMethod"].split("#")[0]
+        vm = proof.get("verificationMethod", "")
+        if not pub_hex and vm.startswith("did:key:"):
+            did_key = vm.split("#")[0]
             try:
                 raw = decode_base58(did_key.replace("did:key:z", ""))
                 pub_hex = raw[2:].hex()
+            except Exception:
+                pass
+        elif not pub_hex and vm.startswith("did:peer:0"):
+            try:
+                multibase = vm[10:].split("#")[0]
+                raw = decode_base58(multibase[1:])
+                pub_hex = raw[2:].hex()
+            except Exception:
+                pass
+        elif not pub_hex and vm.startswith("did:jwk:"):
+            try:
+                import json, base64
+                raw_encoded = vm.replace("did:jwk:", "").split("#")[0]
+                padded = raw_encoded + "=" * ((4 - len(raw_encoded) % 4) % 4)
+                jwk = json.loads(base64.urlsafe_b64decode(padded.encode("ascii")).decode("utf-8"))
+                if "x" in jwk:
+                    padded_x = jwk["x"] + "=" * ((4 - len(jwk["x"]) % 4) % 4)
+                    pub_hex = base64.urlsafe_b64decode(padded_x.encode("ascii")).hex()
             except Exception:
                 pass
 

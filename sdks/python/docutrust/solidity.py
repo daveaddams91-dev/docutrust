@@ -17,7 +17,7 @@ pragma solidity {solidity_version};
 
 /**
  * @title {contract_name}
- * @author DocuTrust Sovereign Trust Engine v8.0.0
+ * @author DocuTrust Sovereign Trust Engine v9.0.0
  * @notice Verifies W3C Verifiable Credentials, Merkle Inclusion Proofs, and EIP-712 attestations on-chain.
  */
 contract {contract_name} {{
@@ -111,6 +111,102 @@ contract {contract_name} {{
     ) public pure returns (bool) {{
         address recovered = ecrecover(digest, v, r, s);
         return recovered != address(0) && recovered == expectedSigner;
+    }}
+}}
+"""
+
+    @staticmethod
+    def generate_registry_contract(
+        contract_name: str = "DocuTrustRegistry",
+        solidity_version: str = "^0.8.20"
+    ) -> str:
+        """Generates a multi-issuer Sovereign Trust Registry smart contract for on-chain accreditation."""
+        return f"""// SPDX-License-Identifier: Apache-2.0
+pragma solidity {solidity_version};
+
+/**
+ * @title {contract_name}
+ * @author DocuTrust Sovereign Trust Engine v9.0.0
+ * @notice Manages accredited issuer registries, revocation status roots, and multi-schema accreditation policies.
+ */
+contract {contract_name} {{
+    struct IssuerInfo {{
+        bool accredited;
+        uint8 accreditationLevel;
+        string didUri;
+        uint256 registeredAt;
+        uint256 expiresAt;
+    }}
+
+    event IssuerRegistered(address indexed issuerAddress, string didUri, uint8 level, uint256 expiresAt);
+    event IssuerRevoked(address indexed issuerAddress, string reason);
+    event RevocationRootUpdated(address indexed issuerAddress, bytes32 indexed rootHash, uint256 indexed version);
+
+    address public owner;
+    mapping(address => IssuerInfo) public issuers;
+    mapping(address => bytes32) public issuerRevocationRoots;
+    mapping(address => uint256) public issuerRevocationVersions;
+
+    modifier onlyOwner() {{
+        require(msg.sender == owner, "DocuTrust: caller is not owner");
+        _;
+    }}
+
+    modifier onlyAccredited() {{
+        require(issuers[msg.sender].accredited, "DocuTrust: caller is not accredited");
+        require(issuers[msg.sender].expiresAt == 0 || block.timestamp <= issuers[msg.sender].expiresAt, "DocuTrust: accreditation expired");
+        _;
+    }}
+
+    constructor() {{
+        owner = msg.sender;
+        issuers[msg.sender] = IssuerInfo({{
+            accredited: true,
+            accreditationLevel: 3,
+            didUri: "did:key:docutrust-root",
+            registeredAt: block.timestamp,
+            expiresAt: 0
+        }});
+    }}
+
+    function registerIssuer(
+        address issuerAddress,
+        string calldata didUri,
+        uint8 level,
+        uint256 validDurationSeconds
+    ) external onlyOwner {{
+        require(issuerAddress != address(0), "DocuTrust: invalid issuer address");
+        uint256 expiresAt = validDurationSeconds > 0 ? block.timestamp + validDurationSeconds : 0;
+
+        issuers[issuerAddress] = IssuerInfo({{
+            accredited: true,
+            accreditationLevel: level,
+            didUri: didUri,
+            registeredAt: block.timestamp,
+            expiresAt: expiresAt
+        }});
+
+        emit IssuerRegistered(issuerAddress, didUri, level, expiresAt);
+    }}
+
+    function revokeIssuer(address issuerAddress, string calldata reason) external onlyOwner {{
+        require(issuers[issuerAddress].accredited, "DocuTrust: issuer not accredited");
+        issuers[issuerAddress].accredited = false;
+        emit IssuerRevoked(issuerAddress, reason);
+    }}
+
+    function updateRevocationRoot(bytes32 newRoot) external onlyAccredited {{
+        require(newRoot != bytes32(0), "DocuTrust: invalid revocation root");
+        issuerRevocationRoots[msg.sender] = newRoot;
+        issuerRevocationVersions[msg.sender] += 1;
+        emit RevocationRootUpdated(msg.sender, newRoot, issuerRevocationVersions[msg.sender]);
+    }}
+
+    function isIssuerAccredited(address issuerAddress) external view returns (bool) {{
+        IssuerInfo memory info = issuers[issuerAddress];
+        if (!info.accredited) return false;
+        if (info.expiresAt > 0 && block.timestamp > info.expiresAt) return false;
+        return true;
     }}
 }}
 """

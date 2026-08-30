@@ -26,6 +26,7 @@ import JsonLdStudio from './components/JsonLdStudio.jsx';
 import TrustChainStudio from './components/TrustChainStudio.jsx';
 import QuantumArmorStudio from './components/QuantumArmorStudio.jsx';
 import BadgeStudio from './components/BadgeStudio.jsx';
+import PolicyStudio from './components/PolicyStudio.jsx';
 import Footer from './components/Footer.jsx';
 
 export default function App() {
@@ -43,6 +44,7 @@ export default function App() {
 
       <main className="flex-1">
         {activeTab === 'hero' && <HeroSection setActiveTab={setActiveTab} />}
+        {activeTab === 'policy' && <PolicyStudio />}
         {activeTab === 'badge' && <BadgeStudio />}
         {activeTab === 'confidential' && <ConfidentialComputeStudio />}
         {activeTab === 'jsonld' && <JsonLdStudio />}

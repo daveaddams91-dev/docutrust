@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="docutrust",
-    version="8.1.0",
+    version="9.0.0",
     description="Python SDK for DocuTrust Sovereign Verifiable Credentials",
     author="DocuTrust Contributors",
     packages=find_packages(),

@@ -55,6 +55,26 @@ class BadgeEngine:
             "textSecondary": "#a7f3d0",
             "sealPrimary": "#059669",
             "sealSecondary": "#065f46"
+        },
+        "obsidian-noir": {
+            "bgStart": "#09090b",
+            "bgEnd": "#18181b",
+            "border": "#a1a1aa",
+            "accent": "#f4f4f5",
+            "textPrimary": "#fafafa",
+            "textSecondary": "#a1a1aa",
+            "sealPrimary": "#27272a",
+            "sealSecondary": "#09090b"
+        },
+        "royal-amethyst": {
+            "bgStart": "#2e1065",
+            "bgEnd": "#170530",
+            "border": "#c084fc",
+            "accent": "#e879f9",
+            "textPrimary": "#fdf4ff",
+            "textSecondary": "#e9d5ff",
+            "sealPrimary": "#9333ea",
+            "sealSecondary": "#581c87"
         }
     }
 
@@ -79,7 +99,8 @@ class BadgeEngine:
         recipient = opts.get("recipient_name") or subject.get("name") or subject.get("recipient") or subject.get("id") or "Verified Credential Holder"
         issuer_val = credential.get("issuer")
         issuer = opts.get("issuer_display_name") or (issuer_val if isinstance(issuer_val, str) else (issuer_val.get("id") if isinstance(issuer_val, dict) else "DocuTrust Accredited Authority"))
-        issuance_date = credential.get("issuanceDate", datetime.now(timezone.utc).strftime("%Y-%m-%d"))[:10]
+        issuance_date_str = credential.get("validFrom") or credential.get("issuanceDate") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        issuance_date = issuance_date_str[:10]
         cred_id = credential.get("id", f"urn:uuid:{canonical_hash[:16]}")
 
         return f"""<?xml version="1.0" encoding="UTF-8"?>

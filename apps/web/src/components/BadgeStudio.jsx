@@ -80,6 +80,24 @@ const THEMES = {
     accent: '#34d399',
     textPrimary: '#d1fae5',
     textSecondary: '#6ee7b7'
+  },
+  'obsidian-noir': {
+    name: 'Obsidian Noir',
+    bgStart: '#0a0a0c',
+    bgEnd: '#18181b',
+    border: '#e4e4e7',
+    accent: '#ffffff',
+    textPrimary: '#ffffff',
+    textSecondary: '#a1a1aa'
+  },
+  'royal-amethyst': {
+    name: 'Royal Amethyst',
+    bgStart: '#1e102f',
+    bgEnd: '#3b0764',
+    border: '#c084fc',
+    accent: '#e9d5ff',
+    textPrimary: '#faf5ff',
+    textSecondary: '#d8b4fe'
   }
 };
 

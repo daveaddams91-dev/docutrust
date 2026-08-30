@@ -1141,5 +1141,130 @@ class TestDocuTrustPython(unittest.TestCase):
         self.assertTrue(verify_res["valid"])
         self.assertEqual(verify_res["issuer"], issuer_kp["did"])
 
+    def test_policy_engine_evaluation_and_receipt(self):
+        from docutrust.policy import PolicyEngine
+        from docutrust.crypto import generate_keypair
+
+        evaluator_kp = generate_keypair()
+        issuer_kp = generate_keypair()
+
+        credential = {
+            "id": "urn:uuid:py-policy-cred-01",
+            "type": ["VerifiableCredential", "SecurityOfficerCredential"],
+            "issuer": issuer_kp["did"],
+            "validFrom": "2026-08-30T10:00:00Z",
+            "credentialSubject": {
+                "id": "did:key:holder777",
+                "name": "Alex Vance",
+                "clearanceLevel": 4,
+                "role": "SecurityLead",
+                "active": True
+            }
+        }
+
+        policy = {
+            "id": "policy-sec-clearance-v9",
+            "name": "High Clearance Access Policy",
+            "allowedIssuers": [issuer_kp["did"]],
+            "requiredCredentialTypes": ["SecurityOfficerCredential"],
+            "condition": {
+                "operator": "and",
+                "conditions": [
+                    {"field": "credentialSubject.clearanceLevel", "operator": "gte", "value": 3},
+                    {"field": "credentialSubject.role", "operator": "eq", "value": "SecurityLead"},
+                    {"field": "credentialSubject.active", "operator": "eq", "value": True}
+                ]
+            }
+        }
+
+        result = PolicyEngine.evaluate(credential, policy, evaluator_keypair=evaluator_kp)
+        self.assertTrue(result["passed"])
+        self.assertEqual(len(result["errors"]), 0)
+        self.assertIn("receipt", result)
+
+        # Verify receipt
+        receipt_ok = PolicyEngine.verify_receipt(result["receipt"], evaluator_kp["publicKeyHex"])
+        self.assertTrue(receipt_ok)
+
+    def test_did_peer_0_and_2(self):
+        from docutrust.did import DIDResolver, create_did_peer_0, create_did_peer_2
+        from docutrust.crypto import generate_keypair
+
+        kp1 = generate_keypair()
+        peer0 = create_did_peer_0(kp1["publicKeyHex"])
+        self.assertTrue(peer0.startswith("did:peer:0z"))
+
+        doc0 = DIDResolver.resolve(peer0)
+        self.assertEqual(doc0["id"], peer0)
+        self.assertEqual(doc0["verificationMethod"][0]["publicKeyHex"], kp1["publicKeyHex"])
+
+        kp2 = generate_keypair()
+        peer2 = create_did_peer_2(
+            verification_key_hex=kp1["publicKeyHex"],
+            encryption_key_hex=kp2["publicKeyHex"],
+            service_endpoint="https://agent.docutrust.org"
+        )
+        self.assertTrue(peer2.startswith("did:peer:2.V"))
+        self.assertIn(".E", peer2)
+        self.assertIn(".S", peer2)
+
+        doc2 = DIDResolver.resolve(peer2)
+        self.assertEqual(doc2["id"], peer2)
+        self.assertEqual(len(doc2["verificationMethod"]), 2)
+        self.assertEqual(len(doc2["service"]), 1)
+
+    def test_solidity_registry_contract_generation(self):
+        from docutrust.solidity import SolidityEngine
+        code = SolidityEngine.generate_registry_contract(contract_name="DocuTrustGovRegistry")
+        self.assertIn("contract DocuTrustGovRegistry", code)
+        self.assertIn("registerIssuer", code)
+        self.assertIn("updateRevocationRoot", code)
+
+    def test_badge_engine_v9_themes(self):
+        from docutrust.badge import BadgeEngine
+        from docutrust.crypto import generate_keypair, sign_data, canonicalize_json
+
+        issuer_kp = generate_keypair()
+        unsigned = {
+            "@context": ["https://www.w3.org/ns/credentials/v2"],
+            "id": "urn:uuid:py-badge-vc-v9",
+            "type": ["VerifiableCredential", "SecurityClearanceBadge"],
+            "issuer": {"id": issuer_kp["did"]},
+            "validFrom": "2026-08-30T10:00:00Z",
+            "credentialSubject": {
+                "id": "did:key:holder888",
+                "degree": "Top Secret Clearance",
+                "recipient": "Agent Smith"
+            }
+        }
+        sig = sign_data(canonicalize_json(unsigned), issuer_kp)
+        credential = {
+            **unsigned,
+            "proof": {
+                "type": "Ed25519Signature2020",
+                "created": "2026-08-30T10:00:00Z",
+                "verificationMethod": f"{issuer_kp['did']}#key-1",
+                "proofPurpose": "assertionMethod",
+                "proofValue": sig
+            }
+        }
+
+        svg_noir = BadgeEngine.render_badge_svg(credential, {
+            "theme": "obsidian-noir",
+            "badge_title": "Top Secret Clearance",
+            "recipient_name": "Agent Smith"
+        })
+        self.assertIn("#09090b", svg_noir)
+        self.assertTrue(BadgeEngine.verify_badge_svg(svg_noir)["valid"])
+
+        svg_amethyst = BadgeEngine.render_badge_svg(credential, {
+            "theme": "royal-amethyst",
+            "badge_title": "Top Secret Clearance",
+            "recipient_name": "Agent Smith"
+        })
+        self.assertIn("#2e1065", svg_amethyst)
+        self.assertTrue(BadgeEngine.verify_badge_svg(svg_amethyst)["valid"])
+
 if __name__ == '__main__':
     unittest.main()
+

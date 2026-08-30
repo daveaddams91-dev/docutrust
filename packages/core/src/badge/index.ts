@@ -9,13 +9,15 @@ import { canonicalizeJson, sha256Hex } from '../crypto/index.js';
 import { VerifiableCredentialsEngine } from '../vc/index.js';
 
 export interface BadgeRenderOptions {
-  theme?: 'sovereign' | 'academic-gold' | 'cyber-neon' | 'emerald-cert';
+  theme?: 'sovereign' | 'academic-gold' | 'cyber-neon' | 'emerald-cert' | 'obsidian-noir' | 'royal-amethyst';
   width?: number;
   height?: number;
   includeWatermark?: boolean;
   issuerDisplayName?: string;
   badgeTitle?: string;
   recipientName?: string;
+  criteriaUrl?: string;
+  criteriaNarrative?: string;
 }
 
 export interface BadgeVerificationResult {
@@ -70,6 +72,26 @@ export class BadgeEngine {
       textSecondary: '#a7f3d0',
       sealPrimary: '#059669',
       sealSecondary: '#065f46'
+    },
+    'obsidian-noir': {
+      bgStart: '#09090b',
+      bgEnd: '#18181b',
+      border: '#a1a1aa',
+      accent: '#f4f4f5',
+      textPrimary: '#fafafa',
+      textSecondary: '#a1a1aa',
+      sealPrimary: '#27272a',
+      sealSecondary: '#09090b'
+    },
+    'royal-amethyst': {
+      bgStart: '#2e1065',
+      bgEnd: '#170530',
+      border: '#c084fc',
+      accent: '#e879f9',
+      textPrimary: '#fdf4ff',
+      textSecondary: '#e9d5ff',
+      sealPrimary: '#9333ea',
+      sealSecondary: '#581c87'
     }
   };
 
@@ -94,7 +116,8 @@ export class BadgeEngine {
     const title = options.badgeTitle || subject.degree || subject.title || subject.achievement || (Array.isArray(credential.type) ? credential.type[credential.type.length - 1] : 'Verifiable Credential');
     const recipient = options.recipientName || subject.name || subject.recipient || subject.id || 'Verified Credential Holder';
     const issuer = options.issuerDisplayName || (typeof credential.issuer === 'string' ? credential.issuer : credential.issuer?.id || 'DocuTrust Accredited Authority');
-    const issuanceDate = credential.issuanceDate ? new Date(credential.issuanceDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+    const issuanceDateStr = credential.validFrom || credential.issuanceDate;
+    const issuanceDate = issuanceDateStr ? new Date(issuanceDateStr).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
     const credId = credential.id || `urn:uuid:${canonicalHash.slice(0, 16)}`;
 
     return `<?xml version="1.0" encoding="UTF-8"?>

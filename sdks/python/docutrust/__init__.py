@@ -53,8 +53,10 @@ from .jsonld import JsonLdCanonicalizationEngine
 from .trustchain import TrustChainEngine
 from .quantum_armor import DualHybridKEMEngine
 from .badge import BadgeEngine
+from .policy import PolicyEngine
+from .did import create_did_peer_0, create_did_peer_2
 
-__version__ = "8.0.0"
+__version__ = "9.0.0"
 __all__ = [
     "DocuTrustClient",
     "canonicalize_json",
@@ -108,6 +110,8 @@ __all__ = [
     "PresentationExchangeEngine",
     "MultiSigEngine",
     "DIDResolver",
+    "create_did_peer_0",
+    "create_did_peer_2",
     "AnonCredsEngine",
     "DKGEngine",
     "SolidityEngine",
@@ -118,5 +122,6 @@ __all__ = [
     "JsonLdCanonicalizationEngine",
     "TrustChainEngine",
     "DualHybridKEMEngine",
-    "BadgeEngine"
+    "BadgeEngine",
+    "PolicyEngine"
 ]

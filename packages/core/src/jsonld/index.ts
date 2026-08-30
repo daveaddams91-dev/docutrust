@@ -221,6 +221,20 @@ export class JsonLdCanonicalizationEngine {
           const raw = decodeBase58(didKey.replace('did:key:z', ''));
           pubHex = raw.subarray(2).toString('hex');
         } catch (_) {}
+      } else if (proof.verificationMethod.startsWith('did:peer:0')) {
+        try {
+          const multibase = proof.verificationMethod.substring(10).split('#')[0];
+          const raw = decodeBase58(multibase.substring(1));
+          pubHex = raw.subarray(2).toString('hex');
+        } catch (_) {}
+      } else if (proof.verificationMethod.startsWith('did:jwk:')) {
+        try {
+          const rawEncoded = proof.verificationMethod.replace('did:jwk:', '').split('#')[0];
+          const jwk = JSON.parse(Buffer.from(rawEncoded, 'base64url').toString('utf8'));
+          if (jwk.x) {
+            pubHex = Buffer.from(jwk.x, 'base64url').toString('hex');
+          }
+        } catch (_) {}
       }
     }
 

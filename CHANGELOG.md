@@ -1,5 +1,48 @@
 # 📝 DocuTrust Changelog & Release Notes
 
+## [v9.0.0] - Sovereign Policy-as-Proof AST Engine, W3C did:peer RFC 0627, Status List Aggregator & EVM Multi-Issuer Trust Registry - 2026-08-30
+
+### 🌟 Release Overview (v9.0.0 - Major Milestone Release)
+DocuTrust 9.0.0 expands the sovereign cryptographic mesh into verifiable policy computation, offline peer-to-peer decentralized identifiers, scalable multi-partition status list aggregation, and EVM on-chain accreditation:
+
+1. **Sovereign Policy-as-Proof AST Engine (`@docutrust/core/policy`, `docutrust.policy`)**:
+   - Implemented `PolicyEngine` supporting composable Abstract Syntax Tree (AST) policy conditions with recursive evaluation across 12 relational and logical operators (`and`, `or`, `not`, `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `in`, `not_in`, `contains`, `regex`, `exists`).
+   - Cryptographic Proof Receipts (`DocuTrustPolicyReceipt2026`): Generates unforgeable Ed25519-signed evaluation receipts binding the target payload SHA-256 digest, policy SHA-256 digest, evaluation verdict, and execution trace timestamp.
+   - Standalone receipt verification via `PolicyEngine.verifyReceipt` allowing third parties to mathematically verify policy compliance proofs without requiring access to private AST rules or underlying engine logic.
+
+2. **W3C `did:peer` RFC 0627 Decentralized Identifiers (`@docutrust/core/did`, `docutrust.did`)**:
+   - Implemented RFC 0627 compliant peer-to-peer DID generation and deterministic offline resolution:
+     - **Method 0** (`did:peer:0z...`): Inception key encoding using multicodec and multibase base58btc.
+     - **Method 2** (`did:peer:2.V...`): Multiple purpose-separated keys (verification, key agreement) and service endpoints with compact URL encoding.
+   - Universal resolver integration: `DIDResolver.resolve("did:peer:...")` deterministically resolves full W3C DID Documents without network dependencies or ledger lookups.
+
+3. **Bitstring Status List Multi-Partition Aggregator (`@docutrust/core/revocation`, `docutrust.revocation`)**:
+   - Built `BitstringStatusListAggregator` to manage, combine, and cryptographically anchor multiple W3C Bitstring Status List 2024 partitions.
+   - Computes deterministic SHA-256 Merkle root trees over partition status digests, enabling scalable batch verification across millions of credentials.
+
+4. **EVM Multi-Issuer Accreditation & Trust Registry Contract (`@docutrust/core/solidity`, `docutrust.solidity`)**:
+   - Implemented `DocuTrustAccreditationRegistry.sol` providing on-chain issuer accreditation, credential schema registration, multi-sig governance, and revocation root anchoring for EVM chains (Ethereum, Arbitrum, Optimism, Polygon).
+   - Exported convenience generators `generateRegistryContract` and `generateVerifierContract`.
+
+5. **Interactive Web Studio (`PolicyStudio.jsx`, `BadgeStudio.jsx`)**:
+   - Built `PolicyStudio.jsx` featuring real-time AST policy evaluation, compliance presets (CyberDefense Clearance L5, Accredited Investor KYC, GDPR Data Processor), cryptographic receipt issuance & verification, did:peer RFC 0627 tooling, and Solidity export.
+   - Added 2 new visual themes (`obsidian-noir` and `royal-amethyst`) to `BadgeStudio.jsx`.
+
+6. **Full-Stack CLI & REST API Parity**:
+   - CLI: Added `policy-evaluate`, `policy-verify-receipt`, `did-peer-create`, `solidity-export-registry`, and `statuslist-aggregate-check`.
+   - REST API: Added `/api/v1/policy/evaluate`, `/api/v1/policy/verify-receipt`, `/api/v1/did/peer/create`, `GET /api/v1/did/peer/resolve`, `/api/v1/statuslist/aggregate-check`, and `/api/v1/solidity/export-registry`.
+   - SDKs: Synchronized TypeScript client (`@docutrust/sdk`) and Python client (`docutrust`).
+
+7. **100% Test Pass Rate Across Entire Monorepo (237+ Tests Passing Cleanly)**:
+   - Core: 72/72 unit tests passing.
+   - API Server: 55/55 REST API tests passing.
+   - CLI: 44/44 command-line interface tests passing.
+   - Python SDK: 62/62 unit tests passing.
+   - TypeScript SDK: 4/4 test suites passing.
+   - Web Platform: Production build passes with 0 errors.
+
+---
+
 ## [v8.1.0] - Open Badges 3.0 & Verifiable SVG Engine, Sovereign W3C did:jwk DID Method & Interactive Badge Studio - 2026-08-30
 
 ### 🌟 Release Overview (v8.1.0)

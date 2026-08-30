@@ -78,10 +78,29 @@ class TrustChainEngine:
         digest = _sha256_hex(canonical)
 
         pub_hex = expected_delegator_pub_hex
-        if not pub_hex and token.get("delegatorDid", "").startswith("did:key:"):
+        delegator_did = token.get("delegatorDid", "")
+        if not pub_hex and delegator_did.startswith("did:key:"):
             try:
-                raw = decode_base58(token["delegatorDid"].replace("did:key:z", ""))
+                raw = decode_base58(delegator_did.split("#")[0].replace("did:key:z", ""))
                 pub_hex = raw[2:].hex()
+            except Exception:
+                pass
+        elif not pub_hex and delegator_did.startswith("did:peer:0"):
+            try:
+                multibase = delegator_did[10:].split("#")[0]
+                raw = decode_base58(multibase[1:])
+                pub_hex = raw[2:].hex()
+            except Exception:
+                pass
+        elif not pub_hex and delegator_did.startswith("did:jwk:"):
+            try:
+                import json, base64
+                raw_encoded = delegator_did.replace("did:jwk:", "").split("#")[0]
+                padded = raw_encoded + "=" * ((4 - len(raw_encoded) % 4) % 4)
+                jwk = json.loads(base64.urlsafe_b64decode(padded.encode("ascii")).decode("utf-8"))
+                if "x" in jwk:
+                    padded_x = jwk["x"] + "=" * ((4 - len(jwk["x"]) % 4) % 4)
+                    pub_hex = base64.urlsafe_b64decode(padded_x.encode("ascii")).hex()
             except Exception:
                 pass
 

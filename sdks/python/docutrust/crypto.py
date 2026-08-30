@@ -70,6 +70,9 @@ def generate_key_pair() -> Dict[str, str]:
         "keyId": f"{did}#{did.replace('did:key:', '')}"
     }
 
+generate_keypair = generate_key_pair
+
+
 
 def sign_data(payload: Union[str, bytes], private_key: Union[str, Dict[str, Any]]) -> str:
     """Signs data payload with Ed25519 or high-entropy deterministic scheme."""

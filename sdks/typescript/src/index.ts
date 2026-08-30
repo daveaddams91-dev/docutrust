@@ -1363,7 +1363,53 @@ export class DocuTrustClient {
   public async verifyBadgeSvg(svg: string): Promise<{ success: boolean; valid: boolean; canonicalHash?: string; issuer?: string; error?: string }> {
     return this.request('/badge/verify', 'POST', { svg });
   }
+
+  // ==========================================
+  // v9.0.0 Sovereign Policy-as-Proof & did:peer
+  // ==========================================
+
+  /**
+   * Evaluates a Verifiable Credential or Presentation against an AST Policy-as-Proof.
+   */
+  public async evaluatePolicy(payload: any, policy: any, evaluatorKeyPair?: any): Promise<any> {
+    return this.request('/policy/evaluate', 'POST', { payload, policy, evaluatorKeyPair });
+  }
+
+  /**
+   * Resolves a W3C did:peer identifier (Method 0 or Method 2).
+   */
+  public async resolveDidPeer(did: string): Promise<any> {
+    return this.request(`/did/peer/resolve?did=${encodeURIComponent(did)}`, 'GET');
+  }
+
+  /**
+   * Creates a W3C did:peer:0 inception key or did:peer:2 multiple keys URI.
+   */
+  public async createDidPeer(options: {
+    method: 0 | 2;
+    publicKeyHex?: string;
+    verificationKeyHex?: string;
+    encryptionKeyHex?: string;
+    serviceEndpoint?: string;
+  }): Promise<{ success: boolean; did: string }> {
+    return this.request('/did/peer/create', 'POST', options);
+  }
+
+  /**
+   * Validates multi-partition status list aggregation on-chain / off-chain.
+   */
+  public async checkAggregatedStatus(aggregateRoot: string, partitions: any[]): Promise<any> {
+    return this.request('/statuslist/aggregate-check', 'POST', { aggregateRoot, partitions });
+  }
+
+  /**
+   * Generates production-ready Solidity smart contract for the Sovereign Trust Registry.
+   */
+  public async generateSolidityRegistry(options?: { contractName?: string; solidityVersion?: string }): Promise<{ success: boolean; contractCode: string }> {
+    return this.request('/solidity/export-registry', 'POST', options || {});
+  }
 }
+
 
 
 

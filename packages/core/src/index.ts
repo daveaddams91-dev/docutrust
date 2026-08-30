@@ -124,3 +124,7 @@ export * from './quantum-armor';
 // Export Verifiable SVG Digital Badge & Open Badges 3.0 Engine
 export * from './badge';
 
+// Export Sovereign Policy-as-Proof & Governance Rule Engine (DocuTrust v9.0.0)
+export * from './policy';
+
+

@@ -1,7 +1,7 @@
 /**
  * @file packages/core/src/solidity/index.ts
  * @description EVM Smart Contract Verifier Generator & On-Chain ABI Calldata Engine
- * Generates production Solidity contracts (DocuTrustVerifier.sol & DocuTrustAnchorRegistry.sol)
+ * Generates production Solidity contracts (DocuTrustVerifier.sol & DocuTrustRegistry.sol)
  * and formats EVM ABI calldata for Ethereum, Polygon, Arbitrum, Base, and Optimism.
  */
 
@@ -36,7 +36,7 @@ pragma solidity ${version};
 
 /**
  * @title ${name}
- * @author DocuTrust Sovereign Trust Engine v8.0.0
+ * @author DocuTrust Sovereign Trust Engine v9.0.0
  * @notice Verifies W3C Verifiable Credentials, Merkle Inclusion Proofs, and EIP-712 attestations on-chain.
  */
 contract ${name} {
@@ -138,6 +138,105 @@ contract ${name} {
   }
 
   /**
+   * Generates a multi-issuer Sovereign Trust Registry smart contract for on-chain accreditation,
+   * credential revocation status roots, and dynamic trust anchor tracking.
+   */
+  public static generateRegistryContract(options: SolidityContractOptions = {}): string {
+    const version = options.solidityVersion || '^0.8.20';
+    const name = options.contractName || 'DocuTrustRegistry';
+
+    return `// SPDX-License-Identifier: Apache-2.0
+pragma solidity ${version};
+
+/**
+ * @title ${name}
+ * @author DocuTrust Sovereign Trust Engine v9.0.0
+ * @notice Manages accredited issuer registries, revocation status roots, and multi-schema accreditation policies.
+ */
+contract ${name} {
+    struct IssuerInfo {
+        bool accredited;
+        uint8 accreditationLevel; // 1 = Standard, 2 = Enhanced, 3 = Sovereign Root
+        string didUri;
+        uint256 registeredAt;
+        uint256 expiresAt;
+    }
+
+    event IssuerRegistered(address indexed issuerAddress, string didUri, uint8 level, uint256 expiresAt);
+    event IssuerRevoked(address indexed issuerAddress, string reason);
+    event RevocationRootUpdated(address indexed issuerAddress, bytes32 indexed rootHash, uint256 indexed version);
+
+    address public owner;
+    mapping(address => IssuerInfo) public issuers;
+    mapping(address => bytes32) public issuerRevocationRoots;
+    mapping(address => uint256) public issuerRevocationVersions;
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "DocuTrust: caller is not owner");
+        _;
+    }
+
+    modifier onlyAccredited() {
+        require(issuers[msg.sender].accredited, "DocuTrust: caller is not accredited");
+        require(issuers[msg.sender].expiresAt == 0 || block.timestamp <= issuers[msg.sender].expiresAt, "DocuTrust: accreditation expired");
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+        issuers[msg.sender] = IssuerInfo({
+            accredited: true,
+            accreditationLevel: 3,
+            didUri: "did:key:docutrust-root",
+            registeredAt: block.timestamp,
+            expiresAt: 0
+        });
+    }
+
+    function registerIssuer(
+        address issuerAddress,
+        string calldata didUri,
+        uint8 level,
+        uint256 validDurationSeconds
+    ) external onlyOwner {
+        require(issuerAddress != address(0), "DocuTrust: invalid issuer address");
+        uint256 expiresAt = validDurationSeconds > 0 ? block.timestamp + validDurationSeconds : 0;
+
+        issuers[issuerAddress] = IssuerInfo({
+            accredited: true,
+            accreditationLevel: level,
+            didUri: didUri,
+            registeredAt: block.timestamp,
+            expiresAt: expiresAt
+        });
+
+        emit IssuerRegistered(issuerAddress, didUri, level, expiresAt);
+    }
+
+    function revokeIssuer(address issuerAddress, string calldata reason) external onlyOwner {
+        require(issuers[issuerAddress].accredited, "DocuTrust: issuer not accredited");
+        issuers[issuerAddress].accredited = false;
+        emit IssuerRevoked(issuerAddress, reason);
+    }
+
+    function updateRevocationRoot(bytes32 newRoot) external onlyAccredited {
+        require(newRoot != bytes32(0), "DocuTrust: invalid revocation root");
+        issuerRevocationRoots[msg.sender] = newRoot;
+        issuerRevocationVersions[msg.sender] += 1;
+        emit RevocationRootUpdated(msg.sender, newRoot, issuerRevocationVersions[msg.sender]);
+    }
+
+    function isIssuerAccredited(address issuerAddress) external view returns (bool) {
+        IssuerInfo memory info = issuers[issuerAddress];
+        if (!info.accredited) return false;
+        if (info.expiresAt > 0 && block.timestamp > info.expiresAt) return false;
+        return true;
+    }
+}
+`;
+  }
+
+  /**
    * Encodes ABI calldata for calling verifyCredentialOnChain.
    */
   public static encodeVerificationCalldata(
@@ -205,3 +304,9 @@ contract ${name} {
     return current.toString('hex') === rootHex.replace('0x', '');
   }
 }
+
+export const generateVerifierContract = SolidityEngine.generateVerifierContract;
+export const generateRegistryContract = SolidityEngine.generateRegistryContract;
+export const encodeVerificationCalldata = SolidityEngine.encodeVerificationCalldata;
+export const verifyMerkleProofEVM = SolidityEngine.verifyMerkleProofEVM;
+

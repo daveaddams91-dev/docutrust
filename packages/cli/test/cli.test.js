@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const { execSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
+const core = require('@docutrust/core');
 
 const cliPath = path.join(__dirname, '../bin/docutrust.js');
 const tempDir = path.join(__dirname, 'temp-' + Date.now());
@@ -727,6 +728,78 @@ test('CLI Suite', async (t) => {
     const verifyOut = execSync(`node "${cliPath}" badge-verify --svg "${badgeSvgFile}"`).toString();
     assert.ok(verifyOut.includes('AUTHENTIC & VALID'));
   });
+
+  const policyFile = path.join(tempDir, 'policy.json');
+  const policyOutFile = path.join(tempDir, 'policy-out.json');
+  const didPeer0Out = path.join(tempDir, 'did-peer-0.json');
+  const didPeer2Out = path.join(tempDir, 'did-peer-2.json');
+  const registrySolFile = path.join(tempDir, 'DocuTrustGov.sol');
+  const slPart1File = path.join(tempDir, 'sl-part1.json');
+  const slPart2File = path.join(tempDir, 'sl-part2.json');
+
+  await t.test('43. docutrust v9.0.0 commands (policy-evaluate, policy-verify-receipt, did-peer-create, solidity-export-registry, statuslist-aggregate-check)', () => {
+    // 1. policy-evaluate and policy-verify-receipt
+    fs.writeFileSync(policyFile, JSON.stringify({
+      id: 'policy-clearance-v9',
+      name: 'Security Clearance Check',
+      condition: {
+        operator: 'and',
+        conditions: [
+          { field: 'credentialSubject.degree', operator: 'contains', value: 'Cryptography' }
+        ]
+      }
+    }), 'utf-8');
+
+    const polEvalOut = execSync(`node "${cliPath}" policy-evaluate --payload "${badgeCredFile}" --policy "${policyFile}" --key "${keysFile}" --out "${policyOutFile}"`).toString();
+    assert.ok(polEvalOut.includes('Policy Evaluation PASSED'));
+    assert.ok(fs.existsSync(policyOutFile));
+
+    const evalResult = JSON.parse(fs.readFileSync(policyOutFile, 'utf-8'));
+    assert.strictEqual(evalResult.passed, true);
+    assert.ok(evalResult.receipt);
+
+    const receiptFile = path.join(tempDir, 'receipt.json');
+    fs.writeFileSync(receiptFile, JSON.stringify(evalResult.receipt), 'utf-8');
+
+    const receiptVerifyOut = execSync(`node "${cliPath}" policy-verify-receipt --receipt "${receiptFile}"`).toString();
+    assert.ok(receiptVerifyOut.includes('AUTHENTIC & VALID'));
+
+    // 2. did-peer-create
+    const peer0Out = execSync(`node "${cliPath}" did-peer-create --method 0 --out "${didPeer0Out}"`).toString();
+    assert.ok(peer0Out.includes('did:peer:0z'));
+    assert.ok(fs.existsSync(didPeer0Out));
+
+    const peer2Out = execSync(`node "${cliPath}" did-peer-create --method 2 --service "https://service.docutrust.org" --out "${didPeer2Out}"`).toString();
+    assert.ok(peer2Out.includes('did:peer:2.V'));
+    assert.ok(fs.existsSync(didPeer2Out));
+
+    // 3. solidity-export-registry
+    const solOut = execSync(`node "${cliPath}" solidity-export-registry --name DocuTrustGov --out "${registrySolFile}"`).toString();
+    assert.ok(solOut.includes('Solidity Trust Registry smart contract exported'));
+    assert.ok(fs.existsSync(registrySolFile));
+    const solCode = fs.readFileSync(registrySolFile, 'utf-8');
+    assert.ok(solCode.includes('contract DocuTrustGov'));
+    assert.ok(solCode.includes('registerIssuer'));
+
+    // 4. statuslist-aggregate-check
+    const bsl1 = new core.BitstringStatusList2024(1000, 1, 'revocation');
+    const bsl2 = new core.BitstringStatusList2024(1000, 1, 'revocation');
+    bsl2.setStatus(5, 1);
+
+    const sl1 = { id: 'urn:sl:1', partitionIndex: 0, partitionSize: 1000, encodedList: bsl1.encode(true) };
+    const sl2 = { id: 'urn:sl:2', partitionIndex: 1, partitionSize: 1000, encodedList: bsl2.encode(true) };
+    fs.writeFileSync(slPart1File, JSON.stringify(sl1), 'utf-8');
+    fs.writeFileSync(slPart2File, JSON.stringify(sl2), 'utf-8');
+
+    const coreAggregator = new core.BitstringStatusListAggregator();
+    coreAggregator.addPartition(sl1);
+    coreAggregator.addPartition(sl2);
+    const expectedRoot = coreAggregator.getAggregateRoot();
+
+    const aggOut = execSync(`node "${cliPath}" statuslist-aggregate-check --root "${expectedRoot}" --lists "${slPart1File},${slPart2File}"`).toString();
+    assert.ok(aggOut.includes('Status List Multi-Partition Root matches'));
+  });
 });
+
 
 

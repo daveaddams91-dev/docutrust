@@ -208,6 +208,25 @@ describe('DocuTrust TypeScript SDK (@docutrust/sdk)', () => {
     // 39. Confidential Linear Combination
     await client.evaluateConfidentialLinearCombination([{ ciphertextHex: 'c1', weight: 2 }], { n: '123' });
     assert.strictEqual(mockCalls[38].url, 'https://test-api.docutrust.org/api/v1/confidential/compute/linear-combination');
+
+    // 40. Policy Evaluate
+    await client.evaluatePolicy({ id: 'vc-1' }, { id: 'pol-1' });
+    assert.strictEqual(mockCalls[39].url, 'https://test-api.docutrust.org/api/v1/policy/evaluate');
+
+    // 41. did:peer create & resolve
+    await client.createDidPeer({ method: 0, publicKeyHex: 'abcdef' });
+    assert.strictEqual(mockCalls[40].url, 'https://test-api.docutrust.org/api/v1/did/peer/create');
+
+    await client.resolveDidPeer('did:peer:0z6Mku7');
+    assert.strictEqual(mockCalls[41].url, 'https://test-api.docutrust.org/api/v1/did/peer/resolve?did=did%3Apeer%3A0z6Mku7');
+
+    // 42. Status List Aggregate Check
+    await client.checkAggregatedStatus('0xroot', []);
+    assert.strictEqual(mockCalls[42].url, 'https://test-api.docutrust.org/api/v1/statuslist/aggregate-check');
+
+    // 43. Solidity Export Registry
+    await client.generateSolidityRegistry({ contractName: 'MyRegistry' });
+    assert.strictEqual(mockCalls[43].url, 'https://test-api.docutrust.org/api/v1/solidity/export-registry');
   });
 
   test('DocuTrustClient handles HTTP error responses gracefully', async () => {

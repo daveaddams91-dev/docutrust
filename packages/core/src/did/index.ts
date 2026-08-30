@@ -1,4 +1,4 @@
-import { decodeBase58 } from '../crypto';
+import { decodeBase58, encodeBase58 } from '../crypto';
 
 export interface VerificationMethod {
   id: string;
@@ -11,14 +11,22 @@ export interface VerificationMethod {
   ethereumAddress?: string;
 }
 
+export interface DIDService {
+  id: string;
+  type: string;
+  serviceEndpoint: string | Record<string, any>;
+}
+
 export interface DIDDocument {
   '@context': string[];
   id: string;
   verificationMethod: VerificationMethod[];
   authentication: string[];
   assertionMethod: string[];
+  keyAgreement?: string[];
   capabilityInvocation?: string[];
   capabilityDelegation?: string[];
+  service?: DIDService[];
 }
 
 export class DIDResolver {
@@ -65,6 +73,10 @@ export class DIDResolver {
 
     if (did.startsWith('did:ethr:')) {
       return this.resolveDidEthr(did);
+    }
+
+    if (did.startsWith('did:peer:')) {
+      return this.resolveDidPeer(did);
     }
 
     if (did.startsWith('did:web:')) {
@@ -336,6 +348,13 @@ export class DIDResolver {
       vmType = 'RsaVerificationKey2018';
     }
 
+    let publicKeyHex: string | undefined;
+    if (jwk.kty === 'OKP' && jwk.crv === 'Ed25519' && jwk.x) {
+      try {
+        publicKeyHex = Buffer.from(jwk.x, 'base64url').toString('hex');
+      } catch (_) {}
+    }
+
     const keyId = `${did}#0`;
 
     return {
@@ -349,7 +368,8 @@ export class DIDResolver {
           id: keyId,
           type: vmType,
           controller: did,
-          publicKeyJwk: jwk
+          publicKeyJwk: jwk,
+          ...(publicKeyHex ? { publicKeyHex } : {})
         }
       ],
       authentication: [keyId],
@@ -357,6 +377,170 @@ export class DIDResolver {
       capabilityInvocation: [keyId],
       capabilityDelegation: [keyId]
     };
+  }
+
+  /**
+   * Deterministically resolves a did:peer (RFC 0627 Peer DID Method) without network access.
+   * Supports Method 0 (Inception Key) and Method 2 (Multiple Keys & Endpoints).
+   */
+  public static resolveDidPeer(did: string): DIDDocument {
+    if (!did || !did.startsWith('did:peer:')) {
+      throw new Error(`Invalid did:peer format: ${did}`);
+    }
+
+    const methodNum = did.charAt(9);
+
+    // Method 0: Inception key
+    if (methodNum === '0') {
+      const multibase = did.substring(10); // e.g. z6Mku...
+      if (!multibase.startsWith('z')) {
+        throw new Error(`Invalid did:peer:0 format: expected multibase 'z' prefix.`);
+      }
+
+      const decoded = decodeBase58(multibase.substring(1));
+      if (decoded[0] !== 0xed || decoded[1] !== 0x01) {
+        throw new Error(`Unsupported did:peer:0 algorithm prefix. Expected Ed25519 (0xed01).`);
+      }
+
+      const rawPubKey = decoded.subarray(2);
+      const publicKeyHex = rawPubKey.toString('hex');
+      const keyId = `${did}#${multibase}`;
+
+      return {
+        '@context': [
+          'https://www.w3.org/ns/did/v1',
+          'https://w3id.org/security/suites/ed25519-2020/v1'
+        ],
+        id: did,
+        verificationMethod: [
+          {
+            id: keyId,
+            type: 'Ed25519VerificationKey2020',
+            controller: did,
+            publicKeyMultibase: multibase,
+            publicKeyHex
+          }
+        ],
+        authentication: [keyId],
+        assertionMethod: [keyId]
+      };
+    }
+
+    // Method 2: Multiple Keys & Services (.E, .V, .S)
+    if (methodNum === '2') {
+      const parts = did.substring(11).split('.');
+      const verificationMethods: VerificationMethod[] = [];
+      const authentications: string[] = [];
+      const assertionMethods: string[] = [];
+      const keyAgreements: string[] = [];
+      const services: DIDService[] = [];
+
+      let keyIndex = 0;
+      let serviceIndex = 0;
+
+      for (const part of parts) {
+        if (!part) continue;
+        const prefix = part.charAt(0);
+        const val = part.substring(1);
+
+        if (prefix === 'V') {
+          // Verification / Authentication Key (Ed25519)
+          if (val.startsWith('z')) {
+            const decoded = decodeBase58(val.substring(1));
+            const raw = decoded.subarray(2);
+            const pubHex = raw.toString('hex');
+            const keyId = `${did}#key-${++keyIndex}`;
+            verificationMethods.push({
+              id: keyId,
+              type: 'Ed25519VerificationKey2020',
+              controller: did,
+              publicKeyMultibase: val,
+              publicKeyHex: pubHex
+            });
+            authentications.push(keyId);
+            assertionMethods.push(keyId);
+          }
+        } else if (prefix === 'E') {
+          // Key Agreement / Encryption Key (X25519)
+          if (val.startsWith('z')) {
+            const decoded = decodeBase58(val.substring(1));
+            const raw = decoded.subarray(2);
+            const pubHex = raw.toString('hex');
+            const keyId = `${did}#key-${++keyIndex}`;
+            verificationMethods.push({
+              id: keyId,
+              type: 'X25519KeyAgreementKey2020',
+              controller: did,
+              publicKeyMultibase: val,
+              publicKeyHex: pubHex
+            });
+            keyAgreements.push(keyId);
+          }
+        } else if (prefix === 'S') {
+          // Service Endpoint
+          try {
+            const serviceJson = Buffer.from(val, 'base64url').toString('utf8');
+            const parsed = JSON.parse(serviceJson);
+            services.push({
+              id: `${did}#service-${++serviceIndex}`,
+              type: parsed.t || 'DIDCommMessaging',
+              serviceEndpoint: parsed.s || parsed.serviceEndpoint || parsed
+            });
+          } catch (_) {}
+        }
+      }
+
+      return {
+        '@context': [
+          'https://www.w3.org/ns/did/v1',
+          'https://w3id.org/security/suites/ed25519-2020/v1'
+        ],
+        id: did,
+        verificationMethod: verificationMethods,
+        authentication: authentications,
+        assertionMethod: assertionMethods,
+        ...(keyAgreements.length > 0 ? { keyAgreement: keyAgreements } : {}),
+        ...(services.length > 0 ? { service: services } : {})
+      };
+    }
+
+    throw new Error(`Unsupported did:peer method variant: did:peer:${methodNum}`);
+  }
+
+  /**
+   * Generates a did:peer:0 (Inception Key) from an Ed25519 public key hex.
+   */
+  public static createDidPeer0(publicKeyHex: string): string {
+    const rawPubKey = Buffer.from(publicKeyHex, 'hex');
+    const multicodecKey = Buffer.concat([Buffer.from([0xed, 0x01]), rawPubKey]);
+    const multibase = `z${encodeBase58(multicodecKey)}`;
+    return `did:peer:0${multibase}`;
+  }
+
+  /**
+   * Generates a did:peer:2 (Multiple Keys & Services) identifier.
+   */
+  public static createDidPeer2(options: {
+    verificationKeyHex: string;
+    encryptionKeyHex?: string;
+    serviceEndpoint?: string;
+  }): string {
+    const vRaw = Buffer.from(options.verificationKeyHex, 'hex');
+    const vMulti = `z${encodeBase58(Buffer.concat([Buffer.from([0xed, 0x01]), vRaw]))}`;
+    let peerDid = `did:peer:2.V${vMulti}`;
+
+    if (options.encryptionKeyHex) {
+      const eRaw = Buffer.from(options.encryptionKeyHex, 'hex');
+      const eMulti = `z${encodeBase58(Buffer.concat([Buffer.from([0xec, 0x01]), eRaw]))}`;
+      peerDid += `.E${eMulti}`;
+    }
+
+    if (options.serviceEndpoint) {
+      const sPayload = Buffer.from(JSON.stringify({ t: 'dm', s: options.serviceEndpoint })).toString('base64url');
+      peerDid += `.S${sPayload}`;
+    }
+
+    return peerDid;
   }
 
   /**
@@ -386,4 +570,16 @@ export class DIDResolver {
 
 export function createDidJwk(jwk: Record<string, any>): string {
   return DIDResolver.encodeDidJwk(jwk);
+}
+
+export function createDidPeer0(publicKeyHex: string): string {
+  return DIDResolver.createDidPeer0(publicKeyHex);
+}
+
+export function createDidPeer2(options: {
+  verificationKeyHex: string;
+  encryptionKeyHex?: string;
+  serviceEndpoint?: string;
+}): string {
+  return DIDResolver.createDidPeer2(options);
 }

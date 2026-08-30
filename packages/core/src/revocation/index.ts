@@ -264,3 +264,111 @@ export class BitstringStatusList2024 {
     };
   }
 }
+
+/**
+ * Enterprise Multi-Partition Bitstring Status List Aggregator
+ * Shards large-scale status list registries across partitioned ranges (e.g. 100,000 items/shard)
+ * and computes unified cryptographic status roots for blockchain / immutable anchoring.
+ */
+export class BitstringStatusListAggregator {
+  private partitions: Map<string, BitstringStatusList2024> = new Map();
+  public readonly partitionSize: number;
+  public readonly statusSize: number;
+  public readonly statusPurpose: BitstringStatusPurpose;
+
+  constructor(
+    partitionSize: number = 100000,
+    statusSize: number = 1,
+    statusPurpose: BitstringStatusPurpose = 'revocation'
+  ) {
+    this.partitionSize = partitionSize;
+    this.statusSize = statusSize;
+    this.statusPurpose = statusPurpose;
+  }
+
+  public getOrCreatePartition(partitionIndex: number): BitstringStatusList2024 {
+    const key = `partition_${partitionIndex}`;
+    if (!this.partitions.has(key)) {
+      this.partitions.set(key, new BitstringStatusList2024(this.partitionSize, this.statusSize, this.statusPurpose));
+    }
+    return this.partitions.get(key)!;
+  }
+
+  public setStatus(globalIndex: number, status: number): { partitionIndex: number; localIndex: number } {
+    const partitionIndex = Math.floor(globalIndex / this.partitionSize);
+    const localIndex = globalIndex % this.partitionSize;
+    const partition = this.getOrCreatePartition(partitionIndex);
+    partition.setStatus(localIndex, status);
+    return { partitionIndex, localIndex };
+  }
+
+  public getStatus(globalIndex: number): {
+    partitionIndex: number;
+    localIndex: number;
+    status: number;
+    isValid: boolean;
+    isRevoked: boolean;
+    isSuspended: boolean;
+  } {
+    const partitionIndex = Math.floor(globalIndex / this.partitionSize);
+    const localIndex = globalIndex % this.partitionSize;
+    const key = `partition_${partitionIndex}`;
+    const partition = this.partitions.get(key);
+    const status = partition ? partition.getStatus(localIndex) : 0;
+
+    return {
+      partitionIndex,
+      localIndex,
+      status,
+      isValid: status === 0,
+      isRevoked: status === 1,
+      isSuspended: status === 2
+    };
+  }
+
+  /**
+   * Computes SHA-256 cryptographic digest across all status list partitions.
+   */
+  public computeAggregatedStatusRoot(): string {
+    const crypto = require('crypto');
+    const sortedKeys = Array.from(this.partitions.keys()).sort();
+    const hashes = sortedKeys.map(k => {
+      const enc = this.partitions.get(k)!.encode(true);
+      return crypto.createHash('sha256').update(`${k}:${enc}`).digest('hex');
+    });
+
+    if (hashes.length === 0) {
+      return crypto.createHash('sha256').update('EMPTY_STATUS_REGISTRY').digest('hex');
+    }
+
+    return crypto.createHash('sha256').update(hashes.join(':')).digest('hex');
+  }
+
+  public getAggregateRoot(): string {
+    return this.computeAggregatedStatusRoot();
+  }
+
+  public addPartition(partitionData: any, partitionIndex?: number): void {
+    if (partitionData instanceof BitstringStatusList2024) {
+      const idx = partitionIndex ?? this.partitions.size;
+      this.partitions.set(`partition_${idx}`, partitionData);
+    } else if (partitionData && typeof partitionData === 'object') {
+      const idx = partitionData.partitionIndex ?? partitionIndex ?? this.partitions.size;
+      if (partitionData.encodedList) {
+        const decoded = BitstringStatusList2024.decode(partitionData.encodedList, {
+          length: partitionData.partitionSize || this.partitionSize,
+          statusSize: this.statusSize,
+          statusPurpose: this.statusPurpose
+        });
+        this.partitions.set(`partition_${idx}`, decoded);
+      } else {
+        this.getOrCreatePartition(idx);
+      }
+    }
+  }
+
+  public getPartitionCount(): number {
+    return this.partitions.size;
+  }
+}
+

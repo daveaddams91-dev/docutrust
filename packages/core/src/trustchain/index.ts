@@ -120,6 +120,20 @@ export class TrustChainEngine {
         const raw = decodeBase58(cleanDid.replace('did:key:z', ''));
         pubHex = raw.subarray(2).toString('hex');
       } catch (_) {}
+    } else if (!pubHex && token.delegatorDid.startsWith('did:peer:0')) {
+      try {
+        const multibase = token.delegatorDid.substring(10).split('#')[0];
+        const raw = decodeBase58(multibase.substring(1));
+        pubHex = raw.subarray(2).toString('hex');
+      } catch (_) {}
+    } else if (!pubHex && token.delegatorDid.startsWith('did:jwk:')) {
+      try {
+        const rawEncoded = token.delegatorDid.replace('did:jwk:', '').split('#')[0];
+        const jwk = JSON.parse(Buffer.from(rawEncoded, 'base64url').toString('utf8'));
+        if (jwk.x) {
+          pubHex = Buffer.from(jwk.x, 'base64url').toString('hex');
+        }
+      } catch (_) {}
     }
 
     if (!pubHex) return false;

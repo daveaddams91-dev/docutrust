@@ -81,7 +81,10 @@ const {
   JsonLdCanonicalizationEngine,
   TrustChainEngine,
   DualHybridKEMEngine,
-  BadgeEngine
+  BadgeEngine,
+  PolicyEngine,
+  BitstringStatusListAggregator,
+  generateRegistryContract
 } = require('@docutrust/core');
 
 const PORT = process.env.PORT || 4000;
@@ -178,7 +181,7 @@ const server = http.createServer(async (req, res) => {
       return jsonResponse(200, {
         status: 'healthy',
         service: 'DocuTrust Sovereign Verifiable Credentials Engine',
-        version: '8.0.0',
+        version: '9.0.0',
         features: [
           'W3C VC 2.0',
           'DID Key Ed25519',
@@ -2004,6 +2007,115 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // ==========================================
+    // v9.0.0 Sovereign Policy-as-Proof Endpoints
+    // ==========================================
+    if (pathname === '/api/v1/policy/evaluate' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { payload, policy, evaluatorKeyPair } = body;
+      if (!payload || !policy) {
+        return jsonResponse(400, { error: 'Missing payload or policy parameters.' });
+      }
+      try {
+        const result = PolicyEngine.evaluate(payload, policy, { evaluatorKeyPair });
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/policy/verify-receipt' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { receipt, publicKeyHex } = body;
+      if (!receipt) {
+        return jsonResponse(400, { error: 'Missing receipt parameter.' });
+      }
+      try {
+        const valid = PolicyEngine.verifyReceipt(receipt, publicKeyHex);
+        return jsonResponse(200, { success: true, valid });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ==========================================
+    // v9.0.0 W3C did:peer Creation & Resolution
+    // ==========================================
+    if (pathname === '/api/v1/did/peer/create' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { method = 0, publicKeyHex, verificationKeyHex, encryptionKeyHex, serviceEndpoint } = body;
+      try {
+        let did = '';
+        if (method === 0) {
+          const keyHex = publicKeyHex || verificationKeyHex || generateKeyPair().publicKeyHex;
+          did = DIDResolver.createDidPeer0(keyHex);
+        } else if (method === 2) {
+          const keyHex = verificationKeyHex || publicKeyHex || generateKeyPair().publicKeyHex;
+          did = DIDResolver.createDidPeer2({
+            verificationKeyHex: keyHex,
+            encryptionKeyHex,
+            serviceEndpoint
+          });
+        } else {
+          return jsonResponse(400, { error: 'Invalid did:peer method. Must be 0 or 2.' });
+        }
+        const didDocument = await DIDResolver.resolve(did);
+        return jsonResponse(200, { success: true, did, didDocument });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/did/peer/resolve' && req.method === 'GET') {
+      const did = url.searchParams.get('did');
+      if (!did) {
+        return jsonResponse(400, { error: 'Missing did query parameter.' });
+      }
+      try {
+        const didDocument = await DIDResolver.resolve(did);
+        return jsonResponse(200, { success: true, didDocument });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ==========================================
+    // v9.0.0 Status List Aggregator
+    // ==========================================
+    if (pathname === '/api/v1/statuslist/aggregate-check' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { aggregateRoot, partitions } = body;
+      if (!aggregateRoot || !Array.isArray(partitions)) {
+        return jsonResponse(400, { error: 'Missing aggregateRoot or partitions array.' });
+      }
+      try {
+        const aggregator = new BitstringStatusListAggregator();
+        for (const p of partitions) {
+          aggregator.addPartition(p);
+        }
+        const computedRoot = aggregator.getAggregateRoot();
+        const cleanExpected = aggregateRoot.replace(/^0x/, '');
+        const valid = computedRoot.toLowerCase() === cleanExpected.toLowerCase();
+        return jsonResponse(200, { success: true, valid, aggregateRoot, computedRoot });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ==========================================
+    // v9.0.0 Solidity Trust Registry Export
+    // ==========================================
+    if (pathname === '/api/v1/solidity/export-registry' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { contractName = 'DocuTrustRegistry', solidityVersion = '^0.8.24' } = body;
+      try {
+        const contractCode = generateRegistryContract({ contractName, solidityVersion });
+        return jsonResponse(200, { success: true, contractCode, contractName, solidityVersion });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
     // Default 404
     jsonResponse(404, { error: 'Route not found' });
   } catch (err) {
@@ -2013,9 +2125,10 @@ const server = http.createServer(async (req, res) => {
 
 if (require.main === module) {
   server.listen(PORT, () => {
-    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v8.0.0 running on http://localhost:${PORT}`);
+    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v9.0.0 running on http://localhost:${PORT}`);
   });
 }
 
 module.exports = { server, generateKeyPair, generatePQCKeyPair, canonicalizeJson, sha256Hex, MerkleTree };
+
 

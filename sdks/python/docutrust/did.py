@@ -1,6 +1,6 @@
 from __future__ import annotations
-from typing import Dict, Any
-from .crypto import decode_base58
+from typing import Dict, Any, Optional
+from .crypto import decode_base58, encode_base58
 
 class DIDResolver:
     """
@@ -142,24 +142,142 @@ class DIDResolver:
             elif kty == "RSA":
                 vm_type = "RsaVerificationKey2018"
 
+            publicKeyHex = None
+            if kty == "OKP" and crv == "Ed25519" and "x" in jwk:
+                try:
+                    import base64
+                    raw_x = jwk["x"]
+                    padded_x = raw_x + "=" * ((4 - len(raw_x) % 4) % 4)
+                    publicKeyHex = base64.urlsafe_b64decode(padded_x.encode("ascii")).hex()
+                except Exception:
+                    pass
+
             vm_id = f"{did}#0"
+            vm = {
+                "id": vm_id,
+                "type": vm_type,
+                "controller": did,
+                "publicKeyJwk": jwk
+            }
+            if publicKeyHex:
+                vm["publicKeyHex"] = publicKeyHex
+
             return {
                 "@context": [
                     "https://www.w3.org/ns/did/v1",
                     "https://w3id.org/security/suites/jws-2020/v1"
                 ],
                 "id": did,
-                "verificationMethod": [{
-                    "id": vm_id,
-                    "type": vm_type,
-                    "controller": did,
-                    "publicKeyJwk": jwk
-                }],
+                "verificationMethod": [vm],
                 "authentication": [vm_id],
                 "assertionMethod": [vm_id],
                 "capabilityInvocation": [vm_id],
                 "capabilityDelegation": [vm_id]
             }
+
+        if method == "peer":
+            method_num = did[9] if len(did) > 9 else ""
+            if method_num == "0":
+                multibase = did[10:].split("#")[0]
+                if not multibase.startswith("z"):
+                    raise ValueError("Invalid did:peer:0 format: expected multibase 'z' prefix.")
+                decoded = decode_base58(multibase[1:])
+                if decoded[0] != 0xed or decoded[1] != 0x01:
+                    raise ValueError("Unsupported did:peer:0 algorithm prefix. Expected Ed25519.")
+                pub_hex = decoded[2:].hex()
+                vm_id = f"{did}#{multibase}"
+                return {
+                    "@context": [
+                        "https://www.w3.org/ns/did/v1",
+                        "https://w3id.org/security/suites/ed25519-2020/v1"
+                    ],
+                    "id": did,
+                    "verificationMethod": [{
+                        "id": vm_id,
+                        "type": "Ed25519VerificationKey2020",
+                        "controller": did,
+                        "publicKeyMultibase": multibase,
+                        "publicKeyHex": pub_hex
+                    }],
+                    "authentication": [vm_id],
+                    "assertionMethod": [vm_id]
+                }
+
+            if method_num == "2":
+                import json, base64
+                parts_str = did[11:].split("#")[0].split(".")
+                vms = []
+                auths = []
+                asserts = []
+                key_agreements = []
+                services = []
+
+                key_idx = 0
+                service_idx = 0
+
+                for part in parts_str:
+                    if not part:
+                        continue
+                    prefix = part[0]
+                    val = part[1:]
+
+                    if prefix == "V" and val.startswith("z"):
+                        decoded = decode_base58(val[1:])
+                        pub_hex = decoded[2:].hex()
+                        key_idx += 1
+                        key_id = f"{did}#key-{key_idx}"
+                        vms.append({
+                            "id": key_id,
+                            "type": "Ed25519VerificationKey2020",
+                            "controller": did,
+                            "publicKeyMultibase": val,
+                            "publicKeyHex": pub_hex
+                        })
+                        auths.append(key_id)
+                        asserts.append(key_id)
+                    elif prefix == "E" and val.startswith("z"):
+                        decoded = decode_base58(val[1:])
+                        pub_hex = decoded[2:].hex()
+                        key_idx += 1
+                        key_id = f"{did}#key-{key_idx}"
+                        vms.append({
+                            "id": key_id,
+                            "type": "X25519KeyAgreementKey2020",
+                            "controller": did,
+                            "publicKeyMultibase": val,
+                            "publicKeyHex": pub_hex
+                        })
+                        key_agreements.append(key_id)
+                    elif prefix == "S":
+                        try:
+                            padded_s = val + "=" * ((4 - len(val) % 4) % 4)
+                            s_json = json.loads(base64.urlsafe_b64decode(padded_s.encode("ascii")).decode("utf-8"))
+                            service_idx += 1
+                            services.append({
+                                "id": f"{did}#service-{service_idx}",
+                                "type": s_json.get("t", "DIDCommMessaging"),
+                                "serviceEndpoint": s_json.get("s", s_json)
+                            })
+                        except Exception:
+                            pass
+
+                doc = {
+                    "@context": [
+                        "https://www.w3.org/ns/did/v1",
+                        "https://w3id.org/security/suites/ed25519-2020/v1"
+                    ],
+                    "id": did,
+                    "verificationMethod": vms,
+                    "authentication": auths,
+                    "assertionMethod": asserts
+                }
+                if key_agreements:
+                    doc["keyAgreement"] = key_agreements
+                if services:
+                    doc["service"] = services
+                return doc
+
+            raise ValueError(f"Unsupported did:peer method variant: {did}")
 
         if method == "web":
             domain = parts[2].replace("%3A", ":")
@@ -179,6 +297,34 @@ class DIDResolver:
         raise ValueError(f"Unsupported DID method: {method}")
 
     @staticmethod
+    def create_did_peer_0(public_key_hex: str) -> str:
+        """Generates a did:peer:0 (Inception Key) from Ed25519 public key hex."""
+        raw_pub = bytes.fromhex(public_key_hex)
+        multicodec = bytes([0xed, 0x01]) + raw_pub
+        multibase = f"z{encode_base58(multicodec)}"
+        return f"did:peer:0{multibase}"
+
+    @staticmethod
+    def create_did_peer_2(verification_key_hex: str, encryption_key_hex: Optional[str] = None, service_endpoint: Optional[str] = None) -> str:
+        """Generates a did:peer:2 (Multiple Keys & Services) URI."""
+        import json, base64
+        v_raw = bytes.fromhex(verification_key_hex)
+        v_multi = f"z{encode_base58(bytes([0xed, 0x01]) + v_raw)}"
+        peer_did = f"did:peer:2.V{v_multi}"
+
+        if encryption_key_hex:
+            e_raw = bytes.fromhex(encryption_key_hex)
+            e_multi = f"z{encode_base58(bytes([0xec, 0x01]) + e_raw)}"
+            peer_did += f".E{e_multi}"
+
+        if service_endpoint:
+            s_bytes = json.dumps({"t": "dm", "s": service_endpoint}, separators=(',', ':')).encode("utf-8")
+            s_b64 = base64.urlsafe_b64encode(s_bytes).decode("ascii").rstrip("=")
+            peer_did += f".S{s_b64}"
+
+        return peer_did
+
+    @staticmethod
     def encode_did_jwk(jwk: Dict[str, Any]) -> str:
         """Encodes a JSON Web Key dictionary into a canonical did:jwk URI."""
         import json, base64
@@ -194,3 +340,9 @@ class DIDResolver:
         raw = did.replace("did:jwk:", "").split("#")[0]
         padded = raw + "=" * ((4 - len(raw) % 4) % 4)
         return json.loads(base64.urlsafe_b64decode(padded.encode("ascii")).decode("utf-8"))
+
+create_did_peer_0 = DIDResolver.create_did_peer_0
+create_did_peer_2 = DIDResolver.create_did_peer_2
+encode_did_jwk = DIDResolver.encode_did_jwk
+decode_did_jwk = DIDResolver.decode_did_jwk
+

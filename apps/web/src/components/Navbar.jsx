@@ -25,6 +25,7 @@ import {
 export default function Navbar({ activeTab, setActiveTab }) {
   const navItems = [
     { id: 'hero', label: 'Overview', icon: ShieldCheck },
+    { id: 'policy', label: 'Policy Studio', icon: Sparkles },
     { id: 'badge', label: 'Badges', icon: Award },
     { id: 'confidential', label: 'Confidential ZK', icon: Binary },
     { id: 'jsonld', label: 'JSON-LD 2.0', icon: FileCode },
@@ -58,7 +59,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
           <div>
             <div className="flex items-center gap-1.5">
               <span className="font-bold text-lg tracking-tight text-white font-sans">DocuTrust</span>
-              <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 font-mono font-semibold">v8.0.0</span>
+              <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 font-mono font-semibold">v9.0.0</span>
             </div>
             <span className="text-[10px] text-gray-400 tracking-wide block font-mono">Quantum Sovereign Trust Mesh</span>
           </div>

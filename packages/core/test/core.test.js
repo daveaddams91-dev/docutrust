@@ -132,14 +132,18 @@ const {
   SolidityEngine,
   // Audit Bundle Engine
   AuditBundleEngine,
-  // v6.0.0 Modules
+  // v6.0.0 / v9.0.0 Modules
   PaillierCryptosystem,
   ConfidentialClaimsEngine,
   JsonLdCanonicalizationEngine,
   TrustChainEngine,
   DualHybridKEMEngine,
   BadgeEngine,
-  createDidJwk
+  createDidJwk,
+  createDidPeer0,
+  createDidPeer2,
+  PolicyEngine,
+  BitstringStatusListAggregator
 } = require('../dist/index.js');
 
 // 1. Cryptography Tests
@@ -2340,4 +2344,187 @@ test('61. Badge: Verifiable SVG digital badge rendering, embedded metadata extra
   const tamperedResult = await BadgeEngine.verifyBadgeSvg(tamperedPayloadSvg);
   assert.equal(tamperedResult.valid, false);
 });
+
+// 67. Sovereign Policy-as-Proof & Governance Rule Engine (DocuTrust v9.0.0)
+test('67. Sovereign Policy Engine: evaluate AST conditions and verify signed receipt', () => {
+  const evaluatorKp = generateKeyPair();
+  const issuerKp = generateKeyPair();
+
+  const credential = {
+    id: 'urn:uuid:credential-v9-policy-test',
+    type: ['VerifiableCredential', 'AccreditedEngineerCredential'],
+    issuer: issuerKp.did,
+    validFrom: new Date(Date.now() - 3600000).toISOString(),
+    credentialSubject: {
+      id: 'did:key:holder123',
+      name: 'Dr. Evelyn Reed',
+      age: 32,
+      jurisdiction: 'EU',
+      clearanceLevel: 4,
+      skills: ['cryptography', 'distributed-systems', 'zero-knowledge'],
+      status: 'active'
+    }
+  };
+
+  const policy = {
+    id: 'policy-sovereign-clearance-v9',
+    name: 'Critical Infrastructure Clearance Policy',
+    version: '1.0.0',
+    allowedIssuers: [issuerKp.did],
+    requiredCredentialTypes: ['AccreditedEngineerCredential'],
+    maxCredentialAgeSeconds: 86400,
+    condition: {
+      operator: 'and',
+      conditions: [
+        { field: 'credentialSubject.age', operator: 'gte', value: 21 },
+        { field: 'credentialSubject.jurisdiction', operator: 'in', value: ['US', 'EU', 'UK'] },
+        { field: 'credentialSubject.clearanceLevel', operator: 'gte', value: 3 },
+        { field: 'credentialSubject.skills', operator: 'contains', value: 'cryptography' },
+        {
+          operator: 'or',
+          conditions: [
+            { field: 'credentialSubject.status', operator: 'eq', value: 'active' },
+            { field: 'credentialSubject.provisional', operator: 'eq', value: true }
+          ]
+        }
+      ]
+    }
+  };
+
+  const result = PolicyEngine.evaluate(credential, policy, { evaluatorKeyPair: evaluatorKp });
+  assert.equal(result.passed, true);
+  assert.equal(result.errors.length, 0);
+  assert.ok(result.receipt);
+  assert.equal(result.receipt.policyId, 'policy-sovereign-clearance-v9');
+
+  // Verify receipt cryptographically
+  const receiptValid = PolicyEngine.verifyReceipt(result.receipt, evaluatorKp.publicKeyHex);
+  assert.equal(receiptValid, true);
+
+  // Negative evaluation test
+  const failingCredential = {
+    ...credential,
+    credentialSubject: {
+      ...credential.credentialSubject,
+      clearanceLevel: 2 // Fails >= 3
+    }
+  };
+
+  const failingResult = PolicyEngine.evaluate(failingCredential, policy);
+  assert.equal(failingResult.passed, false);
+  assert.ok(failingResult.errors.length > 0);
+});
+
+// 68. W3C did:peer Method 0 (Inception Key)
+test('68. W3C did:peer Method 0: deterministic generation and document resolution', async () => {
+  const kp = generateKeyPair();
+  const peerDid = createDidPeer0(kp.publicKeyHex);
+  assert.ok(peerDid.startsWith('did:peer:0z'));
+
+  const doc = await DIDResolver.resolve(peerDid);
+  assert.equal(doc.id, peerDid);
+  assert.equal(doc.verificationMethod.length, 1);
+  assert.equal(doc.verificationMethod[0].publicKeyHex, kp.publicKeyHex);
+  assert.equal(doc.verificationMethod[0].type, 'Ed25519VerificationKey2020');
+});
+
+// 69. W3C did:peer Method 2 (Multiple Keys & Service Endpoints)
+test('69. W3C did:peer Method 2: deterministic multi-key and service resolution', async () => {
+  const vKp = generateKeyPair();
+  const eKp = generateKeyPair();
+  const endpoint = 'https://agents.docutrust.org/didcomm';
+
+  const peerDid2 = createDidPeer2({
+    verificationKeyHex: vKp.publicKeyHex,
+    encryptionKeyHex: eKp.publicKeyHex,
+    serviceEndpoint: endpoint
+  });
+
+  assert.ok(peerDid2.startsWith('did:peer:2.V'));
+  assert.ok(peerDid2.includes('.E'));
+  assert.ok(peerDid2.includes('.S'));
+
+  const doc = await DIDResolver.resolve(peerDid2);
+  assert.equal(doc.id, peerDid2);
+  assert.equal(doc.verificationMethod.length, 2);
+  assert.equal(doc.keyAgreement.length, 1);
+  assert.equal(doc.service.length, 1);
+  assert.equal(doc.service[0].serviceEndpoint, endpoint);
+});
+
+// 70. Enterprise Bitstring Status List Aggregator
+test('70. Bitstring Status List Aggregator: sharded multi-partition management & root computation', () => {
+  const aggregator = new BitstringStatusListAggregator(1000, 1, 'revocation');
+
+  // Set status across multiple partitions
+  aggregator.setStatus(50, 1);     // Partition 0, local index 50 -> Revoked
+  aggregator.setStatus(1250, 1);   // Partition 1, local index 250 -> Revoked
+  aggregator.setStatus(3500, 1);   // Partition 3, local index 500 -> Revoked
+
+  const s0 = aggregator.getStatus(50);
+  assert.equal(s0.partitionIndex, 0);
+  assert.equal(s0.isRevoked, true);
+
+  const s1 = aggregator.getStatus(1250);
+  assert.equal(s1.partitionIndex, 1);
+  assert.equal(s1.isRevoked, true);
+
+  const sClean = aggregator.getStatus(100);
+  assert.equal(sClean.isValid, true);
+  assert.equal(sClean.isRevoked, false);
+
+  const root = aggregator.computeAggregatedStatusRoot();
+  assert.ok(typeof root === 'string' && root.length === 64);
+});
+
+// 71. EVM Solidity Sovereign Trust Registry Smart Contract Generator
+test('71. SolidityEngine: generateRegistryContract emits DocuTrustRegistry.sol', () => {
+  const code = SolidityEngine.generateRegistryContract({
+    contractName: 'DocuTrustEnterpriseRegistry',
+    solidityVersion: '^0.8.24'
+  });
+
+  assert.ok(code.includes('contract DocuTrustEnterpriseRegistry'));
+  assert.ok(code.includes('registerIssuer'));
+  assert.ok(code.includes('revokeIssuer'));
+  assert.ok(code.includes('updateRevocationRoot'));
+  assert.ok(code.includes('isIssuerAccredited'));
+});
+
+// 72. Open Badges 3.0 & Verifiable SVG Themes (obsidian-noir and royal-amethyst)
+test('72. BadgeEngine: render obsidian-noir and royal-amethyst themes with validFrom fallback', async () => {
+  const issuerKp = generateKeyPair();
+  const { credential } = VerifiableCredentialsEngine.issue({
+    type: ['VerifiableCredential', 'SecurityClearanceBadge'],
+    issuer: { id: issuerKp.did },
+    credentialSubject: {
+      id: 'did:key:holder999',
+      name: 'Agent Cipher',
+      title: 'Top Secret Level 5'
+    },
+    keyPair: issuerKp
+  });
+
+  const svgNoir = BadgeEngine.renderBadgeSvg(credential, {
+    theme: 'obsidian-noir',
+    badgeTitle: 'Top Secret Level 5',
+    recipientName: 'Agent Cipher'
+  });
+  assert.ok(svgNoir.includes('#09090b'));
+  assert.ok(svgNoir.includes('Agent Cipher'));
+
+  const verifyNoir = await BadgeEngine.verifyBadgeSvg(svgNoir);
+  assert.equal(verifyNoir.valid, true);
+
+  const svgAmethyst = BadgeEngine.renderBadgeSvg(credential, {
+    theme: 'royal-amethyst',
+    badgeTitle: 'Top Secret Level 5',
+    recipientName: 'Agent Cipher'
+  });
+  assert.ok(svgAmethyst.includes('#2e1065'));
+
+  const verifyAmethyst = await BadgeEngine.verifyBadgeSvg(svgAmethyst);
+  assert.equal(verifyAmethyst.valid, true);
+});
+
 

@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
 const { server } = require('../src/server.js');
+const { BitstringStatusList2024, BitstringStatusListAggregator } = require('@docutrust/core');
 
 let baseUrl;
 let serverInstance;
@@ -60,7 +61,7 @@ test('API Server Suite', async (t) => {
     const res = await makeRequest('GET', '/api/v1/health');
     assert.equal(res.status, 200);
     assert.equal(res.body.status, 'healthy');
-    assert.equal(res.body.version, '8.0.0');
+    assert.equal(res.body.version, '9.0.0');
     assert.ok(Array.isArray(res.body.features));
     assert.ok(res.body.systemDid.startsWith('did:key:z6M'));
   });
@@ -1336,5 +1337,94 @@ test('API Server Suite', async (t) => {
     assert.equal(verifyBadgeRes.body.valid, true);
     assert.equal(verifyBadgeRes.body.issuer, keyRes.body.keyPair.did);
   });
+
+  await t.test('54. v9.0.0 API Endpoints (Policy AST, did:peer, StatusList Aggregator, Solidity Registry)', async () => {
+    const keyRes = await makeRequest('POST', '/api/v1/keys/generate');
+    const issuerKp = keyRes.body.keyPair;
+
+    const credRes = await makeRequest('POST', '/api/v1/credentials/issue', {
+      type: ['VerifiableCredential', 'OfficerCredential'],
+      credentialSubject: {
+        id: 'did:key:zOfficer',
+        clearance: 5,
+        department: 'CyberSecurity'
+      },
+      keyPair: issuerKp
+    });
+    assert.equal(credRes.status, 200);
+    const vc = credRes.body.credential;
+
+    // 1. Policy Evaluate
+    const policy = {
+      id: 'pol-cyber-5',
+      name: 'Cyber Clearance Rule',
+      condition: {
+        operator: 'and',
+        conditions: [
+          { field: 'credentialSubject.clearance', operator: 'gte', value: 4 },
+          { field: 'credentialSubject.department', operator: 'eq', value: 'CyberSecurity' }
+        ]
+      }
+    };
+
+    const polRes = await makeRequest('POST', '/api/v1/policy/evaluate', {
+      payload: vc,
+      policy,
+      evaluatorKeyPair: issuerKp
+    });
+    assert.equal(polRes.status, 200);
+    assert.equal(polRes.body.passed, true);
+    assert.ok(polRes.body.receipt);
+
+    // 2. Policy Verify Receipt
+    const receiptVerifyRes = await makeRequest('POST', '/api/v1/policy/verify-receipt', {
+      receipt: polRes.body.receipt,
+      publicKeyHex: issuerKp.publicKeyHex
+    });
+    assert.equal(receiptVerifyRes.status, 200);
+    assert.equal(receiptVerifyRes.body.valid, true);
+
+    // 3. did:peer create & resolve
+    const peer0Res = await makeRequest('POST', '/api/v1/did/peer/create', {
+      method: 0,
+      publicKeyHex: issuerKp.publicKeyHex
+    });
+    assert.equal(peer0Res.status, 200);
+    assert.ok(peer0Res.body.did.startsWith('did:peer:0z'));
+
+    const peer0ResolveRes = await makeRequest('GET', `/api/v1/did/peer/resolve?did=${encodeURIComponent(peer0Res.body.did)}`);
+    assert.equal(peer0ResolveRes.status, 200);
+    assert.equal(peer0ResolveRes.body.didDocument.id, peer0Res.body.did);
+
+    const peer2Res = await makeRequest('POST', '/api/v1/did/peer/create', {
+      method: 2,
+      verificationKeyHex: issuerKp.publicKeyHex,
+      serviceEndpoint: 'https://gateway.docutrust.org'
+    });
+    assert.equal(peer2Res.status, 200);
+    assert.ok(peer2Res.body.did.startsWith('did:peer:2.V'));
+
+    // 4. StatusList Aggregator Check
+    const bsl = new BitstringStatusList2024(1000, 1, 'revocation');
+    const slPart = { id: 'urn:sl:part0', partitionIndex: 0, partitionSize: 1000, encodedList: bsl.encode(true) };
+    const agg = new BitstringStatusListAggregator();
+    agg.addPartition(slPart);
+    const aggRoot = agg.getAggregateRoot();
+
+    const aggCheckRes = await makeRequest('POST', '/api/v1/statuslist/aggregate-check', {
+      aggregateRoot: aggRoot,
+      partitions: [slPart]
+    });
+    assert.equal(aggCheckRes.status, 200);
+    assert.equal(aggCheckRes.body.valid, true);
+
+    // 5. Solidity Export Registry
+    const solRes = await makeRequest('POST', '/api/v1/solidity/export-registry', {
+      contractName: 'DocuTrustEnterpriseRegistry'
+    });
+    assert.equal(solRes.status, 200);
+    assert.ok(solRes.body.contractCode.includes('contract DocuTrustEnterpriseRegistry'));
+  });
 });
+
 

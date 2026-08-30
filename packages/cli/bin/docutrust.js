@@ -213,7 +213,14 @@ const command = args[0];
 
 function printHelp() {
   console.log(`
-\x1b[1m\x1b[36m🛡️ DocuTrust CLI v8.0.0\x1b[0m — Sovereign Trust Mesh & Post-Quantum Governance
+\x1b[1m\x1b[36m🛡️ DocuTrust CLI v9.0.0\x1b[0m — Sovereign Trust Mesh & Post-Quantum Governance
+
+\x1b[1mSOVEREIGN POLICY-AS-PROOF & PEER DIDS (RFC 0627):\x1b[0m
+  \x1b[32mpolicy-evaluate\x1b[0m --payload <f> --policy <f> [--key <k>] [--out <f>] Evaluate VC against Policy AST & emit signed receipt
+  \x1b[32mpolicy-verify-receipt\x1b[0m --receipt <f> [--key <pubHex>]  Verify DocuTrustPolicyReceipt2026 proof
+  \x1b[32mdid-peer-create\x1b[0m --method <0|2> [--pub <hex>] [--enc <hex>] [--service <url>] Create W3C did:peer identifier
+  \x1b[32msolidity-export-registry\x1b[0m [--name <str>] [--out <f>] Generate DocuTrustRegistry.sol multi-issuer trust registry
+  \x1b[32mstatuslist-aggregate-check\x1b[0m --root <h> --lists <f1,f2> Validate multi-partition status list aggregate root
 
 \x1b[1mCORE COMMANDS:\x1b[0m
   \x1b[32mdemo / wizard\x1b[0m                                 Run interactive 10-second end-to-end credential issuance & verification
@@ -2493,6 +2500,143 @@ async function main() {
       console.log(`  Canonical JCS Hash: ${result.canonicalHash}`);
     } else {
       console.log(`\x1b[31m✖\x1b[0m Verifiable SVG Badge is \x1b[1m\x1b[31mINVALID\x1b[0m: ${result.error || 'Verification failed.'}`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // ==========================================
+  // v9.0.0 Sovereign Policy-as-Proof & did:peer
+  // ==========================================
+
+  if (command === 'policy-evaluate') {
+    const payloadFile = getArgValue('--payload') || getArgValue('--in') || getArgValue('-i');
+    const policyFile = getArgValue('--policy') || getArgValue('-p');
+    const keyFile = getArgValue('--key') || getArgValue('-k');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!payloadFile || !policyFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --payload/--in <credential.json> or --policy <policy.json>');
+      process.exit(1);
+    }
+
+    const payload = JSON.parse(fs.readFileSync(payloadFile, 'utf-8'));
+    const policy = JSON.parse(fs.readFileSync(policyFile, 'utf-8'));
+    let evaluatorKp = null;
+    if (keyFile) {
+      evaluatorKp = JSON.parse(fs.readFileSync(keyFile, 'utf-8'));
+    }
+
+    const result = core.PolicyEngine.evaluate(payload, policy, { evaluatorKeyPair: evaluatorKp });
+    if (outFile) {
+      safeWriteFileSync(outFile, JSON.stringify(result, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Policy evaluation result saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(result, null, 2));
+    }
+
+    if (result.passed) {
+      console.log(`\x1b[32m✔ Policy Evaluation PASSED\x1b[0m for policy: \x1b[1m${result.policyName}\x1b[0m`);
+    } else {
+      console.error(`\x1b[31m✖ Policy Evaluation FAILED\x1b[0m: ${result.errors.join(', ')}`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  if (command === 'policy-verify-receipt') {
+    const receiptFile = getArgValue('--receipt') || getArgValue('--in') || getArgValue('-r') || getArgValue('-i');
+    const pubHex = getArgValue('--key') || getArgValue('-k');
+
+    if (!receiptFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --receipt/--in <receipt.json>');
+      process.exit(1);
+    }
+
+    const receipt = JSON.parse(fs.readFileSync(receiptFile, 'utf-8'));
+    const valid = core.PolicyEngine.verifyReceipt(receipt, pubHex || undefined);
+
+    if (valid) {
+      console.log(`\x1b[32m✔\x1b[0m Policy Evaluation Receipt is \x1b[1m\x1b[32mAUTHENTIC & VALID\x1b[0m`);
+      console.log(`  Policy ID: ${receipt.policyId}`);
+      console.log(`  Evaluator DID: ${receipt.evaluatorDid}`);
+      console.log(`  Passed: ${receipt.passed}`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m Policy Evaluation Receipt is \x1b[1m\x1b[31mINVALID\x1b[0m`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  if (command === 'did-peer-create') {
+    const methodStr = getArgValue('--method') || getArgValue('-m') || '0';
+    const method = parseInt(methodStr, 10);
+    const pubHex = getArgValue('--pub') || getArgValue('-p');
+    const encHex = getArgValue('--enc') || getArgValue('-e');
+    const service = getArgValue('--service') || getArgValue('-s');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    let did = '';
+    if (method === 0) {
+      const keyHex = pubHex || generateKeyPair().publicKeyHex;
+      did = core.DIDResolver.createDidPeer0(keyHex);
+    } else if (method === 2) {
+      const keyHex = pubHex || generateKeyPair().publicKeyHex;
+      did = core.DIDResolver.createDidPeer2({
+        verificationKeyHex: keyHex,
+        encryptionKeyHex: encHex || undefined,
+        serviceEndpoint: service || undefined
+      });
+    } else {
+      console.error('\x1b[31mError:\x1b[0m Method must be 0 or 2 for did:peer');
+      process.exit(1);
+    }
+
+    const doc = core.DIDResolver.resolve(did);
+    const result = { did, didDocument: doc };
+
+    if (outFile) {
+      safeWriteFileSync(outFile, JSON.stringify(result, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m did:peer created and saved to \x1b[1m${outFile}\x1b[0m: ${did}`);
+    } else {
+      console.log(JSON.stringify(result, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'solidity-export-registry') {
+    const name = getArgValue('--name') || getArgValue('-n') || 'DocuTrustRegistry';
+    const version = getArgValue('--solc') || '^0.8.24';
+    const outFile = getArgValue('--out') || getArgValue('-o') || `${name}.sol`;
+
+    const code = core.generateRegistryContract({ contractName: name, solidityVersion: version });
+    safeWriteFileSync(outFile, code);
+    console.log(`\x1b[32m✔\x1b[0m Solidity Trust Registry smart contract exported to \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'statuslist-aggregate-check') {
+    const rootHex = getArgValue('--root') || getArgValue('-r');
+    const listsStr = getArgValue('--lists') || getArgValue('-l');
+
+    if (!rootHex || !listsStr) {
+      console.error('\x1b[31mError:\x1b[0m Missing --root <0x.../hex> or --lists <list1.json,list2.json>');
+      process.exit(1);
+    }
+
+    const files = listsStr.split(',');
+    const partitions = files.map(f => JSON.parse(fs.readFileSync(f.trim(), 'utf-8')));
+    const aggregator = new core.BitstringStatusListAggregator();
+    for (const p of partitions) {
+      aggregator.addPartition(p);
+    }
+    const computedRoot = aggregator.getAggregateRoot();
+    const cleanRoot = rootHex.replace(/^0x/, '');
+
+    if (computedRoot.toLowerCase() === cleanRoot.toLowerCase()) {
+      console.log(`\x1b[32m✔\x1b[0m Status List Multi-Partition Root matches: \x1b[32m${computedRoot}\x1b[0m`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m Root mismatch: computed ${computedRoot}, expected ${cleanRoot}`);
       process.exit(1);
     }
     return;
