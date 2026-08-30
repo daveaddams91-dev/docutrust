@@ -55,8 +55,8 @@ class AuditBundleEngine:
         # 5. Manifest
         manifest = {
             "bundleId": bundle_id,
-            "version": "5.0.0",
-            "generator": "DocuTrust Sovereign Trust Engine v5.0.0",
+            "version": "7.0.0",
+            "generator": "DocuTrust Sovereign Trust Engine v7.0.0",
             "organization": organization,
             "createdAt": created_at,
             "complianceStandards": standards,
@@ -176,7 +176,7 @@ class AuditBundleEngine:
         standards_lines = "\n".join(f"- **{s}** — Validated" for s in standards)
 
         errors = result.get("errors", [])
-        error_section = ("### ⚠️ Errors Encountered:\n" + "\n".join(f"- {e}" for e in errors)) if errors else "*Cryptographically sealed and signed by DocuTrust Sovereign Trust Engine v5.0.0.*"
+        error_section = ("### ⚠️ Errors Encountered:\n" + "\n".join(f"- {e}" for e in errors)) if errors else "*Cryptographically sealed and signed by DocuTrust Sovereign Trust Engine v7.0.0.*"
 
         status_text = "✅ **PASSED (100% CRYPTOGRAPHIC INTEGRITY)**" if result.get("valid") else "❌ **FAILED**"
         sig_status = "✅ VALID" if result.get("signatureValid") else "❌ INVALID"

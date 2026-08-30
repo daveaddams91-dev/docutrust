@@ -4,7 +4,7 @@
 
 ### The Open-Source Sovereign Trust Fabric for Verifiable Credentials, Paillier Homomorphic Compute, W3C URDNA2015 JSON-LD Signatures, Hierarchical Trust Chains & Post-Quantum Dual-KEM Armor
 
-[![Version](https://img.shields.io/badge/Version-v6.0.0-cyan.svg)]()
+[![Version](https://img.shields.io/badge/Version-v7.0.0-cyan.svg)]()
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CI Status](https://img.shields.io/badge/CI-100%25%20Passing-brightgreen.svg)]()
 [![Confidential Compute](https://img.shields.io/badge/Privacy-Paillier%20Homomorphic%20%7C%20ZK%20Threshold-purple.svg)]()

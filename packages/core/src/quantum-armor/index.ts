@@ -123,9 +123,9 @@ export class DualHybridKEMEngine {
   ): string {
     const kemKeys: KEMKeyPair = {
       algorithm: 'ML-KEM-768-X25519-Hybrid',
-      publicKeyHex: recipientHybridKeys.publicKeyHex || '',
+      publicKeyHex: recipientHybridKeys.publicKeyHex || (recipientHybridKeys as any).pqcPub || '',
       privateKeyHex: recipientHybridKeys.privateKeyHex || recipientHybridKeys.pqcPriv || '',
-      x25519PublicKeyHex: recipientHybridKeys.x25519PublicKeyHex || '',
+      x25519PublicKeyHex: recipientHybridKeys.x25519PublicKeyHex || (recipientHybridKeys as any).classicalPub || '',
       x25519PrivateKeyHex: recipientHybridKeys.x25519PrivateKeyHex || recipientHybridKeys.classicalPriv || '',
       hybridRecipientId: recipientHybridKeys.hybridRecipientId || ''
     };

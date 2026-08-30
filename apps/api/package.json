@@ -1,6 +1,6 @@
 {
   "name": "@docutrust/api",
-  "version": "6.0.0",
+  "version": "7.0.0",
   "description": "High-Performance REST API for DocuTrust Sovereign Verifiable Credentials",
   "main": "src/server.js",
   "scripts": {
@@ -10,7 +10,7 @@
     "test": "node --test test/api.test.js"
   },
   "dependencies": {
-    "@docutrust/core": "^6.0.0",
+    "@docutrust/core": "^7.0.0",
     "express": "^4.19.2",
     "cors": "^2.8.5"
   },

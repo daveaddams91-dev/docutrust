@@ -213,7 +213,7 @@ const command = args[0];
 
 function printHelp() {
   console.log(`
-\x1b[1m\x1b[36m🛡️ DocuTrust CLI v5.0.0\x1b[0m — Open-Source Sovereign Trust Stack
+\x1b[1m\x1b[36m🛡️ DocuTrust CLI v7.0.0\x1b[0m — Sovereign Trust Mesh & Post-Quantum Governance
 
 \x1b[1mCORE COMMANDS:\x1b[0m
   \x1b[32mdemo / wizard\x1b[0m                                 Run interactive 10-second end-to-end credential issuance & verification
@@ -228,6 +228,28 @@ function printHelp() {
   \x1b[32mdataintegrity-issue\x1b[0m --claims <f> -k <k>        Issue W3C DataIntegrityProof VC (eddsa-jcs-2022 / ml-dsa-65-2026)
   \x1b[32mdataintegrity-verify\x1b[0m --vc <file>               Verify W3C DataIntegrityProof VC
   \x1b[32mhelp\x1b[0m                                          Show this help menu
+
+\x1b[1mPAILLIER CONFIDENTIAL COMPUTE & HOMOMORPHIC ZERO-KNOWLEDGE:\x1b[0m
+  \x1b[32mconfidential-keygen\x1b[0m [--bits <num>] [--out <f>]  Generate Paillier public/private keypair (default 2048-bit)
+  \x1b[32mconfidential-encrypt\x1b[0m -v <val> -k <pub> [--out <f>] Encrypt numerical value with Paillier public key
+  \x1b[32mconfidential-sum\x1b[0m -c <c1,c2...> -k <pub> [--out <f>] Homomorphically add encrypted ciphertexts without decrypting
+  \x1b[32mconfidential-threshold-prove\x1b[0m -v <n> -t <t> -k <k> Generate ZK proof that encrypted value exceeds threshold
+  \x1b[32mconfidential-threshold-verify\x1b[0m -p <f> -k <k> -c <c> Verify Paillier zero-knowledge threshold proof
+
+\x1b[1mW3C URDNA2015 JSON-LD DATASET CANONICALIZATION:\x1b[0m
+  \x1b[32mjsonld-canonicalize\x1b[0m --doc <file> [--out <file>] Normalize JSON-LD document into canonical sorted N-Quads
+  \x1b[32mjsonld-sign\x1b[0m --doc <file> --key <keyfile>       Sign JSON-LD with JsonLdSignature2020 Linked Data Proof
+  \x1b[32mjsonld-verify\x1b[0m --doc <file> [--key <pubHex>]     Verify JsonLdSignature2020 RDF canonicalization signature
+
+\x1b[1mHIERARCHICAL VERIFIABLE TRUST CHAINS & DELEGATION:\x1b[0m
+  \x1b[32mtrustchain-issue\x1b[0m --issuer-did <d> --subject-did <s> Issue cryptographically chained Verifiable Delegation Token
+  \x1b[32mtrustchain-verify-token\x1b[0m --token <file>          Verify individual delegation token signature & expiration
+  \x1b[32mtrustchain-verify\x1b[0m --chain <file> --anchor-did <d> Verify entire multi-tier delegation chain up to Trust Anchor
+
+\x1b[1mPOST-QUANTUM DUAL HYBRID KEM ARMOR (X25519 + ML-KEM-768):\x1b[0m
+  \x1b[32mquantum-armor-keygen\x1b[0m [--out <file>]               Generate dual-hybrid classical (X25519) + PQC (ML-KEM-768) keys
+  \x1b[32mquantum-armor-seal\x1b[0m -d <data> -r <pqcPub,x25519Pub> Encapsulate and encrypt payload under dual-KEM armor
+  \x1b[32mquantum-armor-unseal\x1b[0m --armor <f> --key <privKeys>  Decapsulate hybrid shared secrets and decrypt armor bundle
 
 \x1b[1mANONCREDS 2.0 ZERO-KNOWLEDGE PRIVACY:\x1b[0m
   \x1b[32manoncreds-blind-request\x1b[0m --schema <s> --issuer <i> Create holder blind request with secret commitment

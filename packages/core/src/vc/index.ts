@@ -21,6 +21,7 @@ import { BitstringStatusList2024, StatusList2021 } from '../revocation';
 import { RevocationBloomFilter, SignedBloomFilter } from '../bloom';
 import { SchemaValidator } from '../schema';
 import { DecentralizedTrustRegistry } from '../trust-registry';
+import { JsonLdCanonicalizationEngine } from '../jsonld';
 
 export interface CredentialSubject {
   id?: string;
@@ -487,6 +488,12 @@ export class VerifiableCredentialsEngine {
         signatureValid = bbsRes.valid;
         if (!signatureValid) {
           errors.push(bbsRes.error || 'BBS+ zero-knowledge signature proof verification failed.');
+        }
+      } else if (credential.proof.type === 'JsonLdSignature2020') {
+        const jsonLdRes = JsonLdCanonicalizationEngine.verifyJsonLd(credential as any, expectedPublicKeyHex);
+        signatureValid = jsonLdRes.valid;
+        if (!signatureValid) {
+          errors.push(...jsonLdRes.errors);
         }
       } else {
         let pubKey = expectedPublicKeyHex;

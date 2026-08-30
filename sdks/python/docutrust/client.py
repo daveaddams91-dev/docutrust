@@ -6,7 +6,7 @@ from typing import Dict, Any, List, Optional, Union
 from .crypto import canonicalize_json, sha256_hex, MerkleTree
 
 class DocuTrustClient:
-    """Client for DocuTrust Sovereign Trust API v5.0.0."""
+    """Client for DocuTrust Sovereign Trust API v7.0.0."""
     def __init__(self, api_url: str = "https://api.docutrust.org/api/v1", api_key: Optional[str] = None):
         self.api_url = api_url.rstrip("/")
         self.api_key = api_key

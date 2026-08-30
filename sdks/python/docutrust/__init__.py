@@ -53,7 +53,7 @@ from .jsonld import JsonLdCanonicalizationEngine
 from .trustchain import TrustChainEngine
 from .quantum_armor import DualHybridKEMEngine
 
-__version__ = "6.0.0"
+__version__ = "7.0.0"
 __all__ = [
     "DocuTrustClient",
     "canonicalize_json",

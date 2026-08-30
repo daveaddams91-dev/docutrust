@@ -861,7 +861,7 @@ class TestDocuTrustPython(unittest.TestCase):
             mmr=mmr
         )
         self.assertEqual(bundle["type"], "DocuTrustAuditBundle2026")
-        self.assertEqual(bundle["manifest"]["version"], "5.0.0")
+        self.assertEqual(bundle["manifest"]["version"], "7.0.0")
 
         verify_res = AuditBundleEngine.verify_audit_bundle(bundle)
         self.assertTrue(verify_res["valid"])
