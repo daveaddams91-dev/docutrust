@@ -61,7 +61,7 @@ test('API Server Suite', async (t) => {
     const res = await makeRequest('GET', '/api/v1/health');
     assert.equal(res.status, 200);
     assert.equal(res.body.status, 'healthy');
-    assert.equal(res.body.version, '9.0.0');
+    assert.equal(res.body.version, '10.0.0');
     assert.ok(Array.isArray(res.body.features));
     assert.ok(res.body.systemDid.startsWith('did:key:z6M'));
   });
@@ -1424,6 +1424,72 @@ test('API Server Suite', async (t) => {
     });
     assert.equal(solRes.status, 200);
     assert.ok(solRes.body.contractCode.includes('contract DocuTrustEnterpriseRegistry'));
+  });
+
+  await t.test('44. POST /api/v1/ringsig/sign and verify (Linkable Ring Signatures)', async () => {
+    const k1 = classicalKeys;
+    const k2 = (await makeRequest('POST', '/api/v1/keys/generate')).body.keyPair;
+    const k3 = (await makeRequest('POST', '/api/v1/keys/generate')).body.keyPair;
+
+    const ring = [k1.publicKeyHex, k2.publicKeyHex, k3.publicKeyHex];
+    const message = { ballot: 'ELECTION_PRESIDENCY_V10', choice: 'CANDIDATE_A' };
+
+    const signRes = await makeRequest('POST', '/api/v1/ringsig/sign', {
+      message,
+      ring,
+      signerPrivateKeyHex: k2.privateKeyHex,
+      signerPublicKeyHex: k2.publicKeyHex
+    });
+    assert.equal(signRes.status, 200);
+    assert.equal(signRes.body.success, true);
+    assert.ok(signRes.body.signature.keyImage);
+    assert.equal(signRes.body.signature.ring.length, 3);
+
+    const verifyRes = await makeRequest('POST', '/api/v1/ringsig/verify', {
+      message,
+      signature: signRes.body.signature
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.valid, true);
+    assert.equal(verifyRes.body.isDoubleAction, false);
+  });
+
+  await t.test('45. POST /api/v1/smt/set, prove, and verify (256-bit Sparse Merkle Trees)', async () => {
+    const setRes = await makeRequest('POST', '/api/v1/smt/set', {
+      key: 'did:key:alice_10',
+      value: 'ACTIVE_SECURITY_CLEARANCE'
+    });
+    assert.equal(setRes.status, 200);
+    assert.equal(setRes.body.success, true);
+    assert.ok(setRes.body.root);
+
+    const entries = {};
+    entries[setRes.body.key] = setRes.body.value;
+
+    const proveRes = await makeRequest('POST', '/api/v1/smt/prove', {
+      key: 'did:key:alice_10',
+      entries
+    });
+    assert.equal(proveRes.status, 200);
+    assert.equal(proveRes.body.success, true);
+    assert.equal(proveRes.body.proof.exists, true);
+
+    const verifyRes = await makeRequest('POST', '/api/v1/smt/verify', {
+      proof: proveRes.body.proof,
+      root: setRes.body.root
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.valid, true);
+  });
+
+  await t.test('46. POST /api/v1/solidity/export-smt generates DocuTrustSMTVerifier.sol', async () => {
+    const res = await makeRequest('POST', '/api/v1/solidity/export-smt', {
+      contractName: 'DocuTrustSMTVerifier'
+    });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
+    assert.ok(res.body.contractCode.includes('contract DocuTrustSMTVerifier'));
+    assert.ok(res.body.contractCode.includes('verifySMTProof'));
   });
 });
 

@@ -544,9 +544,22 @@ export class DIDResolver {
   }
 
   /**
-   * Encodes a JSON Web Key (JWK) into a canonical did:jwk identifier.
+   * Encodes a JSON Web Key (JWK) or raw public key hex into a canonical did:jwk identifier.
    */
-  public static encodeDidJwk(jwk: Record<string, any>): string {
+  public static encodeDidJwk(jwkOrHex: Record<string, any> | string): string {
+    let jwk: Record<string, any>;
+    if (typeof jwkOrHex === 'string') {
+      const cleanHex = jwkOrHex.replace(/^0x/, '');
+      const b64url = Buffer.from(cleanHex, 'hex').toString('base64url');
+      jwk = {
+        kty: 'OKP',
+        crv: 'Ed25519',
+        x: b64url
+      };
+    } else {
+      jwk = { ...jwkOrHex };
+    }
+
     const sanitizedJwk: Record<string, any> = { ...jwk };
     delete sanitizedJwk.d; // Ensure private key material is never encoded
     delete sanitizedJwk.p;
@@ -568,8 +581,8 @@ export class DIDResolver {
   }
 }
 
-export function createDidJwk(jwk: Record<string, any>): string {
-  return DIDResolver.encodeDidJwk(jwk);
+export function createDidJwk(jwkOrHex: Record<string, any> | string): string {
+  return DIDResolver.encodeDidJwk(jwkOrHex);
 }
 
 export function createDidPeer0(publicKeyHex: string): string {

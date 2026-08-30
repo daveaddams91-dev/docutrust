@@ -1,13 +1,14 @@
 /**
  * @file packages/core/src/policy/index.ts
- * @description Sovereign Policy-as-Proof & Governance Rule Engine (DocuTrust v9.0.0)
+ * @description Sovereign Policy-as-Proof & Governance Rule Engine (DocuTrust v10.0.0)
  * Evaluates verifiable presentation claims, credential subjects, and zero-knowledge assertions
- * against AST-based logical constraint trees (AND, OR, NOT, GTE, LTE, EQ, NEQ, IN, CONTAINS, REGEX),
- * emitting cryptographically signed execution receipts.
+ * against AST-based logical constraint trees (AND, OR, NOT, GTE, LTE, EQ, NEQ, IN, CONTAINS, REGEX,
+ * VALID_BETWEEN, EPOCH_WITHIN, ALL_OF, ANY_OF, NONE_OF, TYPE_IS), emitting cryptographically signed execution receipts.
  */
 
 import * as crypto from 'crypto';
-import { sha256Hex, canonicalizeJson, signData, verifySignature, KeyPair } from '../crypto/index.js';
+import { sha256Hex, canonicalizeJson, signData, verifySignature, KeyPair, decodeBase58 } from '../crypto/index.js';
+import { DIDResolver } from '../did/index.js';
 
 export type PolicyOperator =
   | 'and'
@@ -24,13 +25,20 @@ export type PolicyOperator =
   | 'contains'
   | 'regex'
   | 'exists'
-  | 'not_exists';
+  | 'not_exists'
+  | 'valid_between'
+  | 'epoch_within'
+  | 'all_of'
+  | 'any_of'
+  | 'none_of'
+  | 'type_is';
 
 export interface PolicyRuleCondition {
   field?: string; // Dot-separated path in credential, e.g. "credentialSubject.age" or "issuer.id"
   operator: PolicyOperator;
-  value?: any; // Expected value or threshold or array for "in"
-  conditions?: PolicyRuleCondition[]; // Child conditions for composite operators (and, or, not)
+  value?: any; // Expected value, range [min, max], or threshold
+  conditions?: PolicyRuleCondition[]; // Child conditions for composite operators (and, or, not, all_of, any_of)
+  itemCondition?: PolicyRuleCondition; // For all_of, any_of array item evaluations
   description?: string;
 }
 
@@ -147,7 +155,7 @@ export class PolicyEngine {
     }
 
     // 4. Recursively evaluate condition AST
-    const traces = this.evaluateCondition(payload, policy.condition);
+    const traces = this.evaluateCondition(payload, policy.condition, evaluationTime);
     if (!traces.passed) {
       if (traces.reason) errors.push(traces.reason);
     }
@@ -213,13 +221,23 @@ export class PolicyEngine {
     const digest = sha256Hex(canonicalizeJson(unsigned));
 
     let pubHex = expectedEvaluatorPublicKeyHex;
-    if (!pubHex && receipt.evaluatorDid?.startsWith('did:key:')) {
-      try {
-        const { decodeBase58 } = require('../crypto/index.js');
-        const cleanDid = receipt.evaluatorDid.split('#')[0];
-        const raw = decodeBase58(cleanDid.replace('did:key:z', ''));
-        pubHex = raw.subarray(2).toString('hex');
-      } catch (_) {}
+    if (!pubHex && receipt.evaluatorDid) {
+      const cleanDid = receipt.evaluatorDid.split('#')[0];
+      if (cleanDid.startsWith('did:key:z')) {
+        try {
+          const raw = decodeBase58(cleanDid.replace('did:key:z', ''));
+          pubHex = raw.subarray(2).toString('hex');
+        } catch (_) {}
+      } else if (cleanDid.startsWith('did:peer:0z')) {
+        try {
+          const raw = decodeBase58(cleanDid.replace('did:peer:0z', ''));
+          pubHex = raw.subarray(2).toString('hex');
+        } catch (_) {}
+      }
+    }
+
+    if (!pubHex && receipt.evaluatorDid && /^[0-9a-fA-F]{64}$/.test(receipt.evaluatorDid)) {
+      pubHex = receipt.evaluatorDid;
     }
 
     if (!pubHex) return false;
@@ -227,11 +245,12 @@ export class PolicyEngine {
   }
 
   /**
-   * Resolves a nested field value by dot notation (e.g. "credentialSubject.scores.math").
+   * Resolves a nested field value by dot notation and array index notation (e.g. "credentialSubject.scores[0]").
    */
   public static resolveFieldValue(obj: any, path?: string): any {
     if (!path || !obj) return undefined;
-    const parts = path.split('.');
+    const normalized = path.replace(/\[(\w+)\]/g, '.$1');
+    const parts = normalized.split('.');
     let curr = obj;
     for (const part of parts) {
       if (curr === null || curr === undefined) return undefined;
@@ -243,7 +262,11 @@ export class PolicyEngine {
   /**
    * Evaluates an individual condition node against the payload.
    */
-  private static evaluateCondition(payload: Record<string, any>, condition: PolicyRuleCondition): ConditionEvaluationTrace {
+  private static evaluateCondition(
+    payload: Record<string, any>,
+    condition: PolicyRuleCondition,
+    referenceTime: Date = new Date()
+  ): ConditionEvaluationTrace {
     const op = condition.operator?.toLowerCase() as PolicyOperator;
 
     // Composite logic: AND
@@ -254,7 +277,7 @@ export class PolicyEngine {
       let failedReason: string | undefined;
 
       for (const cond of childConditions) {
-        const trace = this.evaluateCondition(payload, cond);
+        const trace = this.evaluateCondition(payload, cond, referenceTime);
         childrenTraces.push(trace);
         if (!trace.passed) {
           allPassed = false;
@@ -277,7 +300,7 @@ export class PolicyEngine {
       let anyPassed = false;
 
       for (const cond of childConditions) {
-        const trace = this.evaluateCondition(payload, cond);
+        const trace = this.evaluateCondition(payload, cond, referenceTime);
         childrenTraces.push(trace);
         if (trace.passed) anyPassed = true;
       }
@@ -296,7 +319,7 @@ export class PolicyEngine {
       if (!childCondition) {
         return { condition, passed: false, reason: 'NOT condition missing child condition.' };
       }
-      const childTrace = this.evaluateCondition(payload, childCondition);
+      const childTrace = this.evaluateCondition(payload, childCondition, referenceTime);
       return {
         condition,
         passed: !childTrace.passed,
@@ -429,6 +452,84 @@ export class PolicyEngine {
           actualValue: actual,
           passed,
           reason: passed ? undefined : `Field "${condition.field}" (${JSON.stringify(actual)}) does not match regex /${expected}/`
+        };
+      }
+      case 'valid_between': {
+        if (!actual || !Array.isArray(expected) || expected.length < 2) {
+          return { condition, actualValue: actual, passed: false, reason: `Invalid date bounds for valid_between on "${condition.field}"` };
+        }
+        const actTime = new Date(actual).getTime();
+        const startTime = new Date(expected[0]).getTime();
+        const endTime = new Date(expected[1]).getTime();
+        const passed = !isNaN(actTime) && actTime >= startTime && actTime <= endTime;
+        return {
+          condition,
+          actualValue: actual,
+          passed,
+          reason: passed ? undefined : `Field "${condition.field}" (${actual}) is outside window [${expected[0]}, ${expected[1]}]`
+        };
+      }
+      case 'epoch_within': {
+        if (!actual || typeof expected !== 'number') {
+          return { condition, actualValue: actual, passed: false, reason: `epoch_within requires date string and duration in seconds` };
+        }
+        const actTime = new Date(actual).getTime();
+        const diffSeconds = Math.abs(referenceTime.getTime() - actTime) / 1000;
+        const passed = diffSeconds <= expected;
+        return {
+          condition,
+          actualValue: actual,
+          passed,
+          reason: passed ? undefined : `Field "${condition.field}" timestamp is ${Math.round(diffSeconds)}s away, exceeding threshold (${expected}s)`
+        };
+      }
+      case 'type_is': {
+        let passed = false;
+        const expectedType = String(expected).toLowerCase();
+        if (expectedType === 'array') passed = Array.isArray(actual);
+        else if (expectedType === 'null') passed = actual === null;
+        else passed = typeof actual === expectedType;
+        return {
+          condition,
+          actualValue: actual,
+          passed,
+          reason: passed ? undefined : `Field "${condition.field}" has type "${Array.isArray(actual) ? 'array' : typeof actual}", expected "${expectedType}"`
+        };
+      }
+      case 'all_of': {
+        if (!Array.isArray(actual) || !condition.itemCondition) {
+          return { condition, actualValue: actual, passed: false, reason: `all_of requires array field and itemCondition` };
+        }
+        const passed = actual.every(item => this.evaluateCondition(item, condition.itemCondition!, referenceTime).passed);
+        return {
+          condition,
+          actualValue: actual,
+          passed,
+          reason: passed ? undefined : `Not all items in "${condition.field}" satisfied item condition.`
+        };
+      }
+      case 'any_of': {
+        if (!Array.isArray(actual) || !condition.itemCondition) {
+          return { condition, actualValue: actual, passed: false, reason: `any_of requires array field and itemCondition` };
+        }
+        const passed = actual.some(item => this.evaluateCondition(item, condition.itemCondition!, referenceTime).passed);
+        return {
+          condition,
+          actualValue: actual,
+          passed,
+          reason: passed ? undefined : `None of the items in "${condition.field}" satisfied item condition.`
+        };
+      }
+      case 'none_of': {
+        if (!Array.isArray(actual) || !condition.itemCondition) {
+          return { condition, actualValue: actual, passed: false, reason: `none_of requires array field and itemCondition` };
+        }
+        const passed = !actual.some(item => this.evaluateCondition(item, condition.itemCondition!, referenceTime).passed);
+        return {
+          condition,
+          actualValue: actual,
+          passed,
+          reason: passed ? undefined : `One or more items in "${condition.field}" unexpectedly matched item condition.`
         };
       }
       default:

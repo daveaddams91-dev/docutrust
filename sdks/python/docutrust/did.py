@@ -325,13 +325,25 @@ class DIDResolver:
         return peer_did
 
     @staticmethod
-    def encode_did_jwk(jwk: Dict[str, Any]) -> str:
-        """Encodes a JSON Web Key dictionary into a canonical did:jwk URI."""
+    def encode_did_jwk(jwk_or_hex: Union[Dict[str, Any], str]) -> str:
+        """Encodes a JSON Web Key dictionary or 64-char public key hex string into a canonical did:jwk URI."""
         import json, base64
-        clean_jwk = {k: v for k, v in jwk.items() if k not in ("d", "p", "q", "dp", "dq", "qi")}
-        raw_bytes = json.dumps(clean_jwk, separators=(',', ':')).encode("utf-8")
+        if isinstance(jwk_or_hex, str):
+            clean_hex = jwk_or_hex.replace("0x", "").strip()
+            raw_bytes = bytes.fromhex(clean_hex)
+            b64_x = base64.urlsafe_b64encode(raw_bytes).decode("ascii").rstrip("=")
+            jwk = {"kty": "OKP", "crv": "Ed25519", "x": b64_x}
+        else:
+            jwk = {k: v for k, v in jwk_or_hex.items() if k not in ("d", "p", "q", "dp", "dq", "qi")}
+
+        raw_bytes = json.dumps(jwk, separators=(',', ':')).encode("utf-8")
         b64url = base64.urlsafe_b64encode(raw_bytes).decode("ascii").rstrip("=")
         return f"did:jwk:{b64url}"
+
+    @staticmethod
+    def create_did_jwk(jwk_or_hex: Union[Dict[str, Any], str]) -> str:
+        """Creates a canonical did:jwk URI from a JWK dict or Ed25519 public key hex string."""
+        return DIDResolver.encode_did_jwk(jwk_or_hex)
 
     @staticmethod
     def decode_did_jwk(did: str) -> Dict[str, Any]:
@@ -344,5 +356,7 @@ class DIDResolver:
 create_did_peer_0 = DIDResolver.create_did_peer_0
 create_did_peer_2 = DIDResolver.create_did_peer_2
 encode_did_jwk = DIDResolver.encode_did_jwk
+create_did_jwk = DIDResolver.create_did_jwk
 decode_did_jwk = DIDResolver.decode_did_jwk
+
 

@@ -213,7 +213,15 @@ const command = args[0];
 
 function printHelp() {
   console.log(`
-\x1b[1m\x1b[36m🛡️ DocuTrust CLI v9.0.0\x1b[0m — Sovereign Trust Mesh & Post-Quantum Governance
+\x1b[1m\x1b[36m🛡️ DocuTrust CLI v10.0.0\x1b[0m — Sovereign Trust Mesh, Sparse Merkle Trees & Linkable Ring Signatures
+
+\x1b[1mLINKABLE RING SIGNATURES (LSAG) & KEY TRANSPARENCY SMT (v10.0.0):\x1b[0m
+  \x1b[32mringsig-sign\x1b[0m --msg <f|txt> --ring <p1,p2..> --key <priv> [--pub <pub>] [--out <f>] 1-of-N anonymous signature
+  \x1b[32mringsig-verify\x1b[0m --msg <f|txt> --sig <sig.json> [--used-tags <t1,t2..>] Verify LSAG ring proof & double-action
+  \x1b[32msmt-set\x1b[0m --key <k> --val <v> [--state <f>] [--out <f>] Update 256-bit Sparse Merkle Tree leaf
+  \x1b[32msmt-prove\x1b[0m --key <k> [--state <f>] [--out <f>] Generate SMT inclusion / non-membership proof
+  \x1b[32msmt-verify\x1b[0m --proof <proof.json> [--root <hex>] Verify SMT audit proof against root
+  \x1b[32msolidity-export-smt\x1b[0m [--name <str>] [--out <f>] Generate DocuTrustSMTVerifier.sol EVM smart contract
 
 \x1b[1mSOVEREIGN POLICY-AS-PROOF & PEER DIDS (RFC 0627):\x1b[0m
   \x1b[32mpolicy-evaluate\x1b[0m --payload <f> --policy <f> [--key <k>] [--out <f>] Evaluate VC against Policy AST & emit signed receipt
@@ -409,6 +417,11 @@ async function runDemoWizard() {
 }
 
 async function main() {
+  if (command === 'version' || command === '--version' || command === '-v') {
+    console.log('10.0.0');
+    return;
+  }
+
   if (!command || command === 'help' || command === '--help' || command === '-h') {
     printHelp();
     return;
@@ -2403,12 +2416,12 @@ async function main() {
   }
 
   if (command === 'quantum-armor-unseal') {
-    const envFile = getArgValue('--envelope') || getArgValue('--in') || getArgValue('-e') || getArgValue('-i');
+    const envFile = getArgValue('--armor') || getArgValue('--envelope') || getArgValue('--in') || getArgValue('-a') || getArgValue('-e') || getArgValue('-i');
     const privFile = getArgValue('--priv') || getArgValue('--key') || getArgValue('-k');
     const outFile = getArgValue('--out') || getArgValue('-o') || 'unsealed-vc.json';
 
     if (!envFile || !privFile) {
-      console.error('\x1b[31mError:\x1b[0m Missing --envelope/--in <envelope.json> or --priv/--key <dual-keys.json>');
+      console.error('\x1b[31mError:\x1b[0m Missing --armor/--envelope/--in <envelope.json> or --priv/--key <dual-keys.json>');
       process.exit(1);
     }
 
@@ -2592,7 +2605,7 @@ async function main() {
       process.exit(1);
     }
 
-    const doc = core.DIDResolver.resolve(did);
+    const doc = await core.DIDResolver.resolve(did);
     const result = { did, didDocument: doc };
 
     if (outFile) {
@@ -2601,6 +2614,198 @@ async function main() {
     } else {
       console.log(JSON.stringify(result, null, 2));
     }
+    return;
+  }
+
+  // ========================================================
+  // Linkable Ring Signatures (LSAG) Commands (DocuTrust v10)
+  // ========================================================
+  if (command === 'ringsig-sign') {
+    const msgInput = getArgValue('--msg') || getArgValue('-m');
+    const ringStr = getArgValue('--ring') || getArgValue('-r');
+    const privHex = getArgValue('--key') || getArgValue('-k');
+    const pubHex = getArgValue('--pub') || getArgValue('-p');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!msgInput || !ringStr || !privHex) {
+      console.error('\x1b[31mError:\x1b[0m Missing --msg <txt/file>, --ring <pub1,pub2..>, or --key <privHex>');
+      process.exit(1);
+    }
+
+    let message = msgInput;
+    if (fs.existsSync(msgInput)) {
+      try {
+        message = JSON.parse(fs.readFileSync(msgInput, 'utf-8'));
+      } catch (_) {
+        message = fs.readFileSync(msgInput, 'utf-8');
+      }
+    }
+
+    const ring = ringStr.split(',').map(s => s.trim());
+    let signerPub = pubHex;
+    if (!signerPub) {
+      // Derive or search
+      signerPub = ring[0];
+    }
+
+    const sig = core.RingSignatureEngine.sign({
+      message,
+      ring,
+      signerPrivateKeyHex: privHex,
+      signerPublicKeyHex: signerPub
+    });
+
+    if (outFile) {
+      safeWriteFileSync(outFile, JSON.stringify(sig, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Linkable Ring Signature generated and saved to \x1b[1m${outFile}\x1b[0m`);
+      console.log(`  Key Image Tag: \x1b[36m${sig.keyImage}\x1b[0m`);
+      console.log(`  Ring Size: ${sig.ring.length} participants`);
+    } else {
+      console.log(JSON.stringify(sig, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'ringsig-verify') {
+    const msgInput = getArgValue('--msg') || getArgValue('-m');
+    const sigFile = getArgValue('--sig') || getArgValue('-s');
+    const usedTagsStr = getArgValue('--used-tags') || getArgValue('-u');
+
+    if (!msgInput || !sigFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --msg <txt/file> or --sig <signature.json>');
+      process.exit(1);
+    }
+
+    let message = msgInput;
+    if (fs.existsSync(msgInput)) {
+      try {
+        message = JSON.parse(fs.readFileSync(msgInput, 'utf-8'));
+      } catch (_) {
+        message = fs.readFileSync(msgInput, 'utf-8');
+      }
+    }
+
+    const signature = JSON.parse(fs.readFileSync(sigFile, 'utf-8'));
+    const usedKeyImages = usedTagsStr ? usedTagsStr.split(',').map(s => s.trim()) : undefined;
+
+    const result = core.RingSignatureEngine.verify({
+      message,
+      signature,
+      usedKeyImages
+    });
+
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m Linkable Ring Signature is \x1b[1m\x1b[32mVALID & ANONYMOUS\x1b[0m`);
+      console.log(`  Ring Size: ${result.ringSize} participants`);
+      console.log(`  Key Image Tag: ${result.keyImage}`);
+      console.log(`  Double Action: ${result.isDoubleAction ? 'YES' : 'NO'}`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m Ring Signature Verification \x1b[1m\x1b[31mFAILED\x1b[0m: ${result.error || 'Invalid ring loop'}`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // ========================================================
+  // 256-bit Sparse Merkle Tree (SMT) Commands (DocuTrust v10)
+  // ========================================================
+  if (command === 'smt-set') {
+    const key = getArgValue('--key') || getArgValue('-k');
+    const val = getArgValue('--val') || getArgValue('-v');
+    const stateFile = getArgValue('--state') || getArgValue('-s') || 'smt-state.json';
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!key || val === null) {
+      console.error('\x1b[31mError:\x1b[0m Missing --key <hex/string> or --val <hex/string>');
+      process.exit(1);
+    }
+
+    const smt = new core.SparseMerkleTree(256);
+    let state = {};
+    if (fs.existsSync(stateFile)) {
+      try {
+        state = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
+        for (const [k, v] of Object.entries(state.leaves || {})) {
+          smt.set(k, v);
+        }
+      } catch (_) {}
+    }
+
+    const keyHex = key.length === 64 && /^[0-9a-fA-F]+$/.test(key) ? key : sha256Hex(key);
+    const valHex = val.length === 64 && /^[0-9a-fA-F]+$/.test(val) ? val : sha256Hex(val);
+
+    smt.set(keyHex, valHex);
+    state.leaves = state.leaves || {};
+    state.leaves[keyHex] = valHex;
+    state.root = smt.getRoot();
+
+    safeWriteFileSync(stateFile, JSON.stringify(state, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m SMT updated. New Root: \x1b[1m\x1b[32m${state.root}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'smt-prove') {
+    const key = getArgValue('--key') || getArgValue('-k');
+    const stateFile = getArgValue('--state') || getArgValue('-s') || 'smt-state.json';
+    const outFile = getArgValue('--out') || getArgValue('-o') || 'smt-proof.json';
+
+    if (!key) {
+      console.error('\x1b[31mError:\x1b[0m Missing --key <hex/string>');
+      process.exit(1);
+    }
+
+    const smt = new core.SparseMerkleTree(256);
+    if (fs.existsSync(stateFile)) {
+      try {
+        const state = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
+        for (const [k, v] of Object.entries(state.leaves || {})) {
+          smt.set(k, v);
+        }
+      } catch (_) {}
+    }
+
+    const keyHex = key.length === 64 && /^[0-9a-fA-F]+$/.test(key) ? key : sha256Hex(key);
+    const proof = smt.prove(keyHex);
+
+    safeWriteFileSync(outFile, JSON.stringify(proof, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m SMT ${proof.exists ? 'Inclusion' : 'Non-Membership'} proof saved to \x1b[1m${outFile}\x1b[0m`);
+    console.log(`  Root: ${proof.root}`);
+    console.log(`  Exists: ${proof.exists}`);
+    return;
+  }
+
+  if (command === 'smt-verify') {
+    const proofFile = getArgValue('--proof') || getArgValue('-p');
+    const rootHex = getArgValue('--root') || getArgValue('-r');
+
+    if (!proofFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --proof <proof.json>');
+      process.exit(1);
+    }
+
+    const proof = JSON.parse(fs.readFileSync(proofFile, 'utf-8'));
+    const valid = core.SparseMerkleTree.verifyProof(proof, rootHex || undefined);
+
+    if (valid) {
+      console.log(`\x1b[32m✔\x1b[0m SMT Proof is \x1b[1m\x1b[32mCRYPTOGRAPHICALLY VALID\x1b[0m`);
+      console.log(`  Audit Status: ${proof.exists ? 'INCLUDED' : 'NON-MEMBER (DOES NOT EXIST)'}`);
+      console.log(`  Key: ${proof.key}`);
+      console.log(`  Root: ${proof.root}`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m SMT Proof verification \x1b[1m\x1b[31mFAILED\x1b[0m`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  if (command === 'solidity-export-smt') {
+    const name = getArgValue('--name') || getArgValue('-n') || 'DocuTrustSMTVerifier';
+    const version = getArgValue('--solc') || '^0.8.24';
+    const outFile = getArgValue('--out') || getArgValue('-o') || `${name}.sol`;
+
+    const code = core.generateSMTVerifierContract({ contractName: name, solidityVersion: version });
+    safeWriteFileSync(outFile, code);
+    console.log(`\x1b[32m✔\x1b[0m Solidity SMT Verifier smart contract exported to \x1b[1m${outFile}\x1b[0m`);
     return;
   }
 

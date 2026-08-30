@@ -143,7 +143,10 @@ const {
   createDidPeer0,
   createDidPeer2,
   PolicyEngine,
-  BitstringStatusListAggregator
+  BitstringStatusListAggregator,
+  RingSignatureEngine,
+  SparseMerkleTree,
+  generateSMTVerifierContract
 } = require('../dist/index.js');
 
 // 1. Cryptography Tests
@@ -2526,5 +2529,171 @@ test('72. BadgeEngine: render obsidian-noir and royal-amethyst themes with valid
   const verifyAmethyst = await BadgeEngine.verifyBadgeSvg(svgAmethyst);
   assert.equal(verifyAmethyst.valid, true);
 });
+
+// 73. Cryptographic Linkable Ring Signatures (LSAG) (DocuTrust v10.0.0)
+test('73. Linkable Ring Signatures (LSAG): 1-of-N anonymous signing, key image linkability, and loop verification', () => {
+  // Generate 4 keypairs for the ring
+  const kp1 = generateKeyPair();
+  const kp2 = generateKeyPair();
+  const kp3 = generateKeyPair();
+  const kp4 = generateKeyPair();
+
+  const ring = [kp1.publicKeyHex, kp2.publicKeyHex, kp3.publicKeyHex, kp4.publicKeyHex];
+  const payload = { vote: 'PROPOSAL_DAO_UPGRADE_10', ballotId: 'urn:uuid:ballot-2026-99' };
+
+  // Signer 3 (kp3) signs anonymously on behalf of the 4-member ring
+  const sig = RingSignatureEngine.sign({
+    message: payload,
+    ring,
+    signerPrivateKeyHex: kp3.privateKeyHex,
+    signerPublicKeyHex: kp3.publicKeyHex
+  });
+
+  assert.equal(sig.type, 'DocuTrustLinkableRingSignature2026');
+  assert.equal(sig.ring.length, 4);
+  assert.equal(sig.responses.length, 4);
+  assert.ok(sig.keyImage.length === 64);
+
+  // Verification succeeds without revealing signer index
+  const verifyResult = RingSignatureEngine.verify({
+    message: payload,
+    signature: sig
+  });
+  assert.equal(verifyResult.valid, true);
+  assert.equal(verifyResult.ringSize, 4);
+  assert.equal(verifyResult.isDoubleAction, false);
+
+  // Key image double-action check
+  const usedKeyImages = new Set([sig.keyImage]);
+  const doubleActionResult = RingSignatureEngine.verify({
+    message: payload,
+    signature: sig,
+    usedKeyImages
+  });
+  assert.equal(doubleActionResult.valid, false);
+  assert.equal(doubleActionResult.isDoubleAction, true);
+});
+
+// 74. 256-bit Sparse Merkle Tree (SMT) Key Transparency & Revocation
+test('74. Sparse Merkle Tree (SMT): inclusion proofs, non-membership proofs, and audit verification', () => {
+  const smt = new SparseMerkleTree(256);
+
+  const key1 = sha256Hex('did:key:alice_key_v1');
+  const val1 = sha256Hex('STATUS_ACTIVE_2026');
+  const key2 = sha256Hex('did:key:bob_key_v1');
+  const val2 = sha256Hex('STATUS_REVOKED_2026');
+  const uninsertedKey = sha256Hex('did:key:charlie_unregistered');
+
+  smt.set(key1, val1);
+  smt.set(key2, val2);
+
+  const root = smt.getRoot();
+  assert.ok(typeof root === 'string' && root.length === 64);
+  assert.equal(smt.get(key1), val1);
+  assert.equal(smt.get(key2), val2);
+  assert.equal(smt.get(uninsertedKey), null);
+
+  // Inclusion Proof for Key 1
+  const proof1 = smt.prove(key1);
+  assert.equal(proof1.exists, true);
+  assert.equal(proof1.value, val1);
+  const isValid1 = SparseMerkleTree.verifyProof(proof1, root);
+  assert.equal(isValid1, true);
+
+  // Non-Membership Proof for uninserted key
+  const proofNonMember = smt.prove(uninsertedKey);
+  assert.equal(proofNonMember.exists, false);
+  const isValidNonMember = SparseMerkleTree.verifyProof(proofNonMember, root);
+  assert.equal(isValidNonMember, true);
+});
+
+// 75. Extended Sovereign Policy Engine (Temporal Windows & Array Quantifiers)
+test('75. PolicyEngine: evaluate valid_between, epoch_within, type_is, and array quantifiers (all_of, any_of)', () => {
+  const credential = {
+    '@context': ['https://www.w3.org/ns/credentials/v2'],
+    id: 'urn:uuid:test-temporal-cred',
+    type: ['VerifiableCredential', 'AuditReportCredential'],
+    validFrom: '2026-06-15T12:00:00Z',
+    credentialSubject: {
+      id: 'did:key:z6MkuSubject',
+      auditScore: 95,
+      findings: [
+        { severity: 'low', resolved: true },
+        { severity: 'info', resolved: true }
+      ],
+      complianceTags: ['GDPR', 'SOC2', 'ISO27001']
+    }
+  };
+
+  const policy = {
+    id: 'policy:temporal-audit-v10',
+    name: 'Advanced Temporal & Array Audit Policy',
+    version: '10.0.0',
+    condition: {
+      operator: 'and',
+      conditions: [
+        {
+          field: 'validFrom',
+          operator: 'valid_between',
+          value: ['2026-01-01T00:00:00Z', '2026-12-31T23:59:59Z']
+        },
+        {
+          field: 'credentialSubject.auditScore',
+          operator: 'type_is',
+          value: 'number'
+        },
+        {
+          field: 'credentialSubject.findings',
+          operator: 'all_of',
+          itemCondition: {
+            field: 'resolved',
+            operator: 'eq',
+            value: true
+          }
+        },
+        {
+          field: 'credentialSubject.complianceTags',
+          operator: 'contains',
+          value: 'SOC2'
+        }
+      ]
+    }
+  };
+
+  const result = PolicyEngine.evaluate(credential, policy);
+  assert.equal(result.passed, true);
+  assert.equal(result.errors.length, 0);
+});
+
+// 76. EVM Solidity SMT Verifier Smart Contract Generator
+test('76. SolidityEngine: generateSMTVerifierContract emits DocuTrustSMTVerifier.sol', () => {
+  const code = generateSMTVerifierContract({
+    contractName: 'DocuTrustEnterpriseSMT',
+    solidityVersion: '^0.8.24'
+  });
+
+  assert.ok(code.includes('contract DocuTrustEnterpriseSMT'));
+  assert.ok(code.includes('computeLeafHash'));
+  assert.ok(code.includes('verifySMTProof'));
+  assert.ok(code.includes('SMTProofVerified'));
+});
+
+// 77. Native Universal DID Verification in verifySignature (did:peer:0 and did:jwk)
+test('77. verifySignature: native public key parsing for did:peer:0 and did:jwk', () => {
+  const kp = generateKeyPair();
+  const message = 'DocuTrust Universal Verification 2026';
+  const sig = signData(message, kp);
+
+  // did:peer:0 verification
+  const peer0 = createDidPeer0(kp.publicKeyHex);
+  const isPeer0Valid = verifySignature(message, sig, peer0);
+  assert.equal(isPeer0Valid, true);
+
+  // did:jwk verification
+  const jwk = createDidJwk(kp.publicKeyHex);
+  const isJwkValid = verifySignature(message, sig, jwk);
+  assert.equal(isJwkValid, true);
+});
+
 
 

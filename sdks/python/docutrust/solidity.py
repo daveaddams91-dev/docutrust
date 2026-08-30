@@ -273,3 +273,53 @@ contract {contract_name} {{
             current = hashlib.sha256(combined).digest()
 
         return current.hex().lower() == root_hex.replace("0x", "").lower()
+
+    @staticmethod
+    def generate_smt_verifier_contract(
+        contract_name: str = "DocuTrustSMTVerifier",
+        solidity_version: str = "^0.8.20"
+    ) -> str:
+        """Generates production-ready Solidity contract code for verifying 256-bit Sparse Merkle Trees on-chain."""
+        return f"""// SPDX-License-Identifier: Apache-2.0
+pragma solidity {solidity_version};
+
+/**
+ * @title {contract_name}
+ * @author DocuTrust Sovereign Trust Engine v10.0.0
+ * @notice Verifies 256-bit Sparse Merkle Tree (SMT) inclusion and non-membership proofs on-chain.
+ */
+contract {contract_name} {{
+    event SMTVerified(bytes32 indexed root, bytes32 indexed key, bytes32 indexed value, bool exists);
+
+    function verifySMTProof(
+        bytes32 key,
+        bytes32 value,
+        bytes32 root,
+        bytes32[] calldata sideNodes,
+        uint256 depth
+    ) public pure returns (bool) {{
+        require(depth <= 256, "DocuTrust: depth out of bounds");
+        require(sideNodes.length == depth, "DocuTrust: side nodes mismatch depth");
+
+        bytes32 current = value == bytes32(0) ? bytes32(0) : sha256(abi.encodePacked(bytes1(0x00), key, value));
+
+        for (uint256 i = 0; i < depth; i++) {{
+            bytes32 sibling = sideNodes[i];
+            uint256 bit = (uint256(key) >> (255 - i)) & 1;
+
+            if (current == bytes32(0) && sibling == bytes32(0)) {{
+                current = bytes32(0);
+            }} else {{
+                if (bit == 1) {{
+                    current = sha256(abi.encodePacked(bytes1(0x01), sibling, current));
+                }} else {{
+                    current = sha256(abi.encodePacked(bytes1(0x01), current, sibling));
+                }}
+            }}
+        }}
+
+        return current == root;
+    }}
+}}
+"""
+

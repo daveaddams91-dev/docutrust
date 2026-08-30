@@ -1265,6 +1265,112 @@ class TestDocuTrustPython(unittest.TestCase):
         self.assertIn("#2e1065", svg_amethyst)
         self.assertTrue(BadgeEngine.verify_badge_svg(svg_amethyst)["valid"])
 
+    def test_linkable_ring_signature_lsag(self):
+        from docutrust.ringsig import RingSignatureEngine
+        from docutrust.crypto import generate_keypair
+
+        k1 = generate_keypair()
+        k2 = generate_keypair()
+        k3 = generate_keypair()
+
+        ring = [k1["publicKeyHex"], k2["publicKeyHex"], k3["publicKeyHex"]]
+        msg = {"action": "BALLOT_VOTE_PROPOSAL_10", "vote": "YES"}
+
+        sig = RingSignatureEngine.sign(
+            message=msg,
+            ring=ring,
+            signer_private_key_hex=k2["privateKeyHex"],
+            signer_public_key_hex=k2["publicKeyHex"]
+        )
+        self.assertEqual(sig["type"], "DocuTrustLinkableRingSignature2026")
+        self.assertEqual(len(sig["ring"]), 3)
+        self.assertEqual(len(sig["keyImage"]), 64)
+
+        # Verification
+        audit = RingSignatureEngine.verify(message=msg, signature=sig)
+        self.assertTrue(audit["valid"])
+        self.assertFalse(audit["isDoubleAction"])
+
+        # Double-voting detection
+        audit_used = RingSignatureEngine.verify(message=msg, signature=sig, used_key_images=[sig["keyImage"]])
+        self.assertFalse(audit_used["valid"])
+        self.assertTrue(audit_used["isDoubleAction"])
+
+    def test_sparse_merkle_tree_smt(self):
+        from docutrust.smt import SparseMerkleTree
+
+        smt = SparseMerkleTree(256)
+        smt.set("did:key:alice_10", "VALID_CERTIFICATE_HASH_123")
+        smt.set("did:key:bob_10", "REVOKED_STATUS_456")
+
+        root = smt.get_root()
+        self.assertEqual(len(root), 64)
+
+        # Proof of inclusion
+        proof_alice = smt.prove("did:key:alice_10")
+        self.assertTrue(proof_alice["exists"])
+        self.assertTrue(SparseMerkleTree.verify_proof(proof_alice, root))
+
+        # Proof of non-membership
+        proof_charlie = smt.prove("did:key:charlie_nonexistent")
+        self.assertFalse(proof_charlie["exists"])
+        self.assertTrue(SparseMerkleTree.verify_proof(proof_charlie, root))
+
+    def test_policy_engine_v10_operators(self):
+        from docutrust.policy import PolicyEngine
+
+        cred = {
+            "type": ["VerifiableCredential", "SecurityClearance"],
+            "credentialSubject": {
+                "roles": ["admin", "auditor"],
+                "securityLevel": 4,
+                "createdDate": "2026-08-30T12:00:00Z"
+            }
+        }
+
+        # Array indexing path test
+        pol_bracket = {
+            "id": "pol-bracket",
+            "condition": {
+                "operator": "eq",
+                "field": "credentialSubject.roles[0]",
+                "value": "admin"
+            }
+        }
+        res_bracket = PolicyEngine.evaluate(cred, pol_bracket)
+        self.assertTrue(res_bracket["passed"])
+
+        # all_of & valid_between
+        pol_combo = {
+            "id": "pol-combo",
+            "condition": {
+                "operator": "and",
+                "conditions": [
+                    {
+                        "operator": "all_of",
+                        "field": "credentialSubject.roles",
+                        "value": ["admin", "auditor"]
+                    },
+                    {
+                        "operator": "valid_between",
+                        "field": "credentialSubject.securityLevel",
+                        "min": 1,
+                        "max": 5
+                    }
+                ]
+            }
+        }
+        res_combo = PolicyEngine.evaluate(cred, pol_combo)
+        self.assertTrue(res_combo["passed"])
+
+    def test_solidity_smt_verifier_generation(self):
+        from docutrust.solidity import SolidityEngine
+
+        code = SolidityEngine.generate_smt_verifier_contract(contract_name="DocuTrustSMTVerifier")
+        self.assertIn("contract DocuTrustSMTVerifier", code)
+        self.assertIn("verifySMTProof", code)
+
 if __name__ == '__main__':
     unittest.main()
+
 

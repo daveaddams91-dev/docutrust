@@ -54,9 +54,11 @@ from .trustchain import TrustChainEngine
 from .quantum_armor import DualHybridKEMEngine
 from .badge import BadgeEngine
 from .policy import PolicyEngine
-from .did import create_did_peer_0, create_did_peer_2
+from .did import create_did_peer_0, create_did_peer_2, create_did_jwk, encode_did_jwk, decode_did_jwk
+from .ringsig import RingSignatureEngine
+from .smt import SparseMerkleTree
 
-__version__ = "9.0.0"
+__version__ = "10.0.0"
 __all__ = [
     "DocuTrustClient",
     "canonicalize_json",
@@ -112,6 +114,9 @@ __all__ = [
     "DIDResolver",
     "create_did_peer_0",
     "create_did_peer_2",
+    "create_did_jwk",
+    "encode_did_jwk",
+    "decode_did_jwk",
     "AnonCredsEngine",
     "DKGEngine",
     "SolidityEngine",
@@ -123,5 +128,8 @@ __all__ = [
     "TrustChainEngine",
     "DualHybridKEMEngine",
     "BadgeEngine",
-    "PolicyEngine"
+    "PolicyEngine",
+    "RingSignatureEngine",
+    "SparseMerkleTree"
 ]
+

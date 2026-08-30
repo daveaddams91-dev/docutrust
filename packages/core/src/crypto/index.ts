@@ -196,6 +196,25 @@ export function verifySignature(
       const spkiHeader = Buffer.from('302a300506032b6570032100', 'hex');
       const fullDer = Buffer.concat([spkiHeader, rawClassicalPub]);
       keyObject = crypto.createPublicKey({ key: fullDer, format: 'der', type: 'spki' });
+    } else if (typeof publicKey === 'string' && publicKey.startsWith('did:peer:0z')) {
+      const multibase = publicKey.replace('did:peer:0z', '').split('#')[0];
+      const decoded = decodeBase58(multibase);
+      const rawPub = decoded.subarray(2, 34);
+      const spkiHeader = Buffer.from('302a300506032b6570032100', 'hex');
+      const fullDer = Buffer.concat([spkiHeader, rawPub]);
+      keyObject = crypto.createPublicKey({ key: fullDer, format: 'der', type: 'spki' });
+    } else if (typeof publicKey === 'string' && publicKey.startsWith('did:jwk:')) {
+      const b64 = publicKey.replace('did:jwk:', '').split('#')[0];
+      const jwkJson = Buffer.from(b64, 'base64url').toString('utf-8');
+      const jwk = JSON.parse(jwkJson);
+      if (jwk.kty === 'OKP' && jwk.crv === 'Ed25519' && jwk.x) {
+        const rawPub = Buffer.from(jwk.x, 'base64url');
+        const spkiHeader = Buffer.from('302a300506032b6570032100', 'hex');
+        const fullDer = Buffer.concat([spkiHeader, rawPub]);
+        keyObject = crypto.createPublicKey({ key: fullDer, format: 'der', type: 'spki' });
+      } else {
+        throw new Error('Unsupported JWK format for Ed25519.');
+      }
     } else if (typeof publicKey === 'string' && /^[0-9a-fA-F]{64}$/.test(publicKey)) {
       const spkiHeader = Buffer.from('302a300506032b6570032100', 'hex');
       const fullDer = Buffer.concat([spkiHeader, Buffer.from(publicKey, 'hex')]);

@@ -799,6 +799,62 @@ test('CLI Suite', async (t) => {
     const aggOut = execSync(`node "${cliPath}" statuslist-aggregate-check --root "${expectedRoot}" --lists "${slPart1File},${slPart2File}"`).toString();
     assert.ok(aggOut.includes('Status List Multi-Partition Root matches'));
   });
+
+  await t.test('29. docutrust version displays v10.0.0', () => {
+    const out1 = execSync(`node "${cliPath}" version`).toString().trim();
+    assert.equal(out1, '10.0.0');
+
+    const out2 = execSync(`node "${cliPath}" --version`).toString().trim();
+    assert.equal(out2, '10.0.0');
+
+    const out3 = execSync(`node "${cliPath}" -v`).toString().trim();
+    assert.equal(out3, '10.0.0');
+  });
+
+  await t.test('30. docutrust ringsig-sign and ringsig-verify (Linkable Ring Signatures)', () => {
+    const kp1 = core.generateKeyPair();
+    const kp2 = core.generateKeyPair();
+    const kp3 = core.generateKeyPair();
+
+    const ringList = `${kp1.publicKeyHex},${kp2.publicKeyHex},${kp3.publicKeyHex}`;
+    const voteMsg = 'PROPOSAL_GLOBAL_PRIVACY_V10';
+    const sigOut = path.join(tempDir, 'ringsig.json');
+
+    const signOut = execSync(`node "${cliPath}" ringsig-sign --msg "${voteMsg}" --ring "${ringList}" --key "${kp2.privateKeyHex}" --pub "${kp2.publicKeyHex}" --out "${sigOut}"`).toString();
+    assert.ok(signOut.includes('Linkable Ring Signature generated'));
+    assert.ok(fs.existsSync(sigOut));
+
+    const verifyOut = execSync(`node "${cliPath}" ringsig-verify --msg "${voteMsg}" --sig "${sigOut}"`).toString();
+    assert.ok(verifyOut.includes('VALID & ANONYMOUS'));
+    assert.ok(verifyOut.includes('Ring Size: 3 participants'));
+  });
+
+  await t.test('31. docutrust smt-set, smt-prove, smt-verify (256-bit Sparse Merkle Trees)', () => {
+    const stateFile = path.join(tempDir, 'smt-test-state.json');
+    const proofFile = path.join(tempDir, 'smt-test-proof.json');
+
+    const setOut = execSync(`node "${cliPath}" smt-set --key "did:key:alice_10" --val "ACTIVE_STATUS" --state "${stateFile}"`).toString();
+    assert.ok(setOut.includes('SMT updated. New Root:'));
+
+    const proveOut = execSync(`node "${cliPath}" smt-prove --key "did:key:alice_10" --state "${stateFile}" --out "${proofFile}"`).toString();
+    assert.ok(proveOut.includes('SMT Inclusion proof saved'));
+    assert.ok(fs.existsSync(proofFile));
+
+    const verifyOut = execSync(`node "${cliPath}" smt-verify --proof "${proofFile}"`).toString();
+    assert.ok(verifyOut.includes('CRYPTOGRAPHICALLY VALID'));
+    assert.ok(verifyOut.includes('INCLUDED'));
+  });
+
+  await t.test('32. docutrust solidity-export-smt generates DocuTrustSMTVerifier.sol', () => {
+    const smtSolFile = path.join(tempDir, 'DocuTrustSMTVerifier.sol');
+    const out = execSync(`node "${cliPath}" solidity-export-smt --name DocuTrustSMTVerifier --out "${smtSolFile}"`).toString();
+    assert.ok(out.includes('Solidity SMT Verifier smart contract exported'));
+    assert.ok(fs.existsSync(smtSolFile));
+
+    const code = fs.readFileSync(smtSolFile, 'utf-8');
+    assert.ok(code.includes('contract DocuTrustSMTVerifier'));
+    assert.ok(code.includes('verifySMTProof'));
+  });
 });
 
 

@@ -84,7 +84,10 @@ const {
   BadgeEngine,
   PolicyEngine,
   BitstringStatusListAggregator,
-  generateRegistryContract
+  generateRegistryContract,
+  RingSignatureEngine,
+  SparseMerkleTree,
+  generateSMTVerifierContract
 } = require('@docutrust/core');
 
 const PORT = process.env.PORT || 4000;
@@ -181,7 +184,7 @@ const server = http.createServer(async (req, res) => {
       return jsonResponse(200, {
         status: 'healthy',
         service: 'DocuTrust Sovereign Verifiable Credentials Engine',
-        version: '9.0.0',
+        version: '10.0.0',
         features: [
           'W3C VC 2.0',
           'DID Key Ed25519',
@@ -195,7 +198,10 @@ const server = http.createServer(async (req, res) => {
           'RSA Accumulator Non-Membership Witnesses',
           'Recursive Zero-Knowledge Predicate Graphs',
           'M-of-N MultiSig Threshold Credentials',
-          'Universal DID Resolution'
+          'Universal DID Resolution',
+          'Linkable Ring Signatures (LSAG)',
+          '256-bit Sparse Merkle Trees (SMT)',
+          'Solidity SMT Verifier Generator'
         ],
         systemDid: systemKeyPair.did,
         uptime: process.uptime()
@@ -2116,6 +2122,113 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // ========================================================
+    // v10.0.0 Linkable Ring Signatures (LSAG) Endpoints
+    // ========================================================
+    if (pathname === '/api/v1/ringsig/sign' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { message, ring, signerPrivateKeyHex, signerPublicKeyHex } = body;
+      if (!message || !Array.isArray(ring) || ring.length < 2 || !signerPrivateKeyHex) {
+        return jsonResponse(400, { error: 'Missing message, ring (min 2 keys), or signerPrivateKeyHex.' });
+      }
+      try {
+        const signature = RingSignatureEngine.sign({
+          message,
+          ring,
+          signerPrivateKeyHex,
+          signerPublicKeyHex: signerPublicKeyHex || ring[0]
+        });
+        return jsonResponse(200, { success: true, signature });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/ringsig/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { message, signature, usedKeyImages } = body;
+      if (!message || !signature) {
+        return jsonResponse(400, { error: 'Missing message or signature object.' });
+      }
+      try {
+        const result = RingSignatureEngine.verify({
+          message,
+          signature,
+          usedKeyImages
+        });
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ========================================================
+    // v10.0.0 256-bit Sparse Merkle Tree (SMT) Endpoints
+    // ========================================================
+    if (pathname === '/api/v1/smt/set' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { key, value } = body;
+      if (!key || value === undefined) {
+        return jsonResponse(400, { error: 'Missing key or value.' });
+      }
+      try {
+        const smt = new SparseMerkleTree(256);
+        const keyHex = key.length === 64 && /^[0-9a-fA-F]+$/.test(key) ? key : sha256Hex(key);
+        const valHex = value.length === 64 && /^[0-9a-fA-F]+$/.test(value) ? value : sha256Hex(value);
+        smt.set(keyHex, valHex);
+        const root = smt.getRoot();
+        return jsonResponse(200, { success: true, key: keyHex, value: valHex, root });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/smt/prove' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { key, entries } = body;
+      if (!key) {
+        return jsonResponse(400, { error: 'Missing key.' });
+      }
+      try {
+        const smt = new SparseMerkleTree(256);
+        if (entries && typeof entries === 'object') {
+          for (const [k, v] of Object.entries(entries)) {
+            smt.set(k, v);
+          }
+        }
+        const keyHex = key.length === 64 && /^[0-9a-fA-F]+$/.test(key) ? key : sha256Hex(key);
+        const proof = smt.prove(keyHex);
+        return jsonResponse(200, { success: true, proof });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/smt/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { proof, root } = body;
+      if (!proof) {
+        return jsonResponse(400, { error: 'Missing proof object.' });
+      }
+      try {
+        const valid = SparseMerkleTree.verifyProof(proof, root || undefined);
+        return jsonResponse(200, { success: true, valid, root: root || proof.root, exists: proof.exists });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/solidity/export-smt' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { contractName = 'DocuTrustSMTVerifier', solidityVersion = '^0.8.24' } = body;
+      try {
+        const contractCode = generateSMTVerifierContract({ contractName, solidityVersion });
+        return jsonResponse(200, { success: true, contractCode, contractName, solidityVersion });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
     // Default 404
     jsonResponse(404, { error: 'Route not found' });
   } catch (err) {
@@ -2125,7 +2238,7 @@ const server = http.createServer(async (req, res) => {
 
 if (require.main === module) {
   server.listen(PORT, () => {
-    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v9.0.0 running on http://localhost:${PORT}`);
+    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v10.0.0 running on http://localhost:${PORT}`);
   });
 }
 

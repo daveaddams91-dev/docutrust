@@ -66,6 +66,27 @@ $$\text{Verification: } (d^x \cdot V^b) \equiv g \pmod N$$
 Hierarchical boolean DAGs (AND, OR, NOT, THRESHOLD) evaluated recursively over heterogeneous ZK atomic proofs (Range, Age, Date, Membership, Non-Membership, Set Intersection, Composite):
 $$\text{GraphRootHash} = \text{SHA-256}(\text{JCS}(\text{RootNode}))$$
 
+### 2.8 1-of-N Linkable Ring Signatures (LSAG) & Key Images
+Enables anonymous collective attestations and sovereign whistleblower disclosures across an $N$-member public key ring $\{P_0, P_1, \dots, P_{n-1}\}$ with signer index $\pi \in [0, n-1]$:
+1. Deterministic Key Image computation:
+$$I = \text{SHA-256}(\text{KEY\_IMAGE} \parallel \text{PrivateKey}_\pi \parallel P_\pi)$$
+2. Schnorr ring verification loop:
+$$c_{i+1} = \text{SHA-256}(\text{LSAG\_STEP} \parallel m \parallel L_i \parallel R_i) \pmod q$$
+$$L_i = s_i \cdot G + c_i \cdot P_i, \quad R_i = s_i \cdot H(P_i) + c_i \cdot I$$
+3. Ring closure verification:
+$$c_0 \stackrel{?}{=} \text{SHA-256}(\text{LSAG\_STEP} \parallel m \parallel L_{n-1} \parallel R_{n-1}) \pmod q$$
+Enforces single-action uniqueness in public ledgers without revealing $\pi$.
+
+### 2.9 256-Bit Sparse Merkle Trees (SMT) for Key Transparency
+Provides continuous, logarithmic $O(256)$ cryptographic inclusion and non-membership proofs over $2^{256}$ addressable state keys:
+1. Interior node hashing:
+$$\text{ParentHash} = \text{SHA-256}(\text{LeftChild} \parallel \text{RightChild})$$
+2. Leaf node hashing:
+$$\text{LeafHash} = \text{SHA-256}(\text{"SMT\_LEAF:"} \parallel \text{Key}_{256} \parallel \text{Value})$$
+3. Verification path: Given leaf key bits $b_0 b_1 \dots b_{255}$ and sibling hashes $S_0 \dots S_{255}$, iteratively reconstruct the root:
+$$H_{d} = \begin{cases} \text{SHA-256}(H_{d-1} \parallel S_{d-1}) & \text{if } b_{256-d} = 0 \\ \text{SHA-256}(S_{d-1} \parallel H_{d-1}) & \text{if } b_{256-d} = 1 \end{cases}$$
+Verified on-chain via `DocuTrustSMTVerifier.sol`.
+
 ---
 
 ## 3. Directory Layout

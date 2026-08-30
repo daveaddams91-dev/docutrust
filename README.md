@@ -2,26 +2,24 @@
 
 # 🛡️ DocuTrust
 
-### The Open-Source Sovereign Trust Fabric for Verifiable Credentials, Open Badges 3.0 SVG Badges, Sovereign W3C did:jwk, Paillier Homomorphic Compute & Post-Quantum Cryptography
+### The Open-Source Sovereign Trust Fabric for Verifiable Credentials, 1-of-N Linkable Ring Signatures (LSAG), 256-Bit Sparse Merkle Trees (SMT), Sovereign Policy AST Engine & Post-Quantum Cryptography
 
-[![Version](https://img.shields.io/badge/Version-v8.1.0-cyan.svg)]()
+[![Version](https://img.shields.io/badge/Version-v10.0.0-cyan.svg)]()
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CI Status](https://img.shields.io/badge/CI-100%25%20Passing-brightgreen.svg)]()
+[![Linkable Ring Signatures](https://img.shields.io/badge/Privacy-1--of--N%20LSAG%20Ring%20Signatures-purple.svg)]()
+[![Sparse Merkle Trees](https://img.shields.io/badge/Ledger-256--Bit%20SMT%20Key%20Transparency-cyan.svg)]()
+[![Policy AST](https://img.shields.io/badge/Policy-AST%20Proof--as--Receipt%20Engine-emerald.svg)]()
+[![W3C did:peer](https://img.shields.io/badge/DID-W3C%20did%3Apeer%20RFC%200627-blueviolet.svg)]()
 [![Open Badges 3.0](https://img.shields.io/badge/Badge-Open%20Badges%203.0%20%7C%20Verifiable%20SVG-orange.svg)]()
-[![W3C did:jwk](https://img.shields.io/badge/DID-W3C%20did%3Ajwk%20Method-blueviolet.svg)]()
 [![Confidential Compute](https://img.shields.io/badge/Privacy-Paillier%20Homomorphic%20%7C%20ZK%20Threshold-purple.svg)]()
-[![W3C JSON-LD](https://img.shields.io/badge/Standard-W3C%20URDNA2015%20%7C%20RDFC--1.0-emerald.svg)]()
-[![Trust Chains](https://img.shields.io/badge/Governance-Hierarchical%20Delegation%20Tokens-blue.svg)]()
 [![Quantum Armor](https://img.shields.io/badge/Post--Quantum-Dual%20Hybrid%20KEM%20(X25519%20%2B%20ML--KEM--768)-magenta.svg)]()
-[![AnonCreds 2.0](https://img.shields.io/badge/Privacy-AnonCreds%202.0%20Blind%20BBS%2B-purple.svg)]()
-[![FROST DKG](https://img.shields.io/badge/Threshold-FROST%20K--of--N%20DKG-blue.svg)]()
-[![Solidity Verifier](https://img.shields.io/badge/On--Chain-Solidity%20EVM%20Verifier-emerald.svg)]()
-[![Audit Bundles](https://img.shields.io/badge/Compliance-SOC2%20%7C%20ISO27001%20.dtbundle-teal.svg)]()
+[![Solidity SMT Verifier](https://img.shields.io/badge/On--Chain-Solidity%20SMT%20Verifier-emerald.svg)]()
 [![Python SDK](https://img.shields.io/badge/Python-3.8+-3776AB?logo=python&logoColor=white)]()
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)]()
 
 <p align="center">
-  <b>DocuTrust</b> enables universities, enterprises, and governments to issue tamper-proof academic degrees, employment certificates, and licenses with <b>sub-50ms instant verification</b>, <b>Open Badges 3.0 verifiable vector SVG rendering</b>, <b>W3C did:jwk sovereign resolution</b>, <b>Paillier additive homomorphic confidential computation</b>, <b>W3C VC 2.0 URDNA2015 RDF dataset canonicalization & Linked Data Signatures</b>, <b>hierarchical verifiable trust chains & multi-tier delegation tokens</b>, <b>post-quantum Dual Hybrid KEM armor (X25519 + NIST ML-KEM-768)</b>, <b>AnonCreds 2.0 blind issuance & unlinkable presentations</b>, <b>FROST distributed key generation (DKG)</b>, <b>EVM Solidity smart contract verifiers & Web3 ABI calldata</b>, <b>cryptographic audit bundle packaging (.dtbundle)</b>, <b>W3C DataIntegrityProof 2026 suite</b>, <b>M-of-N MultiSig threshold signatures</b>, <b>Universal W3C DID resolution</b>, <b>W3C Bitstring Status List 2024</b>, <b>DIF Presentation Exchange 2.0</b>, <b>RSA dynamic cryptographic accumulators ($O(1)$ batch & non-membership witnesses)</b>, <b>Recursive Zero-Knowledge Predicate Graphs</b>, <b>multi-recipient General JWE encryption</b>, <b>EIP-712 Ethereum typed credential signing</b>, <b>cross-chain ledger anchoring</b>, <b>decentralized guardian social recovery & timelocked escrow</b>, <b>DIDComm v2 encrypted agent messaging</b>, <b>Merkle Mountain Range streaming logs</b>, <b>BBS+ unlinkable zero-knowledge proofs</b>, <b>RFC 3161 TSA attestation oracles</b>, and <b>IETF SD-JWT mobile wallet interoperability</b>.
+  <b>DocuTrust</b> enables universities, enterprises, and governments to issue tamper-proof academic degrees, employment certificates, and licenses with <b>sub-50ms instant verification</b>, <b>1-of-N Linkable Ring Signatures (LSAG) with double-action prevention</b>, <b>256-bit Sparse Merkle Tree (SMT) key transparency ledgers with logarithmic inclusion & non-membership proofs</b>, <b>composable AST Policy Engine with signed cryptographic receipts</b>, <b>W3C did:peer RFC 0627 & did:jwk sovereign resolution</b>, <b>Open Badges 3.0 verifiable vector SVG rendering</b>, <b>Paillier additive homomorphic confidential computation</b>, <b>W3C VC 2.0 URDNA2015 RDF dataset canonicalization & Linked Data Signatures</b>, <b>hierarchical verifiable trust chains & multi-tier delegation tokens</b>, <b>post-quantum Dual Hybrid KEM armor (X25519 + NIST ML-KEM-768)</b>, <b>AnonCreds 2.0 blind issuance & unlinkable presentations</b>, <b>FROST distributed key generation (DKG)</b>, <b>EVM Solidity SMT verifiers & Multi-Issuer Registry contracts</b>, <b>cryptographic audit bundle packaging (.dtbundle)</b>, <b>W3C DataIntegrityProof 2026 suite</b>, <b>M-of-N MultiSig threshold signatures</b>, <b>Universal W3C DID resolution</b>, and <b>IETF SD-JWT mobile wallet interoperability</b>.
 </p>
 
 [Quickstart Demo](#-10-second-quickstart-demo) • [Architecture](#-system-architecture--workflow) • [Security Hardening](#-defense-in-depth-security-hardening-uncrackable-guarantee) • [CLI Toolkit](#-cli-toolkit) • [Python SDK](#-python-sdk-docutrust) • [REST API](#-rest-api-endpoints)
@@ -158,6 +156,21 @@ node packages/cli/bin/docutrust.js batch \
 
 # 5. Verify cryptographic authenticity offline
 node packages/cli/bin/docutrust.js verify --vc issued-degree.json
+
+# 6. Generate 1-of-N Linkable Ring Signature (LSAG)
+node packages/cli/bin/docutrust.js ringsig-sign \
+  --message '{"action":"ANONYMOUS_BALLOT","vote":"YES"}' \
+  --ring "did:key:alice,did:key:bob,did:key:carol" \
+  --privkey 4a6f8b9c... \
+  --pubkey did:key:alice \
+  --out ring-signature.json
+
+# 7. Query and Verify 256-Bit Sparse Merkle Tree (SMT) Proof
+node packages/cli/bin/docutrust.js smt-prove --key "did:key:alice" --out smt-proof.json
+node packages/cli/bin/docutrust.js smt-verify --proof smt-proof.json
+
+# 8. Export EVM Solidity SMT Verifier Smart Contract
+node packages/cli/bin/docutrust.js solidity-export-smt --out contracts/DocuTrustSMTVerifier.sol
 ```
 
 ---

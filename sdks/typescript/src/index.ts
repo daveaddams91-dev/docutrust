@@ -1408,6 +1408,72 @@ export class DocuTrustClient {
   public async generateSolidityRegistry(options?: { contractName?: string; solidityVersion?: string }): Promise<{ success: boolean; contractCode: string }> {
     return this.request('/solidity/export-registry', 'POST', options || {});
   }
+
+  // ========================================================
+  // v10.0.0 Linkable Ring Signatures (LSAG)
+  // ========================================================
+
+  /**
+   * Generates a 1-of-N Linkable Ring Signature (LSAG) protecting signer identity.
+   */
+  public async signRingSignature(options: {
+    message: any;
+    ring: string[];
+    signerPrivateKeyHex: string;
+    signerPublicKeyHex?: string;
+  }): Promise<{ success: boolean; signature: any }> {
+    return this.request('/ringsig/sign', 'POST', options);
+  }
+
+  /**
+   * Cryptographically verifies an LSAG Linkable Ring Signature and checks for double action tags.
+   */
+  public async verifyRingSignature(options: {
+    message: any;
+    signature: any;
+    usedKeyImages?: string[];
+  }): Promise<{ success: boolean; valid: boolean; ringSize: number; keyImage: string; isDoubleAction: boolean; error?: string }> {
+    return this.request('/ringsig/verify', 'POST', options);
+  }
+
+  // ========================================================
+  // v10.0.0 256-bit Sparse Merkle Trees (SMT) & Solidity Verifier
+  // ========================================================
+
+  /**
+   * Updates or sets a key-value pair in a 256-bit Sparse Merkle Tree.
+   */
+  public async setSMTLeaf(key: string, value: string): Promise<{ success: boolean; key: string; value: string; root: string }> {
+    return this.request('/smt/set', 'POST', { key, value });
+  }
+
+  /**
+   * Generates a logarithmic audit proof (inclusion or non-membership) from an SMT.
+   */
+  public async generateSMTProof(key: string, entries?: Record<string, string>): Promise<{ success: boolean; proof: any }> {
+    return this.request('/smt/prove', 'POST', { key, entries });
+  }
+
+  /**
+   * Verifies an SMT cryptographic inclusion or non-membership proof.
+   */
+  public async verifySMTProof(proof: any, root?: string): Promise<{ success: boolean; valid: boolean; root: string; exists: boolean }> {
+    return this.request('/smt/verify', 'POST', { proof, root });
+  }
+
+  /**
+   * Generates production-ready Solidity smart contract for SMT verification (DocuTrustSMTVerifier.sol).
+   */
+  public async generateSoliditySMTVerifier(options?: { contractName?: string; solidityVersion?: string }): Promise<{ success: boolean; contractCode: string }> {
+    return this.request('/solidity/export-smt', 'POST', options || {});
+  }
+
+  /**
+   * Verifies a Sovereign Policy Evaluation Receipt.
+   */
+  public async verifyPolicyReceipt(receipt: any, publicKeyHex?: string): Promise<{ success: boolean; valid: boolean }> {
+    return this.request('/policy/verify-receipt', 'POST', { receipt, publicKeyHex });
+  }
 }
 
 

@@ -124,7 +124,13 @@ export * from './quantum-armor';
 // Export Verifiable SVG Digital Badge & Open Badges 3.0 Engine
 export * from './badge';
 
-// Export Sovereign Policy-as-Proof & Governance Rule Engine (DocuTrust v9.0.0)
+// Export Sovereign Policy-as-Proof & Governance Rule Engine (DocuTrust v9.0.0+)
 export * from './policy';
+
+// Export Cryptographic Linkable Ring Signatures (LSAG) (DocuTrust v10.0.0)
+export * from './ring-sig';
+
+// Export 256-bit Sparse Merkle Tree (SMT) Key Transparency & Revocation (DocuTrust v10.0.0)
+export * from './smt';
 
 

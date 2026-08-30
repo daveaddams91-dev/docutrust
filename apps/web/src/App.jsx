@@ -27,6 +27,8 @@ import TrustChainStudio from './components/TrustChainStudio.jsx';
 import QuantumArmorStudio from './components/QuantumArmorStudio.jsx';
 import BadgeStudio from './components/BadgeStudio.jsx';
 import PolicyStudio from './components/PolicyStudio.jsx';
+import RingSigStudio from './components/RingSigStudio.jsx';
+import KeyTransparencyStudio from './components/KeyTransparencyStudio.jsx';
 import Footer from './components/Footer.jsx';
 
 export default function App() {
@@ -44,6 +46,8 @@ export default function App() {
 
       <main className="flex-1">
         {activeTab === 'hero' && <HeroSection setActiveTab={setActiveTab} />}
+        {activeTab === 'ringsig' && <RingSigStudio />}
+        {activeTab === 'smt' && <KeyTransparencyStudio />}
         {activeTab === 'policy' && <PolicyStudio />}
         {activeTab === 'badge' && <BadgeStudio />}
         {activeTab === 'confidential' && <ConfidentialComputeStudio />}

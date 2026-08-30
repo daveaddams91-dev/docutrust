@@ -237,6 +237,68 @@ contract ${name} {
   }
 
   /**
+   * Generates production-ready Solidity contract for 256-bit Sparse Merkle Tree (SMT) verification.
+   */
+  public static generateSMTVerifierContract(options: SolidityContractOptions = {}): string {
+    const version = options.solidityVersion || '^0.8.24';
+    const name = options.contractName || 'DocuTrustSMTVerifier';
+
+    return `// SPDX-License-Identifier: Apache-2.0
+pragma solidity ${version};
+
+/**
+ * @title ${name}
+ * @author DocuTrust Sovereign Trust Engine v10.0.0
+ * @notice Verifies 256-bit Sparse Merkle Tree (SMT) inclusion & non-membership proofs on-chain.
+ */
+contract ${name} {
+    struct Sibling {
+        uint8 depth;
+        bytes32 siblingHash;
+        bool isRight;
+    }
+
+    event SMTProofVerified(bytes32 indexed root, bytes32 indexed key, bytes32 valueHash, bool exists, address verifier);
+
+    /**
+     * @notice Computes leaf hash for key-value pair in SMT.
+     */
+    function computeLeafHash(bytes32 key, bytes32 value) public pure returns (bytes32) {
+        return sha256(abi.encodePacked("SMT_LEAF:", key, ":", value));
+    }
+
+    /**
+     * @notice Verifies a Sparse Merkle Tree audit proof against an anchored root.
+     */
+    function verifySMTProof(
+        bytes32 root,
+        bytes32 key,
+        bytes32 value,
+        bool exists,
+        Sibling[] calldata siblings
+    ) public returns (bool) {
+        bytes32 current = exists ? computeLeafHash(key, value) : bytes32(0);
+
+        for (uint256 i = 0; i < siblings.length; i++) {
+            Sibling memory s = siblings[i];
+            if (s.isRight) {
+                current = sha256(abi.encodePacked(current, ":", s.siblingHash));
+            } else {
+                current = sha256(abi.encodePacked(s.siblingHash, ":", current));
+            }
+        }
+
+        bool valid = (current == root);
+        if (valid) {
+            emit SMTProofVerified(root, key, value, exists, msg.sender);
+        }
+        return valid;
+    }
+}
+`;
+  }
+
+  /**
    * Encodes ABI calldata for calling verifyCredentialOnChain.
    */
   public static encodeVerificationCalldata(
@@ -307,6 +369,8 @@ contract ${name} {
 
 export const generateVerifierContract = SolidityEngine.generateVerifierContract;
 export const generateRegistryContract = SolidityEngine.generateRegistryContract;
+export const generateSMTVerifierContract = SolidityEngine.generateSMTVerifierContract;
 export const encodeVerificationCalldata = SolidityEngine.encodeVerificationCalldata;
 export const verifyMerkleProofEVM = SolidityEngine.verifyMerkleProofEVM;
+
 

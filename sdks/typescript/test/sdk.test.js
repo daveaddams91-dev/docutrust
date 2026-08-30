@@ -227,6 +227,31 @@ describe('DocuTrust TypeScript SDK (@docutrust/sdk)', () => {
     // 43. Solidity Export Registry
     await client.generateSolidityRegistry({ contractName: 'MyRegistry' });
     assert.strictEqual(mockCalls[43].url, 'https://test-api.docutrust.org/api/v1/solidity/export-registry');
+
+    // 44. Ring Signature Sign & Verify
+    await client.signRingSignature({ message: 'msg', ring: ['k1', 'k2'], signerPrivateKeyHex: 'priv' });
+    assert.strictEqual(mockCalls[44].url, 'https://test-api.docutrust.org/api/v1/ringsig/sign');
+
+    await client.verifyRingSignature({ message: 'msg', signature: {} });
+    assert.strictEqual(mockCalls[45].url, 'https://test-api.docutrust.org/api/v1/ringsig/verify');
+
+    // 45. SMT Set, Prove, Verify
+    await client.setSMTLeaf('key1', 'val1');
+    assert.strictEqual(mockCalls[46].url, 'https://test-api.docutrust.org/api/v1/smt/set');
+
+    await client.generateSMTProof('key1');
+    assert.strictEqual(mockCalls[47].url, 'https://test-api.docutrust.org/api/v1/smt/prove');
+
+    await client.verifySMTProof({ root: 'r' });
+    assert.strictEqual(mockCalls[48].url, 'https://test-api.docutrust.org/api/v1/smt/verify');
+
+    // 46. Solidity SMT Verifier
+    await client.generateSoliditySMTVerifier({ contractName: 'MySMTVerifier' });
+    assert.strictEqual(mockCalls[49].url, 'https://test-api.docutrust.org/api/v1/solidity/export-smt');
+
+    // 47. Policy Verify Receipt
+    await client.verifyPolicyReceipt({ id: 'rec-1' });
+    assert.strictEqual(mockCalls[50].url, 'https://test-api.docutrust.org/api/v1/policy/verify-receipt');
   });
 
   test('DocuTrustClient handles HTTP error responses gracefully', async () => {

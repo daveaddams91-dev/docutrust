@@ -1,6 +1,6 @@
 {
   "name": "docutrust",
-  "version": "9.0.0",
+  "version": "10.0.0",
   "private": true,
   "description": "The Open-Source Sovereign Trust Stack for Verifiable Digital Credentials, Post-Quantum Cryptography & Multi-Sig Governance",
   "workspaces": [

@@ -1264,3 +1264,66 @@ class DocuTrustClient:
             solidity_version=solidity_version
         )
 
+    # ========================================================
+    # v10.0.0 Linkable Ring Signatures (LSAG)
+    # ========================================================
+
+    def sign_ring_signature(
+        self,
+        message: Union[str, bytes, Dict[str, Any]],
+        ring: List[str],
+        signer_private_key_hex: str,
+        signer_public_key_hex: str
+    ) -> Dict[str, Any]:
+        """Signs a message anonymously using a 1-of-N Linkable Ring Signature."""
+        from .ringsig import RingSignatureEngine
+        return RingSignatureEngine.sign(
+            message=message,
+            ring=ring,
+            signer_private_key_hex=signer_private_key_hex,
+            signer_public_key_hex=signer_public_key_hex
+        )
+
+    def verify_ring_signature(
+        self,
+        message: Union[str, bytes, Dict[str, Any]],
+        signature: Dict[str, Any],
+        used_key_images: Optional[Union[Set[str], List[str]]] = None
+    ) -> Dict[str, Any]:
+        """Verifies a 1-of-N Linkable Ring Signature and checks for double-voting/double-action."""
+        from .ringsig import RingSignatureEngine
+        return RingSignatureEngine.verify(
+            message=message,
+            signature=signature,
+            used_key_images=used_key_images
+        )
+
+    # ========================================================
+    # v10.0.0 256-bit Sparse Merkle Trees (SMT)
+    # ========================================================
+
+    def set_smt_leaf(self, key: str, value: str) -> Dict[str, Any]:
+        """Sets or updates a leaf in a 256-bit Sparse Merkle Tree via REST API."""
+        return self._request("/smt/set", method="POST", json_data={"key": key, "value": value})
+
+    def generate_smt_proof(self, key: str, entries: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+        """Generates an SMT inclusion/non-membership proof via REST API."""
+        return self._request("/smt/prove", method="POST", json_data={"key": key, "entries": entries or {}})
+
+    def verify_smt_proof(self, proof: Dict[str, Any], root: Optional[str] = None) -> Dict[str, Any]:
+        """Verifies an SMT proof via REST API or local logic."""
+        return self._request("/smt/verify", method="POST", json_data={"proof": proof, "root": root})
+
+    def generate_solidity_smt_verifier(
+        self,
+        contract_name: str = "DocuTrustSMTVerifier",
+        solidity_version: str = "^0.8.20"
+    ) -> str:
+        """Generates production-ready Solidity contract code for verifying 256-bit SMT proofs."""
+        from .solidity import SolidityEngine
+        return SolidityEngine.generate_smt_verifier_contract(
+            contract_name=contract_name,
+            solidity_version=solidity_version
+        )
+
+

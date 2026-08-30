@@ -167,12 +167,18 @@ class PolicyEngine:
     def resolve_field_value(cls, obj: Any, path: Optional[str]) -> Any:
         if not path or not obj:
             return None
-        parts = path.split(".")
+        parts = [p for p in re.split(r'\.|\[(\d+)\]', path) if p]
         curr = obj
         for part in parts:
-            if curr is None or not isinstance(curr, dict):
+            if curr is None:
                 return None
-            curr = curr.get(part)
+            if part.isdigit() and isinstance(curr, list):
+                idx = int(part)
+                curr = curr[idx] if 0 <= idx < len(curr) else None
+            elif isinstance(curr, dict):
+                curr = curr.get(part)
+            else:
+                return None
         return curr
 
     @classmethod
@@ -295,4 +301,57 @@ class PolicyEngine:
                     passed = False
             return {"condition": condition, "actualValue": actual, "passed": passed, "reason": None if passed else f"Field '{condition.get('field')}' does not match regex /{expected}/"}
 
+        # v10.0.0 Temporal and quantifier operators
+        if op == "valid_between":
+            min_val = condition.get("min")
+            max_val = condition.get("max")
+            passed = True
+            if min_val is not None and actual < min_val:
+                passed = False
+            if max_val is not None and actual > max_val:
+                passed = False
+            return {"condition": condition, "actualValue": actual, "passed": passed, "reason": None if passed else f"Field '{condition.get('field')}' ({actual}) not between {min_val} and {max_val}"}
+
+        if op == "epoch_within":
+            min_epoch = condition.get("min")
+            max_epoch = condition.get("max")
+            try:
+                dt = datetime.fromisoformat(str(actual).replace("Z", "+00:00"))
+                epoch_sec = dt.timestamp()
+                passed = True
+                if min_epoch is not None and epoch_sec < min_epoch:
+                    passed = False
+                if max_epoch is not None and epoch_sec > max_epoch:
+                    passed = False
+                return {"condition": condition, "actualValue": actual, "passed": passed, "reason": None if passed else f"Epoch time ({epoch_sec}) not within [{min_epoch}, {max_epoch}]"}
+            except Exception as e:
+                return {"condition": condition, "actualValue": actual, "passed": False, "reason": f"Invalid datetime string for epoch comparison: {e}"}
+
+        if op == "type_is":
+            expected_type = str(expected).lower()
+            actual_type = type(actual).__name__.lower()
+            type_map = {"str": "string", "int": "number", "float": "number", "dict": "object", "list": "array", "bool": "boolean"}
+            normalized_actual = type_map.get(actual_type, actual_type)
+            passed = (normalized_actual == expected_type) or (actual_type == expected_type)
+            return {"condition": condition, "actualValue": actual, "passed": passed, "reason": None if passed else f"Field type is {actual_type}, expected {expected_type}"}
+
+        if op == "all_of":
+            expected_list = expected if isinstance(expected, list) else [expected]
+            actual_list = actual if isinstance(actual, list) else [actual]
+            passed = all(item in actual_list for item in expected_list)
+            return {"condition": condition, "actualValue": actual, "passed": passed, "reason": None if passed else f"Field '{condition.get('field')}' missing some required items from {expected_list}"}
+
+        if op == "any_of":
+            expected_list = expected if isinstance(expected, list) else [expected]
+            actual_list = actual if isinstance(actual, list) else [actual]
+            passed = any(item in actual_list for item in expected_list)
+            return {"condition": condition, "actualValue": actual, "passed": passed, "reason": None if passed else f"Field '{condition.get('field')}' matches none of {expected_list}"}
+
+        if op == "none_of":
+            expected_list = expected if isinstance(expected, list) else [expected]
+            actual_list = actual if isinstance(actual, list) else [actual]
+            passed = not any(item in actual_list for item in expected_list)
+            return {"condition": condition, "actualValue": actual, "passed": passed, "reason": None if passed else f"Field '{condition.get('field')}' contains forbidden item from {expected_list}"}
+
         return {"condition": condition, "passed": False, "reason": f"Unsupported policy operator: {op}"}
+

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "docutrust"
-version = "9.0.0"
+version = "10.0.0"
 description = "Python SDK for DocuTrust - Open-Source Sovereign Trust Stack for Verifiable Digital Credentials & Cryptographic Ledger Anchoring"
 readme = "README.md"
 requires-python = ">=3.8"
