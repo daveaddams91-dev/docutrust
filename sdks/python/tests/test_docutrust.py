@@ -4,6 +4,7 @@ from unittest.mock import patch, MagicMock
 import sys
 import os
 import json
+import hashlib
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from docutrust.crypto import canonicalize_json, sha256_hex, MerkleTree, encode_base58, decode_base58
@@ -34,6 +35,11 @@ from docutrust.mmr import MerkleMountainRange
 from docutrust.eip712 import generate_secp256k1_key_pair, sign_vc_eip712, verify_vc_eip712
 from docutrust.social_recovery import SocialRecoveryEngine
 from docutrust.multichain import MultiChainLedgerAnchor
+from docutrust.anoncreds import AnonCredsEngine
+from docutrust.dkg import DKGEngine
+from docutrust.solidity import SolidityEngine
+from docutrust.bundle import AuditBundleEngine
+from docutrust.dataintegrity import DataIntegrityEngine
 
 class TestDocuTrustPython(unittest.TestCase):
     def test_didcomm_messaging(self):
@@ -63,6 +69,7 @@ class TestDocuTrustPython(unittest.TestCase):
         tampered_proof = dict(proof)
         tampered_proof["elementHash"] = tampered_proof["elementHash"][:-2] + "ff"
         self.assertFalse(MerkleMountainRange.verify_proof(tampered_proof))
+
     def test_bbs_signatures_and_zk_proofs(self):
         kp = generate_bbs_keypair(5)
         self.assertTrue(kp["did"].startswith("did:bbs:z"))
@@ -94,6 +101,7 @@ class TestDocuTrustPython(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             combine_shares([shares[0], shares[1]])
+
     def test_canonicalize_json(self):
         obj1 = {"z": 10, "a": "hello", "m": [3, 2, 1]}
         obj2 = {"a": "hello", "m": [3, 2, 1], "z": 10}
@@ -735,9 +743,185 @@ class TestDocuTrustPython(unittest.TestCase):
         pkh_doc = DIDResolver.resolve("did:pkh:eip155:1:0x71C83638379321e0b51B8d6Ac7b6C81204d80916")
         self.assertEqual(pkh_doc["id"], "did:pkh:eip155:1:0x71C83638379321e0b51B8d6Ac7b6C81204d80916")
 
+    # ==========================================
+    # v5.0.0 AnonCreds 2.0 Tests
+    # ==========================================
+
+    def test_anoncreds_engine_lifecycle(self):
+        master_secret_obj = AnonCredsEngine.generate_holder_master_secret()
+        master_secret = master_secret_obj["masterSecret"]
+        schema_id = "schema:docutrust:citizenship:2026"
+        issuer_did = "did:key:zGovernment"
+
+        req_res = AnonCredsEngine.create_blind_request(master_secret, schema_id, issuer_did)
+        request = req_res["request"]
+        blinding_factor = req_res["blindingFactor"]
+
+        self.assertTrue(AnonCredsEngine.verify_blind_request(request))
+
+        claims = {"name": "Alice Doe", "age": 28, "country": "US"}
+        blind_cred = AnonCredsEngine.issue_blind_credential(request, claims)
+        self.assertEqual(blind_cred["type"], "AnonCredsBlindCredential2026")
+
+        cred = AnonCredsEngine.unblind_credential(blind_cred, master_secret, blinding_factor)
+        self.assertEqual(cred["claims"]["country"], "US")
+
+        # Selective disclosure presentation revealing only country
+        verifier_nonce = os.urandom(16).hex()
+        pres = AnonCredsEngine.create_presentation(cred, master_secret, ["country"], verifier_nonce)
+        self.assertIn("country", pres["disclosedClaims"])
+        self.assertNotIn("name", pres["disclosedClaims"])
+
+        result = AnonCredsEngine.verify_presentation(pres, verifier_nonce, cred["issuer"])
+        self.assertTrue(result["valid"])
+        self.assertEqual(result["disclosedClaims"]["country"], "US")
+
+    # ==========================================
+    # v5.0.0 FROST DKG Tests
+    # ==========================================
+
+    def test_frost_dkg_ceremony_and_signing(self):
+        participants = [
+            {"name": "Signer-1"},
+            {"name": "Signer-2"},
+            {"name": "Signer-3"}
+        ]
+        threshold = 2
+        setup = DKGEngine.run_dkg_ceremony(participants, threshold)
+        self.assertEqual(setup["threshold"], 2)
+        self.assertEqual(len(setup["participants"]), 3)
+
+        msg = "Execute Multi-Party Treasury Transfer #1001"
+        share1 = DKGEngine.sign_share(
+            setup["participants"][0]["id"],
+            setup["participants"][0]["privateShareHex"],
+            setup["participants"][0]["did"],
+            msg
+        )
+        share2 = DKGEngine.sign_share(
+            setup["participants"][1]["id"],
+            setup["participants"][1]["privateShareHex"],
+            setup["participants"][1]["did"],
+            msg
+        )
+
+        agg_sig = DKGEngine.aggregate_signatures(
+            setup["groupPublicKeyHex"],
+            setup["groupDid"],
+            threshold,
+            [share1, share2]
+        )
+        self.assertEqual(agg_sig["type"], "DKGThresholdEd25519Signature2026")
+
+        verify_res = DKGEngine.verify_aggregated_signature(agg_sig, msg, setup["groupPublicKeyHex"])
+        self.assertTrue(verify_res["valid"])
+
+    # ==========================================
+    # v5.0.0 Solidity EVM Verifier Tests
+    # ==========================================
+
+    def test_solidity_engine_code_and_calldata(self):
+        source = SolidityEngine.generate_verifier_contract("DocuTrustVerifier")
+        self.assertIn("contract DocuTrustVerifier", source)
+        self.assertIn("verifyCredentialOnChain", source)
+
+        leaves = ["cred1", "cred2", "cred3", "cred4"]
+        tree = MerkleTree(leaves)
+        proof = tree.get_proof(0)
+        proof_array = [step["data"] for step in proof["auditPath"]]
+
+        calldata = SolidityEngine.encode_verification_calldata(proof["leafHash"], proof_array, tree.get_root())
+        self.assertTrue(calldata["calldataHex"].startswith("0x"))
+        self.assertEqual(calldata["methodSignature"], "verifyCredentialOnChain(bytes32,bytes32[],bytes32)")
+
+        # Verify EVM sorted tree semantics
+        leaf1 = hashlib.sha256(b"leaf_data_1").hexdigest()
+        leaf2 = hashlib.sha256(b"leaf_data_2").hexdigest()
+        b1, b2 = bytes.fromhex(leaf1), bytes.fromhex(leaf2)
+        root_hex = hashlib.sha256((b1 + b2) if b1 <= b2 else (b2 + b1)).hexdigest()
+        evm_valid = SolidityEngine.verify_merkle_proof_evm(leaf1, [leaf2], root_hex)
+        self.assertTrue(evm_valid)
+
+    # ==========================================
+    # v5.0.0 Cryptographic Audit Bundle Tests
+    # ==========================================
+
+    def test_audit_bundle_engine(self):
+        mmr = MerkleMountainRange()
+        mmr.append("Log Item 1")
+        mmr.append("Log Item 2")
+
+        bundle = AuditBundleEngine.create_audit_bundle(
+            organization="Sovereign Test Org",
+            credentials=[{"id": "urn:uuid:c1", "jcsCanonicalHash": "a" * 64}],
+            mmr=mmr
+        )
+        self.assertEqual(bundle["type"], "DocuTrustAuditBundle2026")
+        self.assertEqual(bundle["manifest"]["version"], "5.0.0")
+
+        verify_res = AuditBundleEngine.verify_audit_bundle(bundle)
+        self.assertTrue(verify_res["valid"])
+        self.assertTrue(verify_res["signatureValid"])
+        self.assertTrue(verify_res["mmrValid"])
+        self.assertTrue(verify_res["tsaTimestampValid"])
+
+        report = AuditBundleEngine.generate_compliance_report(bundle, verify_res)
+        self.assertIn("DocuTrust Sovereign Compliance & Cryptographic Audit Report", report)
+        self.assertIn("PASSED", report)
+
+    # ==========================================
+    # v5.0.0 W3C DataIntegrityProof Tests
+    # ==========================================
+
+    def test_data_integrity_proof(self):
+        key_pair = {
+            "privateKeyHex": os.urandom(32).hex(),
+            "publicKeyHex": os.urandom(32).hex(),
+            "keyId": "did:key:zIssuer#key-1"
+        }
+        subject = {"id": "did:key:zHolder", "degree": "PostQuantumCryptography"}
+
+        # Classical eddsa-jcs-2022
+        cred_eddsa = DataIntegrityEngine.issue(
+            credential_subject=subject,
+            issuer="did:key:zIssuer",
+            key_pair=key_pair,
+            cryptosuite="eddsa-jcs-2022"
+        )
+        self.assertEqual(cred_eddsa["proof"]["cryptosuite"], "eddsa-jcs-2022")
+        res_eddsa = DataIntegrityEngine.verify(cred_eddsa)
+        self.assertTrue(res_eddsa["valid"])
+        self.assertFalse(res_eddsa["isQuantumSafe"])
+
+        # Post-quantum ml-dsa-65-2026
+        cred_pqc = DataIntegrityEngine.issue(
+            credential_subject=subject,
+            issuer="did:key:zIssuer",
+            key_pair=key_pair,
+            cryptosuite="ml-dsa-65-2026"
+        )
+        self.assertEqual(cred_pqc["proof"]["cryptosuite"], "ml-dsa-65-2026")
+        res_pqc = DataIntegrityEngine.verify(cred_pqc)
+        self.assertTrue(res_pqc["valid"])
+        self.assertTrue(res_pqc["isQuantumSafe"])
+
+    # ==========================================
+    # v5.0.0 Client Methods Tests
+    # ==========================================
+
+    @patch('requests.Session.get')
+    def test_client_v5_get_requests(self, mock_get):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"success": True, "issuers": ["did:key:z1"]}
+        mock_resp.raise_for_status.return_value = None
+        mock_get.return_value = mock_resp
+
+        client = DocuTrustClient()
+        issuers = client.get_trust_registry_issuers()
+        self.assertTrue(issuers["success"])
+
+        vault_creds = client.get_vault_credentials(search="Elena", limit=10)
+        self.assertTrue(vault_creds["success"])
+
 if __name__ == '__main__':
     unittest.main()
-
-
-
-

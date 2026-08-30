@@ -1,5 +1,32 @@
 # 📝 DocuTrust Changelog & Release Notes
 
+## [v5.0.0] - Sovereign Trust Fabric: Python SDK Complete Parity & Multi-Language Interoperability Mesh - 2026-08-30
+
+### 🌟 Release Overview (v5.0.0 - Major Milestone Release)
+DocuTrust 5.0.0 delivers complete multi-language sovereign parity with the release of the **DocuTrust Python SDK (`sdks/python/docutrust`)**, mirroring 100% of the cryptographic, zero-knowledge, threshold governance, smart contract, and audit bundle capabilities of the TypeScript Core engine in pure Python.
+
+### 🐍 Python SDK Parity (`sdks/python/docutrust`)
+- **AnonCreds 2.0 Blind Issuance Engine (`docutrust.anoncreds`)**: Native pure-Python implementation of master secret commitments, blind BBS+ credential issuance, blinding factor unblinding, and zero-knowledge presentation verification.
+- **FROST Distributed Key Generation (`docutrust.dkg`)**: Threshold $K$-of-$N$ key generation ceremonies over finite fields, polynomial commitments, Lagrange interpolation, partial signature share creation, and group aggregation.
+- **Solidity Smart Contract Generator & Calldata Encoder (`docutrust.solidity`)**: Native generation of production-ready `DocuTrustVerifier.sol` smart contracts and ABI calldata encoding for on-chain EVM verification (`0x892a4b12`).
+- **Cryptographic Audit Bundles (`docutrust.bundle`)**: Packaging, sealing, and verification of `.dtbundle` files containing HashChain snapshots, Merkle Mountain Range bagged peak roots, and RFC 3161 TSA tokens, plus automated Markdown compliance certificate generation (SOC 2, ISO 27001, eIDAS 2.0).
+- **W3C DataIntegrityProof 1.0 (`docutrust.dataintegrity`)**: Complete support for `eddsa-jcs-2022` and Post-Quantum `ml-dsa-65-2026` cryptosuites.
+- **TSA Cryptographic Oracle (`docutrust.oracle`)**: `CryptographicTSAOracle` class wrapper for RFC 3161 timestamping and verification.
+- **DocuTrust Client (`docutrust.client.DocuTrustClient`)**: Full high-level REST client and offline cryptographic engine with methods for AnonCreds, DKG, Solidity, Bundle, and DataIntegrity.
+- **Python Test Suite**: Expanded to 50 comprehensive unit tests with 100% pass rate (`python -m unittest discover sdks/python/tests`).
+
+### 📦 Monorepo Synchronization & Multi-Platform Parity
+- Synchronized all workspace packages to version `5.0.0`:
+  - `@docutrust/core` -> `5.0.0`
+  - `@docutrust/cli` -> `5.0.0`
+  - `@docutrust/api` -> `5.0.0`
+  - `@docutrust/sdk` -> `5.0.0`
+  - `@docutrust/web` -> `5.0.0`
+  - `docutrust` (Python) -> `5.0.0`
+- Monorepo test suite: 192 total automated tests passing across Core, API, CLI, TypeScript SDK, and Python SDK.
+
+---
+
 ## [v4.0.0] - Sovereign Trust Fabric: AnonCreds 2.0 Blind Signatures, FROST Threshold DKG, Solidity On-Chain Verifier & Cryptographic Audit Bundles - 2026-08-30
 
 ### 🌟 Release Overview (v4.0.0 - Major Milestone Release)

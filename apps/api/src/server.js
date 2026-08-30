@@ -172,7 +172,7 @@ const server = http.createServer(async (req, res) => {
       return jsonResponse(200, {
         status: 'healthy',
         service: 'DocuTrust Sovereign Verifiable Credentials Engine',
-        version: '3.0.0',
+        version: '5.0.0',
         features: [
           'W3C VC 2.0',
           'DID Key Ed25519',
@@ -1736,7 +1736,7 @@ const server = http.createServer(async (req, res) => {
 
 if (require.main === module) {
   server.listen(PORT, () => {
-    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v3.0.0 running on http://localhost:${PORT}`);
+    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v5.0.0 running on http://localhost:${PORT}`);
   });
 }
 

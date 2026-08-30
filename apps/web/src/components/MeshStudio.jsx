@@ -181,7 +181,7 @@ export default function MeshStudio() {
       <div className="mb-8">
         <div className="flex items-center gap-2 text-cyan-400 text-sm font-semibold tracking-wider uppercase mb-2 font-mono">
           <Layers className="w-4 h-4" />
-          DocuTrust v3.0 Sovereign Trust Mesh
+          DocuTrust v5.0 Sovereign Trust Mesh
         </div>
         <h1 className="text-3xl font-extrabold text-white tracking-tight sm:text-4xl">
           Universal DID Resolver & Multi-Authority Quorum

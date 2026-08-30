@@ -1,6 +1,6 @@
 from __future__ import annotations
 from .client import DocuTrustClient
-from .crypto import canonicalize_json, sha256_hex, MerkleTree
+from .crypto import canonicalize_json, sha256_hex, MerkleTree, encode_base58, decode_base58
 from .pqc import generate_pqc_hybrid_keys
 from .encryption import encrypt_aes_gcm, decrypt_aes_gcm
 from .zk_predicates import (
@@ -15,8 +15,12 @@ from .zk_predicates import (
     verify_set_membership_proof,
     prove_set_non_membership,
     verify_set_non_membership_proof,
+    prove_set_intersection,
+    verify_set_intersection_proof,
     prove_composite_predicate,
-    verify_composite_predicate
+    verify_composite_predicate,
+    prove_predicate_graph,
+    verify_predicate_graph
 )
 from .kem import generate_kem_keypair
 from .shamir import split_secret, combine_shares
@@ -37,22 +41,22 @@ from .accumulator import CryptographicAccumulator, extended_gcd
 from .jwe import MultiRecipientJWE
 from .status_list import BitstringStatusList2024
 from .presentation_exchange import PresentationExchangeEngine
-from .zk_predicates import (
-    prove_set_intersection,
-    verify_set_intersection_proof,
-    prove_predicate_graph,
-    verify_predicate_graph
-)
-
 from .multisig import MultiSigEngine
 from .did import DIDResolver
+from .anoncreds import AnonCredsEngine
+from .dkg import DKGEngine
+from .solidity import SolidityEngine
+from .bundle import AuditBundleEngine
+from .dataintegrity import DataIntegrityEngine
 
-__version__ = "3.0.0"
+__version__ = "5.0.0"
 __all__ = [
     "DocuTrustClient",
     "canonicalize_json",
     "sha256_hex",
     "MerkleTree",
+    "encode_base58",
+    "decode_base58",
     "generate_pqc_hybrid_keys",
     "encrypt_aes_gcm",
     "decrypt_aes_gcm",
@@ -98,7 +102,10 @@ __all__ = [
     "BitstringStatusList2024",
     "PresentationExchangeEngine",
     "MultiSigEngine",
-    "DIDResolver"
+    "DIDResolver",
+    "AnonCredsEngine",
+    "DKGEngine",
+    "SolidityEngine",
+    "AuditBundleEngine",
+    "DataIntegrityEngine"
 ]
-
-

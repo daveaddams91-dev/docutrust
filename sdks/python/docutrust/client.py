@@ -1,17 +1,36 @@
 from __future__ import annotations
 import requests
 import base64
+import json
 from typing import Dict, Any, List, Optional, Union
 from .crypto import canonicalize_json, sha256_hex, MerkleTree
 
 class DocuTrustClient:
-    """Client for DocuTrust Sovereign Trust API v1.1."""
+    """Client for DocuTrust Sovereign Trust API v5.0.0."""
     def __init__(self, api_url: str = "https://api.docutrust.org/api/v1", api_key: Optional[str] = None):
         self.api_url = api_url.rstrip("/")
         self.api_key = api_key
         self.session = requests.Session()
         if api_key:
             self.session.headers.update({"Authorization": f"Bearer {api_key}"})
+
+    def _request(self, endpoint: str, method: str = "GET", json_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Internal helper for executing REST requests."""
+        url = f"{self.api_url}/{endpoint.lstrip('/')}"
+        method = method.upper()
+        if method == "GET":
+            res = self.session.get(url)
+        elif method == "POST":
+            res = self.session.post(url, json=json_data or {})
+        elif method == "PUT":
+            res = self.session.put(url, json=json_data or {})
+        elif method == "DELETE":
+            res = self.session.delete(url)
+        else:
+            raise ValueError(f"Unsupported HTTP method: {method}")
+
+        res.raise_for_status()
+        return res.json()
 
     def issue_credential(
         self,
@@ -816,7 +835,201 @@ class DocuTrustClient:
         qs = f"?{'&'.join(params)}" if params else ""
         return self._request(f"/vault/credentials{qs}", "GET")
 
+    # ==========================================
+    # AnonCreds 2.0 & Privacy-Preserving Blind Issuance
+    # ==========================================
 
+    def create_anoncreds_blind_request(
+        self,
+        schema_id: str,
+        issuer_did: str,
+        master_secret: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Holder creates a blind credential request binding a holder master secret."""
+        from .anoncreds import AnonCredsEngine
+        secret = master_secret or AnonCredsEngine.generate_holder_master_secret()["masterSecret"]
+        return AnonCredsEngine.create_blind_request(secret, schema_id, issuer_did)
 
+    def issue_anoncreds_blind_credential(
+        self,
+        request: Dict[str, Any],
+        claims: Dict[str, Any],
+        issuer_ed_keys: Optional[Dict[str, Any]] = None,
+        issuer_keys: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Issuer issues a blinded BBS+ credential bound to holder master secret."""
+        from .anoncreds import AnonCredsEngine
+        return AnonCredsEngine.issue_blind_credential(request, claims, issuer_keys, issuer_ed_keys)
 
+    def unblind_anoncreds_credential(
+        self,
+        blind_credential: Dict[str, Any],
+        master_secret: str,
+        blinding_factor: str
+    ) -> Dict[str, Any]:
+        """Holder unblinds the blind credential and stores it with their master secret."""
+        from .anoncreds import AnonCredsEngine
+        return AnonCredsEngine.unblind_credential(blind_credential, master_secret, blinding_factor)
 
+    def create_anoncreds_presentation(
+        self,
+        credential: Dict[str, Any],
+        master_secret: str,
+        reveal_keys: List[str],
+        verifier_nonce: str,
+        predicate_proofs: Optional[List[Dict[str, Any]]] = None
+    ) -> Dict[str, Any]:
+        """Holder generates an unlinkable Zero-Knowledge Presentation for a Verifier."""
+        from .anoncreds import AnonCredsEngine
+        return AnonCredsEngine.create_presentation(credential, master_secret, reveal_keys, verifier_nonce, predicate_proofs)
+
+    def verify_anoncreds_presentation(
+        self,
+        presentation: Dict[str, Any],
+        verifier_nonce: Optional[str] = None,
+        issuer_did: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Verifier validates an AnonCreds Zero-Knowledge Presentation."""
+        from .anoncreds import AnonCredsEngine
+        return AnonCredsEngine.verify_presentation(presentation, verifier_nonce, issuer_did)
+
+    # ==========================================
+    # FROST Distributed Key Generation (DKG)
+    # ==========================================
+
+    def run_dkg_ceremony(
+        self,
+        participants: List[Dict[str, Any]],
+        threshold: int
+    ) -> Dict[str, Any]:
+        """Runs a complete Distributed Key Generation (DKG) setup ceremony."""
+        from .dkg import DKGEngine
+        return DKGEngine.run_dkg_ceremony(participants, threshold)
+
+    def sign_dkg_share(
+        self,
+        participant_index: int,
+        private_share_hex: str,
+        signer_did: str,
+        message: Union[str, bytes]
+    ) -> Dict[str, Any]:
+        """Generates a partial signature share for a message using participant private share."""
+        from .dkg import DKGEngine
+        return DKGEngine.sign_share(participant_index, private_share_hex, signer_did, message)
+
+    def aggregate_dkg_signatures(
+        self,
+        group_public_key_hex: str,
+        group_did: str,
+        threshold: int,
+        shares: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Aggregates partial signature shares into a valid group Ed25519 signature."""
+        from .dkg import DKGEngine
+        return DKGEngine.aggregate_signatures(group_public_key_hex, group_did, threshold, shares)
+
+    def verify_dkg_signature(
+        self,
+        signature: Dict[str, Any],
+        message: Union[str, bytes],
+        group_public_key_hex: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Verifies an aggregated FROST threshold signature."""
+        from .dkg import DKGEngine
+        return DKGEngine.verify_aggregated_signature(signature, message, group_public_key_hex)
+
+    # ==========================================
+    # EVM Solidity Smart Contract Verifier
+    # ==========================================
+
+    def generate_solidity_verifier(
+        self,
+        contract_name: str = "DocuTrustVerifier",
+        solidity_version: str = "^0.8.20",
+        owner_address: Optional[str] = None
+    ) -> str:
+        """Generates production-ready DocuTrustVerifier.sol Solidity source code."""
+        from .solidity import SolidityEngine
+        return SolidityEngine.generate_verifier_contract(contract_name, solidity_version, owner_address)
+
+    def encode_solidity_calldata(
+        self,
+        credential_hash: str,
+        merkle_proof: List[Union[str, Dict[str, Any]]],
+        root_hash: str
+    ) -> Dict[str, Any]:
+        """Encodes ABI calldata for calling on-chain verifyCredentialOnChain."""
+        from .solidity import SolidityEngine
+        return SolidityEngine.encode_verification_calldata(credential_hash, merkle_proof, root_hash)
+
+    # ==========================================
+    # Cryptographic Audit Bundles (.dtbundle)
+    # ==========================================
+
+    def create_audit_bundle(
+        self,
+        organization: str = "DocuTrust Enterprise Sovereign Trust",
+        signer_keypair: Optional[Dict[str, Any]] = None,
+        compliance_standards: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """Creates a signed cryptographic audit bundle (.dtbundle)."""
+        from .bundle import AuditBundleEngine
+        return AuditBundleEngine.create_audit_bundle(
+            organization=organization,
+            signer_keypair=signer_keypair,
+            compliance_standards=compliance_standards
+        )
+
+    def verify_audit_bundle(
+        self,
+        bundle: Dict[str, Any],
+        expected_signer_public_key_hex: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Verifies a cryptographic audit bundle (.dtbundle)."""
+        from .bundle import AuditBundleEngine
+        return AuditBundleEngine.verify_audit_bundle(bundle, expected_signer_public_key_hex)
+
+    def get_audit_bundle_compliance_report(
+        self,
+        bundle: Dict[str, Any],
+        expected_signer_public_key_hex: Optional[str] = None
+    ) -> str:
+        """Verifies an audit bundle and generates a formal Markdown compliance report."""
+        from .bundle import AuditBundleEngine
+        result = AuditBundleEngine.verify_audit_bundle(bundle, expected_signer_public_key_hex)
+        return AuditBundleEngine.generate_compliance_report(bundle, result)
+
+    # ==========================================
+    # W3C DataIntegrityProof Cryptosuites
+    # ==========================================
+
+    def issue_data_integrity_credential(
+        self,
+        credential_subject: Dict[str, Any],
+        issuer: Union[str, Dict[str, Any]],
+        key_pair: Dict[str, Any],
+        cryptosuite: str = "eddsa-jcs-2022",
+        type_list: Optional[List[str]] = None,
+        valid_until: Optional[str] = None,
+        cred_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Issues a W3C Verifiable Credential secured with DataIntegrityProof."""
+        from .dataintegrity import DataIntegrityEngine
+        return DataIntegrityEngine.issue(
+            credential_subject=credential_subject,
+            issuer=issuer,
+            key_pair=key_pair,
+            cryptosuite=cryptosuite,
+            type_list=type_list,
+            valid_until=valid_until,
+            cred_id=cred_id
+        )
+
+    def verify_data_integrity_credential(
+        self,
+        credential: Dict[str, Any],
+        expected_public_key_hex: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Verifies a W3C DataIntegrityProof credential."""
+        from .dataintegrity import DataIntegrityEngine
+        return DataIntegrityEngine.verify(credential, expected_public_key_hex)

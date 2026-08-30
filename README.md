@@ -4,7 +4,7 @@
 
 ### The Open-Source Sovereign Trust Fabric for Verifiable Credentials, AnonCreds 2.0 Blind Signatures, FROST Threshold DKG, Solidity On-Chain Verifiers & Cryptographic Audit Bundles
 
-[![Version](https://img.shields.io/badge/Version-v4.0.0-cyan.svg)]()
+[![Version](https://img.shields.io/badge/Version-v5.0.0-cyan.svg)]()
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CI Status](https://img.shields.io/badge/CI-100%25%20Passing-brightgreen.svg)]()
 [![AnonCreds 2.0](https://img.shields.io/badge/Privacy-AnonCreds%202.0%20Blind%20BBS%2B-purple.svg)]()

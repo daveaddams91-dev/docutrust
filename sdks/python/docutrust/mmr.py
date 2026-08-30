@@ -1,7 +1,7 @@
 from __future__ import annotations
 import hashlib
 import math
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Any, Union, Optional
 
 class MerkleMountainRange:
     """Merkle Mountain Range (MMR) high-throughput append-only ledger."""
@@ -54,6 +54,10 @@ class MerkleMountainRange:
         for i in range(len(peaks) - 2, -1, -1):
             root = hashlib.sha256(b"\x02" + bytes.fromhex(peaks[i]) + bytes.fromhex(root)).hexdigest()
         return root
+
+    def get_bagged_root(self) -> str:
+        """Alias for get_bagged_peak_root."""
+        return self.get_bagged_peak_root()
 
     def get_proof(self, element_index: int) -> Dict[str, Any]:
         if element_index < 0 or element_index >= len(self.leaves):

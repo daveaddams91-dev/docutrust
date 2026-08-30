@@ -13,7 +13,7 @@ import { CryptographicTSAOracle, TimestampToken } from '../oracle/index.js';
 
 export interface AuditBundleManifest {
   bundleId: string;
-  version: '4.0.0';
+  version: '5.0.0';
   generator: string;
   organization: string;
   createdAt: string;
@@ -58,24 +58,29 @@ export interface AuditBundleVerificationResult {
   tsaTimestampValid: boolean;
   totalRecordsChecked: number;
   verifiedAt: string;
+  complianceStatus: 'COMPLIANT' | 'NON_COMPLIANT';
   errors: string[];
 }
 
 export class AuditBundleEngine {
   /**
-   * Generates a signed cryptographic audit bundle (.dtbundle) from ledger and vault state.
+   * Generates a complete sovereign cryptographic audit bundle (.dtbundle).
    */
   public static createAuditBundle(options: {
-    organization: string;
-    signerKeyPair: KeyPair;
+    organization?: string;
     credentials?: Array<{ id: string; jcsCanonicalHash?: string }>;
     hashchain?: TamperEvidentHashChain;
     mmr?: MerkleMountainRange;
     complianceStandards?: string[];
-  }): CryptographicAuditBundle {
-    const bundleId = `dtb_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
+    signerKeyPair?: KeyPair;
+  } = {}): CryptographicAuditBundle {
+    const bundleId = `urn:uuid:bundle-${crypto.randomUUID()}`;
     const createdAt = new Date().toISOString();
-    const standards = options.complianceStandards || ['SOC2-TypeII', 'ISO-27001', 'eIDAS-2.0', 'W3C-VC-2.0'];
+    const standards = options.complianceStandards || ['SOC2-Type2', 'ISO-27001', 'eIDAS-2.0', 'W3C-VC-2.0'];
+
+    if (!options.signerKeyPair) {
+      options.signerKeyPair = generateKeyPair();
+    }
 
     // 1. Snapshot HashChain
     const hc = options.hashchain || new TamperEvidentHashChain();
@@ -98,9 +103,9 @@ export class AuditBundleEngine {
     // 5. Build Manifest
     const manifest: AuditBundleManifest = {
       bundleId,
-      version: '4.0.0',
-      generator: 'DocuTrust Sovereign Trust Engine v4.0.0',
-      organization: options.organization,
+      version: '5.0.0',
+      generator: 'DocuTrust Sovereign Trust Engine v5.0.0',
+      organization: options.organization || 'Unknown Organization',
       createdAt,
       complianceStandards: standards,
       totalCredentials: credentialDigests.length,
@@ -209,6 +214,7 @@ export class AuditBundleEngine {
       tsaTimestampValid,
       totalRecordsChecked: records.length + (bundle.credentialDigests ? bundle.credentialDigests.length : 0),
       verifiedAt: new Date().toISOString(),
+      complianceStatus: valid ? 'COMPLIANT' : 'NON_COMPLIANT',
       errors
     };
   }
