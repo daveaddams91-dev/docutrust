@@ -86,17 +86,21 @@ curl -X POST https://api.docutrust.org/api/v1/credentials/verify \\
   -H "Content-Type: application/json" \\
   -d '{"credential": { ... }}'`,
 
-    cli: `# 1. Generate Institutional KeyPair & DID
-$ docutrust keygen --out issuer-keys.json
+    cli: `# 1. AnonCreds 2.0 Blind Request & Blind Issuance
+$ docutrust anoncreds-blind-request --schema "schema:degree" --out req.json
+$ docutrust anoncreds-blind-issue --req req.json --claims claims.json --key keys.json
 
-# 2. Issue a single Credential from subject JSON
-$ docutrust issue --subject student.json --key issuer-keys.json --out degree-vc.json
+# 2. FROST Distributed Key Generation (2-of-3)
+$ docutrust dkg-setup --nodes 3 --threshold 2 --out ceremony.json
+$ docutrust dkg-sign-share --index 1 --share "a3f..." --msg "Block 89" --out s1.json
+$ docutrust dkg-aggregate --pub "04e..." --threshold 2 --shares "s1.json,s2.json"
 
-# 3. Batch Issue 1,000+ Credentials with Merkle Root on Polygon
-$ docutrust batch --csv students.csv --key issuer-keys.json --out-dir ./issued-degrees
+# 3. Export Solidity On-Chain Verifier Smart Contract
+$ docutrust solidity-export-verifier --name DocuTrustVerifier --out DocuTrustVerifier.sol
 
-# 4. Offline Verification of Cryptographic Signatures
-$ docutrust verify --vc degree-vc.json`
+# 4. Generate Signed Cryptographic Audit Bundle
+$ docutrust audit-bundle-create --org "Global Trust Foundation" --key keys.json --out audit.dtbundle
+$ docutrust audit-bundle-verify --bundle audit.dtbundle`
   };
 
   const copyCode = () => {
@@ -111,13 +115,13 @@ $ docutrust verify --vc degree-vc.json`
       <div className="mb-10">
         <div className="flex items-center gap-2 text-xs font-mono text-blue-400 mb-2 uppercase tracking-widest">
           <Terminal className="w-3.5 h-3.5" />
-          <span>Developer SDKs & OpenAPI Specification</span>
+          <span>Developer SDKs & OpenAPI Specification (v4.0.0)</span>
         </div>
         <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
           Developer Hub & Quickstart
         </h2>
         <p className="text-sm text-gray-400 mt-2">
-          Integrate programmatic credential issuance and verification directly into your LMS, ERP, HR portal, or background screening platform.
+          Integrate programmatic credential issuance, AnonCreds 2.0 blind requests, FROST DKG signing, and on-chain Solidity verifiers directly into your stack.
         </p>
       </div>
 
@@ -162,36 +166,36 @@ $ docutrust verify --vc degree-vc.json`
           </h3>
 
           <div className="space-y-2.5">
-            <div className="p-3 rounded-lg bg-gray-950 border border-gray-800 space-y-1">
+            <div className="p-2.5 rounded-lg bg-gray-950 border border-gray-800 space-y-1">
               <div className="flex items-center gap-2">
-                <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400 font-bold">POST</span>
-                <span className="text-white text-[11px]">/api/v1/credentials/issue</span>
+                <span className="px-1.5 py-0.5 rounded text-[10px] bg-indigo-500/10 text-indigo-400 font-bold">POST</span>
+                <span className="text-white text-[11px]">/api/v1/anoncreds/blind-issue</span>
               </div>
-              <p className="text-[10px] text-gray-400 font-sans">Issue a signed W3C Verifiable Credential</p>
+              <p className="text-[10px] text-gray-400 font-sans">AnonCreds 2.0 blind BBS+ credential issuance</p>
             </div>
 
-            <div className="p-3 rounded-lg bg-gray-950 border border-gray-800 space-y-1">
+            <div className="p-2.5 rounded-lg bg-gray-950 border border-gray-800 space-y-1">
               <div className="flex items-center gap-2">
-                <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400 font-bold">POST</span>
-                <span className="text-white text-[11px]">/api/v1/credentials/issue-batch</span>
+                <span className="px-1.5 py-0.5 rounded text-[10px] bg-cyan-500/10 text-cyan-400 font-bold">POST</span>
+                <span className="text-white text-[11px]">/api/v1/dkg/ceremony</span>
               </div>
-              <p className="text-[10px] text-gray-400 font-sans">Batch issue with Merkle tree & ledger anchor</p>
+              <p className="text-[10px] text-gray-400 font-sans">Initialize FROST K-of-N threshold ceremony</p>
             </div>
 
-            <div className="p-3 rounded-lg bg-gray-950 border border-gray-800 space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400 font-bold">POST</span>
-                <span className="text-white text-[11px]">/api/v1/credentials/verify</span>
-              </div>
-              <p className="text-[10px] text-gray-400 font-sans">Verify signature, Merkle proof, & anchor</p>
-            </div>
-
-            <div className="p-3 rounded-lg bg-gray-950 border border-gray-800 space-y-1">
+            <div className="p-2.5 rounded-lg bg-gray-950 border border-gray-800 space-y-1">
               <div className="flex items-center gap-2">
                 <span className="px-1.5 py-0.5 rounded text-[10px] bg-blue-500/10 text-blue-400 font-bold">POST</span>
-                <span className="text-white text-[11px]">/api/v1/keys/generate</span>
+                <span className="text-white text-[11px]">/api/v1/solidity/export-verifier</span>
               </div>
-              <p className="text-[10px] text-gray-400 font-sans">Generate Ed25519 keypair & DID</p>
+              <p className="text-[10px] text-gray-400 font-sans">Generate on-chain Solidity verifier contract</p>
+            </div>
+
+            <div className="p-2.5 rounded-lg bg-gray-950 border border-gray-800 space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400 font-bold">POST</span>
+                <span className="text-white text-[11px]">/api/v1/audit/bundle/create</span>
+              </div>
+              <p className="text-[10px] text-gray-400 font-sans">Package .dtbundle with SOC2 compliance</p>
             </div>
           </div>
         </div>

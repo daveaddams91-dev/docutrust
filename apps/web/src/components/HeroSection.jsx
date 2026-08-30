@@ -202,37 +202,68 @@ export default function HeroSection({ setActiveTab }) {
         </div>
 
         {/* Feature Grid Highlights */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto mt-20 text-left">
-          <div className="glass-card p-6 rounded-2xl border border-gray-800/80 hover:border-blue-500/40 transition-all">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 max-w-6xl mx-auto mt-20 text-left">
+          <div 
+            onClick={() => setActiveTab('anoncreds')}
+            className="glass-card p-5 rounded-2xl border border-gray-800/80 hover:border-indigo-500/50 hover:bg-gray-900/60 transition-all cursor-pointer group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-3 group-hover:scale-105 transition-transform">
               <Lock className="w-5 h-5" />
             </div>
-            <h3 className="text-base font-bold text-white mb-2">Cryptographic Tamper-Proofing</h3>
-            <p className="text-sm text-gray-400 leading-relaxed">
-              Every document is signed with Ed25519 asymmetric keys over canonical JSON (RFC 8785). 
-              A single modified character immediately renders the cryptographic signature invalid.
+            <h3 className="text-sm font-bold text-white mb-1.5 flex items-center gap-1">
+              AnonCreds 2.0 & Blind BBS+
+              <Sparkles className="w-3 h-3 text-indigo-400" />
+            </h3>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              Holder secret blind commitments and unlinkable selective disclosure presentations.
             </p>
           </div>
 
-          <div className="glass-card p-6 rounded-2xl border border-gray-800/80 hover:border-indigo-500/40 transition-all">
-            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-4">
-              <EyeOff className="w-5 h-5" />
+          <div 
+            onClick={() => setActiveTab('dkg')}
+            className="glass-card p-5 rounded-2xl border border-gray-800/80 hover:border-cyan-500/50 hover:bg-gray-900/60 transition-all cursor-pointer group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 mb-3 group-hover:scale-105 transition-transform">
+              <Zap className="w-5 h-5" />
             </div>
-            <h3 className="text-base font-bold text-white mb-2">ZK-Style Selective Disclosure</h3>
-            <p className="text-sm text-gray-400 leading-relaxed">
-              Holders can prove they possess a valid degree or qualification while selectively hiding 
-              sensitive attributes like GPA, student ID, birthdate, or residential address.
+            <h3 className="text-sm font-bold text-white mb-1.5 flex items-center gap-1">
+              FROST Threshold DKG
+              <Sparkles className="w-3 h-3 text-cyan-400" />
+            </h3>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              K-of-N distributed key generation without reconstructing master private keys.
             </p>
           </div>
 
-          <div className="glass-card p-6 rounded-2xl border border-gray-800/80 hover:border-cyan-500/40 transition-all">
-            <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 mb-4">
+          <div 
+            onClick={() => setActiveTab('solidity')}
+            className="glass-card p-5 rounded-2xl border border-gray-800/80 hover:border-blue-500/50 hover:bg-gray-900/60 transition-all cursor-pointer group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 mb-3 group-hover:scale-105 transition-transform">
+              <FileCode className="w-5 h-5" />
+            </div>
+            <h3 className="text-sm font-bold text-white mb-1.5 flex items-center gap-1">
+              Solidity On-Chain Verifier
+              <Sparkles className="w-3 h-3 text-blue-400" />
+            </h3>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              Exportable `DocuTrustVerifier.sol` smart contracts and Web3 ABI calldata generator.
+            </p>
+          </div>
+
+          <div 
+            onClick={() => setActiveTab('bundle')}
+            className="glass-card p-5 rounded-2xl border border-gray-800/80 hover:border-emerald-500/50 hover:bg-gray-900/60 transition-all cursor-pointer group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-3 group-hover:scale-105 transition-transform">
               <Layers className="w-5 h-5" />
             </div>
-            <h3 className="text-base font-bold text-white mb-2">10,000+ Batch Merkle Anchoring</h3>
-            <p className="text-sm text-gray-400 leading-relaxed">
-              Batch thousands of diplomas or corporate badges into a single 32-byte Merkle root anchored 
-              to public ledgers with individual logarithmic inclusion proofs.
+            <h3 className="text-sm font-bold text-white mb-1.5 flex items-center gap-1">
+              Audit Bundles (.dtbundle)
+              <Sparkles className="w-3 h-3 text-emerald-400" />
+            </h3>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              HashChain, MMR peaks, TSA tokens, and automated SOC2 / ISO 27001 compliance certificates.
             </p>
           </div>
         </div>

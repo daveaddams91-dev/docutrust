@@ -123,7 +123,15 @@ const {
   PresentationExchangeEngine,
   // Recursive ZK Graph
   provePredicateGraph,
-  verifyPredicateGraph
+  verifyPredicateGraph,
+  // AnonCreds 2.0
+  AnonCredsEngine,
+  // DKG
+  DKGEngine,
+  // Solidity EVM Engine
+  SolidityEngine,
+  // Audit Bundle Engine
+  AuditBundleEngine
 } = require('../dist/index.js');
 
 // 1. Cryptography Tests
@@ -1746,6 +1754,199 @@ test('49. Security: sanitizeJsonPayload strips prototype pollution attacks recur
   assert.equal(cleaned.nested.constructor, undefined);
   assert.equal(({}).isAdmin, undefined);
 });
+
+// 50. AnonCreds 2.0 Blind Issuance & Presentation
+test('50. AnonCreds 2.0: Blind request, blind issuance, unblinding, presentation, and verification', () => {
+  const issuerEdKp = generateKeyPair();
+  const issuerBbsKp = generateBBSKeyPair(10);
+  const issuerKeys = {
+    issuerDid: issuerEdKp.did,
+    publicKeyHex: issuerEdKp.publicKeyHex,
+    privateKeyHex: issuerEdKp.privateKeyHex,
+    bbsKeyPair: issuerBbsKp,
+    schemaId: 'schema:degree:2026'
+  };
+
+  // 1. Holder generates master secret and creates blind request
+  const { masterSecret } = AnonCredsEngine.generateHolderMasterSecret();
+  const { request, blindingFactor } = AnonCredsEngine.createBlindRequest(
+    masterSecret,
+    'schema:degree:2026',
+    issuerEdKp.did
+  );
+
+  assert.equal(request.type, 'AnonCredsBlindRequest2026');
+  assert.equal(AnonCredsEngine.verifyBlindRequest(request), true);
+
+  // 2. Issuer blind signs claims
+  const claims = {
+    recipientName: 'Alice Henderson',
+    degree: 'M.S. Cybersecurity',
+    gpa: '3.95',
+    graduationYear: 2026
+  };
+  const blindCred = AnonCredsEngine.issueBlindCredential(request, claims, issuerKeys, issuerEdKp);
+  assert.equal(blindCred.type, 'AnonCredsBlindCredential2026');
+  assert.equal(blindCred.blindedCommitment, request.blindedSecretCommitment);
+
+  // 3. Holder unblinds credential
+  const anonCred = AnonCredsEngine.unblindCredential(blindCred, masterSecret, blindingFactor);
+  assert.equal(anonCred.id, blindCred.id);
+
+  // 4. Holder presents with selective disclosure (disclosing degree and gpa, hiding name and year)
+  const presentationNonce = 'verifier-challenge-nonce-777';
+  const presentation = AnonCredsEngine.createPresentation(
+    anonCred,
+    masterSecret,
+    ['degree', 'gpa'],
+    presentationNonce
+  );
+
+  assert.equal(presentation.type, 'AnonCredsPresentation2026');
+  assert.deepEqual(presentation.disclosedClaims, {
+    degree: 'M.S. Cybersecurity',
+    gpa: '3.95'
+  });
+
+  // 5. Verifier verifies presentation
+  const audit = AnonCredsEngine.verifyPresentation(
+    presentation,
+    presentationNonce,
+    issuerEdKp.did
+  );
+
+  assert.equal(audit.valid, true);
+  assert.equal(audit.masterSecretVerified, true);
+  assert.equal(audit.errors.length, 0);
+});
+
+// 51. FROST DKG Ceremony & Threshold Signing
+test('51. DKG: Ceremony setup, share signing, aggregation, and group verification (2-of-3)', () => {
+  const participants = [
+    { name: 'Node 1 (Alpha)' },
+    { name: 'Node 2 (Beta)' },
+    { name: 'Node 3 (Gamma)' }
+  ];
+
+  // 1. Run DKG Ceremony
+  const dkgSetup = DKGEngine.runDKGCeremony(participants, 2);
+  assert.equal(dkgSetup.threshold, 2);
+  assert.equal(dkgSetup.totalParticipants, 3);
+  assert.ok(dkgSetup.groupDid.startsWith('did:dkg:z'));
+
+  // 2. Generate partial signatures for message from Participant 1 and Participant 3
+  const message = 'Batch Merkle Root: 0x9f83...2026';
+  const share1 = DKGEngine.signShare(1, dkgSetup.participants[0].privateShareHex, dkgSetup.participants[0].did, message);
+  const share3 = DKGEngine.signShare(3, dkgSetup.participants[2].privateShareHex, dkgSetup.participants[2].did, message);
+
+  // 3. Aggregate threshold signature
+  const aggregated = DKGEngine.aggregateSignatures(
+    dkgSetup.groupPublicKeyHex,
+    dkgSetup.groupDid,
+    2,
+    [share1, share3]
+  );
+
+  assert.equal(aggregated.type, 'DKGThresholdEd25519Signature2026');
+  assert.deepEqual(aggregated.participatingSigners, [1, 3]);
+
+  // 4. Verify aggregated signature
+  const verifyResult = DKGEngine.verifyAggregatedSignature(aggregated, message, dkgSetup.groupPublicKeyHex);
+  assert.equal(verifyResult.valid, true);
+});
+
+// 52. Solidity EVM Contract Generator & Calldata
+test('52. Solidity: DocuTrustVerifier.sol generation & EVM ABI calldata encoding & Merkle proof validation', () => {
+  const solCode = SolidityEngine.generateVerifierContract({ contractName: 'EnterpriseDocuTrustVerifier' });
+  assert.ok(solCode.includes('contract EnterpriseDocuTrustVerifier'));
+  assert.ok(solCode.includes('function verifyCredentialOnChain'));
+
+  const leaves = [
+    sha256Hex('credential-1'),
+    sha256Hex('credential-2'),
+    sha256Hex('credential-3'),
+    sha256Hex('credential-4')
+  ];
+  const tree = new MerkleTree(leaves);
+  const root = tree.getRoot();
+  const proof = tree.getProof(0);
+
+  const calldata = SolidityEngine.encodeVerificationCalldata(leaves[0], proof.auditPath, root);
+  assert.ok(calldata.calldataHex.startsWith('0x'));
+  assert.equal(calldata.methodSignature, 'verifyCredentialOnChain(bytes32,bytes32[],bytes32)');
+
+  const localValid = MerkleTree.verifyProof(null, proof, root);
+  assert.equal(localValid, true);
+});
+
+// 53. Cryptographic Audit Bundle Packaging (.dtbundle)
+test('53. Cryptographic Audit Bundle: Signed .dtbundle generation, verification, and compliance report', () => {
+  const signerKp = generateKeyPair();
+  const hc = new TamperEvidentHashChain();
+  hc.appendBlock(sha256Hex('root1'), 10, signerKp.did, h => signData(h, signerKp));
+  hc.appendBlock(sha256Hex('root2'), 25, signerKp.did, h => signData(h, signerKp));
+
+  const mmr = new MerkleMountainRange();
+  mmr.append('leaf-1');
+  mmr.append('leaf-2');
+
+  const bundle = AuditBundleEngine.createAuditBundle({
+    organization: 'Acme Federal Trust',
+    signerKeyPair: signerKp,
+    hashchain: hc,
+    mmr,
+    credentials: [{ id: 'cred-1', jcsCanonicalHash: sha256Hex('c1') }]
+  });
+
+  assert.equal(bundle.type, 'DocuTrustAuditBundle2026');
+  assert.equal(bundle.manifest.organization, 'Acme Federal Trust');
+
+  const audit = AuditBundleEngine.verifyAuditBundle(bundle, signerKp.publicKeyHex);
+  assert.equal(audit.valid, true);
+  assert.equal(audit.signatureValid, true);
+  assert.equal(audit.hashchainValid, true);
+  assert.equal(audit.tsaTimestampValid, true);
+
+  const report = AuditBundleEngine.generateComplianceReport(bundle, audit);
+  assert.ok(report.includes('Acme Federal Trust'));
+  assert.ok(report.includes('PASSED'));
+});
+
+// 54. W3C DataIntegrityProof Suites
+test('54. W3C DataIntegrityProof: Issuance with eddsa-jcs-2022 & ml-dsa-65-2026 and verification', async () => {
+  const issuerKp = generateKeyPair();
+
+  // 1. eddsa-jcs-2022
+  const vcEd = VerifiableCredentialsEngine.issueDataIntegrity({
+    issuer: { id: issuerKp.did, name: 'DocuTrust Authority' },
+    credentialSubject: { student: 'Bob', cert: 'B.S. Mathematics' },
+    cryptosuite: 'eddsa-jcs-2022',
+    keyPair: issuerKp
+  });
+
+  assert.equal(vcEd.proof.type, 'DataIntegrityProof');
+  assert.equal(vcEd.proof.cryptosuite, 'eddsa-jcs-2022');
+
+  const auditEd = await VerifiableCredentialsEngine.verify(vcEd);
+  assert.equal(auditEd.valid, true);
+  assert.equal(auditEd.signatureValid, true);
+
+  // 2. ml-dsa-65-2026 PQC
+  const vcPqc = VerifiableCredentialsEngine.issueDataIntegrity({
+    issuer: { id: issuerKp.did, name: 'Quantum Authority' },
+    credentialSubject: { scientist: 'Eve', clearance: 'COSMIC' },
+    cryptosuite: 'ml-dsa-65-2026',
+    keyPair: issuerKp
+  });
+
+  assert.equal(vcPqc.proof.type, 'DataIntegrityProof');
+  assert.equal(vcPqc.proof.cryptosuite, 'ml-dsa-65-2026');
+
+  const auditPqc = await VerifiableCredentialsEngine.verify(vcPqc);
+  assert.equal(auditPqc.valid, true);
+  assert.equal(auditPqc.isQuantumSafe, true);
+});
+
 
 
 

@@ -151,7 +151,13 @@ export class CredentialVault {
     limit?: number;
     offset?: number;
   } = {}): { records: StoredCredentialRecord[]; total: number } {
-    let list = Array.from(this.credentialsMap.values());
+    const now = new Date();
+    let list = Array.from(this.credentialsMap.values()).map(r => {
+      if (r.status === 'valid' && r.validUntil && new Date(r.validUntil) < now) {
+        r.status = 'expired';
+      }
+      return r;
+    });
 
     if (options.issuerId) {
       list = list.filter(r => r.issuerId === options.issuerId);
@@ -163,8 +169,12 @@ export class CredentialVault {
       const q = options.search.toLowerCase();
       list = list.filter(r =>
         (r.recipientName || '').toLowerCase().includes(q) ||
+        (r.recipientId || '').toLowerCase().includes(q) ||
+        (r.issuerName || '').toLowerCase().includes(q) ||
+        (r.issuerId || '').toLowerCase().includes(q) ||
         (r.id || '').toLowerCase().includes(q) ||
-        (Array.isArray(r.type) ? r.type : []).some(t => (t || '').toLowerCase().includes(q))
+        (Array.isArray(r.type) ? r.type : []).some(t => (t || '').toLowerCase().includes(q)) ||
+        (r.rawCredential?.credentialSubject ? JSON.stringify(r.rawCredential.credentialSubject).toLowerCase().includes(q) : false)
       );
     }
 
@@ -193,7 +203,14 @@ export class CredentialVault {
     const unanchored = this.getUnanchored();
     if (unanchored.length === 0) return null;
 
-    const leaves = unanchored.map(u => u.rawCredential.proof.jcsCanonicalHash || sha256Hex(canonicalizeJson(u.rawCredential)));
+    const leaves = unanchored.map(u => {
+      if (u.rawCredential?.proof?.jcsCanonicalHash) {
+        return u.rawCredential.proof.jcsCanonicalHash;
+      }
+      const unsigned = { ...u.rawCredential };
+      delete (unsigned as any).proof;
+      return sha256Hex(canonicalizeJson(unsigned));
+    });
     const tree = new MerkleTree(leaves);
     const root = tree.getRoot();
 

@@ -10,7 +10,15 @@ export interface VerifiablePdfResult {
 }
 
 function escapePdfText(str: string): string {
-  return String(str)
+  // Normalize string, sanitize unicode to clean printable ASCII representation for standard PDF Type1 fonts
+  const clean = String(str)
+    .normalize('NFKD')
+    .replace(/[^\x20-\x7E]/g, c => {
+      // Map common accented latin characters or fallback to ascii
+      const code = c.charCodeAt(0);
+      return code < 256 ? String.fromCharCode(code) : '?';
+    });
+  return clean
     .replace(/\\/g, '\\\\')
     .replace(/\(/g, '\\(')
     .replace(/\)/g, '\\)');
@@ -115,13 +123,14 @@ export function extractVerifiablePdfProof(pdfData: Buffer | string): VerifiableC
   const content = typeof pdfData === 'string' ? pdfData : pdfData.toString('utf-8');
 
   // Search for /DocuTrustProof << /Type /VerifiableCredential /Payload (BASE64) >>
-  const match = content.match(/\/DocuTrustProof\s*<<\s*\/Type\s*\/VerifiableCredential\s*\/Payload\s*\(([^)]+)\)\s*>>/);
+  const match = content.match(/\/DocuTrustProof\s*<<\s*\/Type\s*\/VerifiableCredential\s*\/Payload\s*\(([\s\S]*?)\)\s*>>/);
   if (!match || !match[1]) {
     return null;
   }
 
   try {
-    const rawJson = Buffer.from(match[1], 'base64').toString('utf-8');
+    const rawBase64 = match[1].replace(/\s+/g, '');
+    const rawJson = Buffer.from(rawBase64, 'base64').toString('utf-8');
     return JSON.parse(rawJson) as VerifiableCredential;
   } catch (err) {
     return null;

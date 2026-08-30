@@ -71,7 +71,11 @@ const {
   sanitizeJsonPayload,
   VerifiableCredentialsEngine,
   MultiSigThresholdEngine,
-  DIDResolver
+  DIDResolver,
+  AnonCredsEngine,
+  DKGEngine,
+  SolidityEngine,
+  AuditBundleEngine
 } = require('@docutrust/core');
 
 const PORT = process.env.PORT || 4000;
@@ -1467,6 +1471,260 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/v1/trust/registry' && req.method === 'GET') {
       const all = trustRegistry.listAllIssuers();
       return jsonResponse(200, { success: true, count: all.length, issuers: all });
+    }
+
+    // 46. AnonCreds 2.0 & Blind Credential Issuance Endpoints
+    if (pathname === '/api/v1/anoncreds/blind-request' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { masterSecret, schemaId, issuerDid } = body;
+      if (!schemaId || !issuerDid) {
+        return jsonResponse(400, { error: 'Missing schemaId or issuerDid in request.' });
+      }
+      try {
+        const secret = masterSecret || AnonCredsEngine.generateHolderMasterSecret().masterSecret;
+        const { request, blindingFactor } = AnonCredsEngine.createBlindRequest(secret, schemaId, issuerDid);
+        return jsonResponse(200, { success: true, masterSecret: secret, blindingFactor, request });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/anoncreds/blind-issue' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { request, claims, issuerKeys, issuerEdKeys } = body;
+      if (!request || !claims || !issuerEdKeys) {
+        return jsonResponse(400, { error: 'Missing request, claims, or issuerEdKeys in request.' });
+      }
+      try {
+        const blindCred = AnonCredsEngine.issueBlindCredential(
+          request,
+          claims,
+          issuerKeys || { issuerDid: issuerEdKeys.did, publicKeyHex: issuerEdKeys.publicKeyHex, schemaId: request.schemaId },
+          issuerEdKeys
+        );
+        return jsonResponse(200, { success: true, credential: blindCred });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/anoncreds/unblind' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { blindCredential, masterSecret, blindingFactor } = body;
+      if (!blindCredential || !masterSecret || !blindingFactor) {
+        return jsonResponse(400, { error: 'Missing blindCredential, masterSecret, or blindingFactor.' });
+      }
+      try {
+        const cred = AnonCredsEngine.unblindCredential(blindCredential, masterSecret, blindingFactor);
+        return jsonResponse(200, { success: true, credential: cred });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/anoncreds/create-presentation' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { credential, masterSecret, revealKeys, verifierNonce, predicateProofs } = body;
+      if (!credential || !masterSecret || !revealKeys || !verifierNonce) {
+        return jsonResponse(400, { error: 'Missing credential, masterSecret, revealKeys, or verifierNonce.' });
+      }
+      try {
+        const presentation = AnonCredsEngine.createPresentation(
+          credential,
+          masterSecret,
+          revealKeys,
+          verifierNonce,
+          predicateProofs || []
+        );
+        return jsonResponse(200, { success: true, presentation });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/anoncreds/verify-presentation' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { presentation, verifierNonce, issuerDid } = body;
+      if (!presentation) {
+        return jsonResponse(400, { error: 'Missing presentation payload.' });
+      }
+      try {
+        const result = AnonCredsEngine.verifyPresentation(presentation, verifierNonce, issuerDid);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // 47. FROST Distributed Key Generation (DKG) Endpoints
+    if (pathname === '/api/v1/dkg/ceremony' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { participants, threshold } = body;
+      if (!participants || !Array.isArray(participants) || !threshold) {
+        return jsonResponse(400, { error: 'Missing participants array or threshold parameter.' });
+      }
+      try {
+        const ceremony = DKGEngine.runDKGCeremony(participants, Number(threshold));
+        return jsonResponse(200, { success: true, ceremony });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/dkg/sign-share' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { participantIndex, privateShareHex, signerDid, message } = body;
+      if (participantIndex === undefined || !privateShareHex || !signerDid || !message) {
+        return jsonResponse(400, { error: 'Missing participantIndex, privateShareHex, signerDid, or message.' });
+      }
+      try {
+        const share = DKGEngine.signShare(Number(participantIndex), privateShareHex, signerDid, message);
+        return jsonResponse(200, { success: true, share });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/dkg/aggregate' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { groupPublicKeyHex, groupDid, threshold, shares } = body;
+      if (!groupPublicKeyHex || !groupDid || !threshold || !shares) {
+        return jsonResponse(400, { error: 'Missing groupPublicKeyHex, groupDid, threshold, or shares.' });
+      }
+      try {
+        const signature = DKGEngine.aggregateSignatures(groupPublicKeyHex, groupDid, Number(threshold), shares);
+        return jsonResponse(200, { success: true, signature });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/dkg/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { signature, message, groupPublicKeyHex } = body;
+      if (!signature || !message) {
+        return jsonResponse(400, { error: 'Missing signature or message in request.' });
+      }
+      try {
+        const result = DKGEngine.verifyAggregatedSignature(signature, message, groupPublicKeyHex);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // 48. EVM Solidity Smart Contract & Calldata Endpoints
+    if (pathname === '/api/v1/solidity/generate-verifier' && (req.method === 'GET' || req.method === 'POST')) {
+      let contractName = 'DocuTrustVerifier';
+      let ownerAddress;
+      if (req.method === 'POST') {
+        const body = await readJsonBody();
+        if (body.contractName) contractName = body.contractName;
+        if (body.ownerAddress) ownerAddress = body.ownerAddress;
+      }
+      try {
+        const sourceCode = SolidityEngine.generateVerifierContract({ contractName, ownerAddress });
+        return jsonResponse(200, { success: true, contractName, sourceCode });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/solidity/calldata' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { credentialHash, merkleProof, rootHash } = body;
+      if (!credentialHash || !merkleProof || !rootHash) {
+        return jsonResponse(400, { error: 'Missing credentialHash, merkleProof, or rootHash.' });
+      }
+      try {
+        const calldata = SolidityEngine.encodeVerificationCalldata(credentialHash, merkleProof, rootHash);
+        return jsonResponse(200, { success: true, ...calldata });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // 49. Cryptographic Audit Bundle Endpoints (.dtbundle)
+    if (pathname === '/api/v1/audit/bundle/create' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { organization, signerKeyPair, complianceStandards } = body;
+      try {
+        const kp = signerKeyPair || generateKeyPair();
+        const bundle = AuditBundleEngine.createAuditBundle({
+          organization: organization || 'DocuTrust Enterprise Sovereign Trust',
+          signerKeyPair: kp,
+          hashchain: hashChainLedger,
+          mmr: mmrLedger,
+          complianceStandards: complianceStandards || ['SOC2-TypeII', 'ISO-27001', 'eIDAS-2.0', 'W3C-VC-2.0'],
+          credentials: credentialsStore.map(c => ({ id: c.id, jcsCanonicalHash: c.jcsCanonicalHash }))
+        });
+        return jsonResponse(200, { success: true, bundle });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/audit/bundle/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { bundle, expectedSignerPublicKeyHex } = body;
+      if (!bundle) {
+        return jsonResponse(400, { error: 'Missing bundle payload.' });
+      }
+      try {
+        const result = AuditBundleEngine.verifyAuditBundle(bundle, expectedSignerPublicKeyHex);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/audit/bundle/report' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { bundle, expectedSignerPublicKeyHex } = body;
+      if (!bundle) {
+        return jsonResponse(400, { error: 'Missing bundle payload.' });
+      }
+      try {
+        const result = AuditBundleEngine.verifyAuditBundle(bundle, expectedSignerPublicKeyHex);
+        const report = AuditBundleEngine.generateComplianceReport(bundle, result);
+        return jsonResponse(200, { success: true, result, markdownReport: report });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // 50. W3C DataIntegrityProof Endpoints
+    if (pathname === '/api/v1/credentials/dataintegrity/issue' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { issuer, credentialSubject, cryptosuite, keyPair } = body;
+      if (!issuer || !credentialSubject || !keyPair) {
+        return jsonResponse(400, { error: 'Missing issuer, credentialSubject, or keyPair.' });
+      }
+      try {
+        const vc = VerifiableCredentialsEngine.issueDataIntegrity({
+          issuer,
+          credentialSubject,
+          cryptosuite: cryptosuite || 'eddsa-jcs-2022',
+          keyPair
+        });
+        return jsonResponse(200, { success: true, credential: vc });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/credentials/dataintegrity/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { credential } = body;
+      if (!credential) {
+        return jsonResponse(400, { error: 'Missing credential payload.' });
+      }
+      try {
+        const result = await VerifiableCredentialsEngine.verify(credential);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
     }
 
     // Default 404

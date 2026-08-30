@@ -465,6 +465,106 @@ test('CLI Suite', async (t) => {
     const valCredOut = execSync(`node "${cliPath}" schema-validate-credential --credential "${vcFile}" --schema "${diplomaSchemaFile}"`).toString();
     assert.ok(valCredOut.includes('PASSED'));
   });
+
+  const anonReqFile = path.join(tempDir, 'anon-req.json');
+  const anonClaimsFile = path.join(tempDir, 'anon-claims.json');
+  const anonCredFile = path.join(tempDir, 'anon-cred.json');
+  const anonUnblindFile = path.join(tempDir, 'anon-unblind.json');
+  const anonPresFile = path.join(tempDir, 'anon-pres.json');
+  await t.test('31. docutrust anoncreds commands (request, issue, unblind, derive-proof, verify)', () => {
+    fs.writeFileSync(anonClaimsFile, JSON.stringify({ studentName: 'Alice', degree: 'Ph.D. Quantum Computing' }), 'utf-8');
+
+    // 1. Blind Request
+    const reqOut = execSync(`node "${cliPath}" anoncreds-blind-request --schema "schema:degree" --issuer "did:key:zIssuer" --out "${anonReqFile}"`).toString();
+    assert.ok(reqOut.includes('Blind Request generated'));
+    const reqData = JSON.parse(fs.readFileSync(anonReqFile, 'utf-8'));
+
+    // 2. Blind Issue
+    const issueOut = execSync(`node "${cliPath}" anoncreds-blind-issue --req "${anonReqFile}" --claims "${anonClaimsFile}" --key "${keysFile}" --out "${anonCredFile}"`).toString();
+    assert.ok(issueOut.includes('Blind Credential issued'));
+
+    // 3. Unblind
+    const unblindOut = execSync(`node "${cliPath}" anoncreds-unblind --cred "${anonCredFile}" --secret "${reqData.masterSecret}" --blinding "${reqData.blindingFactor}" --out "${anonUnblindFile}"`).toString();
+    assert.ok(unblindOut.includes('unblinded'));
+
+    // 4. Derive Proof
+    const nonce = 'cli-test-nonce-123';
+    const deriveOut = execSync(`node "${cliPath}" anoncreds-derive-proof --cred "${anonUnblindFile}" --secret "${reqData.masterSecret}" --reveal "degree" --nonce "${nonce}" --out "${anonPresFile}"`).toString();
+    assert.ok(deriveOut.includes('ZK Presentation derived'));
+
+    // 5. Verify Presentation
+    const keys = JSON.parse(fs.readFileSync(keysFile, 'utf-8'));
+    const verifyOut = execSync(`node "${cliPath}" anoncreds-verify --pres "${anonPresFile}" --nonce "${nonce}" --issuer "${keys.did}"`).toString();
+    assert.ok(verifyOut.includes('VALID'));
+  });
+
+  const dkgCeremonyFile = path.join(tempDir, 'dkg-ceremony.json');
+  const dkgShare1SigFile = path.join(tempDir, 'dkg-s1.json');
+  const dkgShare2SigFile = path.join(tempDir, 'dkg-s2.json');
+  const dkgAggSigFile = path.join(tempDir, 'dkg-agg.json');
+  await t.test('32. docutrust dkg commands (setup, sign-share, aggregate, verify)', () => {
+    // 1. Setup Ceremony (2-of-3)
+    const setupOut = execSync(`node "${cliPath}" dkg-setup --nodes 3 --threshold 2 --out "${dkgCeremonyFile}"`).toString();
+    assert.ok(setupOut.includes('DKG Ceremony completed'));
+    const ceremony = JSON.parse(fs.readFileSync(dkgCeremonyFile, 'utf-8'));
+
+    // 2. Sign Shares
+    const msg = 'Ledger Root Hash 0x123456';
+    execSync(`node "${cliPath}" dkg-sign-share --index 1 --share "${ceremony.participants[0].privateShareHex}" --did "${ceremony.participants[0].did}" --msg "${msg}" --out "${dkgShare1SigFile}"`);
+    execSync(`node "${cliPath}" dkg-sign-share --index 2 --share "${ceremony.participants[1].privateShareHex}" --did "${ceremony.participants[1].did}" --msg "${msg}" --out "${dkgShare2SigFile}"`);
+
+    // 3. Aggregate
+    const aggOut = execSync(`node "${cliPath}" dkg-aggregate --pub "${ceremony.groupPublicKeyHex}" --did "${ceremony.groupDid}" --threshold 2 --shares "${dkgShare1SigFile},${dkgShare2SigFile}" --out "${dkgAggSigFile}"`).toString();
+    assert.ok(aggOut.includes('Aggregated FROST signature created'));
+
+    // 4. Verify
+    const verifyOut = execSync(`node "${cliPath}" dkg-verify --sig "${dkgAggSigFile}" --msg "${msg}" --pub "${ceremony.groupPublicKeyHex}"`).toString();
+    assert.ok(verifyOut.includes('VALID'));
+  });
+
+  const solVerifierFile = path.join(tempDir, 'CustomVerifier.sol');
+  const merkleProofFile = path.join(tempDir, 'merkle-proof.json');
+  await t.test('33. docutrust solidity commands (export-verifier, calldata)', () => {
+    // 1. Export Verifier
+    const expOut = execSync(`node "${cliPath}" solidity-export-verifier --name "CustomVerifier" --out "${solVerifierFile}"`).toString();
+    assert.ok(expOut.includes('Solidity Verifier Smart Contract exported'));
+    assert.ok(fs.existsSync(solVerifierFile));
+
+    // 2. Calldata encoding
+    fs.writeFileSync(merkleProofFile, JSON.stringify([
+      { position: 'left', data: '0000000000000000000000000000000000000000000000000000000000000001' }
+    ]), 'utf-8');
+    const callOut = execSync(`node "${cliPath}" solidity-calldata --leaf "0000000000000000000000000000000000000000000000000000000000000002" --proof "${merkleProofFile}" --root "0000000000000000000000000000000000000000000000000000000000000003"`).toString();
+    assert.ok(callOut.includes('calldataHex'));
+  });
+
+  const auditBundleFile = path.join(tempDir, 'audit.dtbundle');
+  await t.test('34. docutrust audit-bundle commands (create, verify)', () => {
+    // 1. Create
+    const createOut = execSync(`node "${cliPath}" audit-bundle-create --org "DocuTrust Global" --key "${keysFile}" --out "${auditBundleFile}"`).toString();
+    assert.ok(createOut.includes('.dtbundle'));
+    assert.ok(fs.existsSync(auditBundleFile));
+
+    // 2. Verify
+    const keys = JSON.parse(fs.readFileSync(keysFile, 'utf-8'));
+    const verifyOut = execSync(`node "${cliPath}" audit-bundle-verify --bundle "${auditBundleFile}" --pub "${keys.publicKeyHex}"`).toString();
+    assert.ok(verifyOut.includes('PASSED'));
+  });
+
+  const diClaimsFile = path.join(tempDir, 'di-claims.json');
+  const diVcFile = path.join(tempDir, 'di-vc.json');
+  await t.test('35. docutrust dataintegrity commands (issue, verify)', () => {
+    fs.writeFileSync(diClaimsFile, JSON.stringify({ employee: 'Bob', clearance: 'TopSecret' }), 'utf-8');
+
+    // 1. Issue
+    const issueOut = execSync(`node "${cliPath}" dataintegrity-issue --claims "${diClaimsFile}" --key "${keysFile}" --suite "eddsa-jcs-2022" --out "${diVcFile}"`).toString();
+    assert.ok(issueOut.includes('DataIntegrityProof VC issued'));
+    assert.ok(fs.existsSync(diVcFile));
+
+    // 2. Verify
+    const verifyOut = execSync(`node "${cliPath}" dataintegrity-verify --vc "${diVcFile}"`).toString();
+    assert.ok(verifyOut.includes('VALID'));
+  });
 });
 
 

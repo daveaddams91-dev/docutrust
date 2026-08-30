@@ -96,3 +96,16 @@ export * from './jwe';
 
 // Export DIF Presentation Exchange v2.0 Engine
 export * from './presentation-exchange';
+
+// Export AnonCreds 2.0 & BBS+ Blind Credential Issuance Engine
+export * from './anoncreds';
+
+// Export Distributed Key Generation (DKG) & FROST Threshold Ed25519
+export * from './dkg';
+
+// Export EVM Solidity Smart Contract Verifier Generator & ABI Calldata Engine
+export * from './solidity';
+
+// Export Cryptographic Audit Bundle Packaging & Compliance Verification (.dtbundle)
+export * from './bundle';
+

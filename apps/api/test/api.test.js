@@ -984,5 +984,155 @@ test('API Server Suite', async (t) => {
     assert.equal(res.body.success, true);
     assert.ok(Array.isArray(res.body.issuers));
   });
+
+  await t.test('42. POST /api/v1/anoncreds (Blind Request, Blind Issue, Unblind, Presentation, Verify)', async () => {
+    const issuerKp = (await makeRequest('POST', '/api/v1/keys/generate')).body.keyPair;
+    
+    // 1. Blind Request
+    const reqRes = await makeRequest('POST', '/api/v1/anoncreds/blind-request', {
+      schemaId: 'schema:degree:2026',
+      issuerDid: issuerKp.did
+    });
+    assert.equal(reqRes.status, 200);
+    assert.ok(reqRes.body.request);
+    assert.ok(reqRes.body.masterSecret);
+
+    // 2. Blind Issue
+    const issueRes = await makeRequest('POST', '/api/v1/anoncreds/blind-issue', {
+      request: reqRes.body.request,
+      claims: { studentName: 'Alice', degree: 'Ph.D.', gpa: '3.99' },
+      issuerEdKeys: issuerKp
+    });
+    assert.equal(issueRes.status, 200);
+    assert.equal(issueRes.body.credential.type, 'AnonCredsBlindCredential2026');
+
+    // 3. Unblind
+    const unblindRes = await makeRequest('POST', '/api/v1/anoncreds/unblind', {
+      blindCredential: issueRes.body.credential,
+      masterSecret: reqRes.body.masterSecret,
+      blindingFactor: reqRes.body.blindingFactor
+    });
+    assert.equal(unblindRes.status, 200);
+
+    // 4. Presentation
+    const presRes = await makeRequest('POST', '/api/v1/anoncreds/create-presentation', {
+      credential: unblindRes.body.credential,
+      masterSecret: reqRes.body.masterSecret,
+      revealKeys: ['degree'],
+      verifierNonce: 'api-verifier-nonce-123'
+    });
+    assert.equal(presRes.status, 200);
+    assert.deepEqual(presRes.body.presentation.disclosedClaims, { degree: 'Ph.D.' });
+
+    // 5. Verify Presentation
+    const verifyRes = await makeRequest('POST', '/api/v1/anoncreds/verify-presentation', {
+      presentation: presRes.body.presentation,
+      verifierNonce: 'api-verifier-nonce-123',
+      issuerDid: issuerKp.did
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.valid, true);
+  });
+
+  await t.test('43. POST /api/v1/dkg (Ceremony, Sign Share, Aggregate, Verify)', async () => {
+    const ceremonyRes = await makeRequest('POST', '/api/v1/dkg/ceremony', {
+      participants: [{ name: 'Alpha' }, { name: 'Beta' }, { name: 'Gamma' }],
+      threshold: 2
+    });
+    assert.equal(ceremonyRes.status, 200);
+    const ceremony = ceremonyRes.body.ceremony;
+
+    const message = 'Batch Hash 0xabcdef123';
+    const s1Res = await makeRequest('POST', '/api/v1/dkg/sign-share', {
+      participantIndex: 1,
+      privateShareHex: ceremony.participants[0].privateShareHex,
+      signerDid: ceremony.participants[0].did,
+      message
+    });
+    assert.equal(s1Res.status, 200);
+
+    const s2Res = await makeRequest('POST', '/api/v1/dkg/sign-share', {
+      participantIndex: 2,
+      privateShareHex: ceremony.participants[1].privateShareHex,
+      signerDid: ceremony.participants[1].did,
+      message
+    });
+    assert.equal(s2Res.status, 200);
+
+    const aggRes = await makeRequest('POST', '/api/v1/dkg/aggregate', {
+      groupPublicKeyHex: ceremony.groupPublicKeyHex,
+      groupDid: ceremony.groupDid,
+      threshold: 2,
+      shares: [s1Res.body.share, s2Res.body.share]
+    });
+    assert.equal(aggRes.status, 200);
+
+    const verifyRes = await makeRequest('POST', '/api/v1/dkg/verify', {
+      signature: aggRes.body.signature,
+      message,
+      groupPublicKeyHex: ceremony.groupPublicKeyHex
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.valid, true);
+  });
+
+  await t.test('44. POST /api/v1/solidity (Generate Verifier & Calldata)', async () => {
+    const solRes = await makeRequest('POST', '/api/v1/solidity/generate-verifier', {
+      contractName: 'CustomVerifier'
+    });
+    assert.equal(solRes.status, 200);
+    assert.ok(solRes.body.sourceCode.includes('contract CustomVerifier'));
+
+    const callRes = await makeRequest('POST', '/api/v1/solidity/calldata', {
+      credentialHash: '0x1111111111111111111111111111111111111111111111111111111111111111',
+      merkleProof: ['0x2222222222222222222222222222222222222222222222222222222222222222'],
+      rootHash: '0x3333333333333333333333333333333333333333333333333333333333333333'
+    });
+    assert.equal(callRes.status, 200);
+    assert.ok(callRes.body.calldataHex.startsWith('0x'));
+  });
+
+  await t.test('45. POST /api/v1/audit/bundle (Create, Verify, Report)', async () => {
+    const kp = (await makeRequest('POST', '/api/v1/keys/generate')).body.keyPair;
+    const createRes = await makeRequest('POST', '/api/v1/audit/bundle/create', {
+      organization: 'DocuTrust Cloud',
+      signerKeyPair: kp
+    });
+    assert.equal(createRes.status, 200);
+    const bundle = createRes.body.bundle;
+    assert.equal(bundle.type, 'DocuTrustAuditBundle2026');
+
+    const verifyRes = await makeRequest('POST', '/api/v1/audit/bundle/verify', {
+      bundle,
+      expectedSignerPublicKeyHex: kp.publicKeyHex
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.valid, true);
+
+    const reportRes = await makeRequest('POST', '/api/v1/audit/bundle/report', {
+      bundle,
+      expectedSignerPublicKeyHex: kp.publicKeyHex
+    });
+    assert.equal(reportRes.status, 200);
+    assert.ok(reportRes.body.markdownReport.includes('DocuTrust Cloud'));
+  });
+
+  await t.test('46. POST /api/v1/credentials/dataintegrity (Issue & Verify)', async () => {
+    const kp = (await makeRequest('POST', '/api/v1/keys/generate')).body.keyPair;
+    const issueRes = await makeRequest('POST', '/api/v1/credentials/dataintegrity/issue', {
+      issuer: { id: kp.did, name: 'DocuTrust Authority' },
+      credentialSubject: { student: 'Bob', cert: 'B.S. Mathematics' },
+      cryptosuite: 'eddsa-jcs-2022',
+      keyPair: kp
+    });
+    assert.equal(issueRes.status, 200);
+    assert.equal(issueRes.body.credential.proof.cryptosuite, 'eddsa-jcs-2022');
+
+    const verifyRes = await makeRequest('POST', '/api/v1/credentials/dataintegrity/verify', {
+      credential: issueRes.body.credential
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.valid, true);
+  });
 });
 

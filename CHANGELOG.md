@@ -1,5 +1,89 @@
 # 📝 DocuTrust Changelog & Release Notes
 
+## [v4.0.0] - Sovereign Trust Fabric: AnonCreds 2.0 Blind Signatures, FROST Threshold DKG, Solidity On-Chain Verifier & Cryptographic Audit Bundles - 2026-08-30
+
+### 🌟 Release Overview (v4.0.0 - Major Milestone Release)
+DocuTrust 4.0.0 introduces the **Sovereign Trust Fabric**, elevating the decentralized identity and verifiable credentials ecosystem to enterprise and Web3 grade. This major release incorporates:
+1. **AnonCreds 2.0 & Blind BBS+ Issuance**: Cryptographic holder master secret commitments and unlinkable selective disclosure presentations.
+2. **Distributed Key Generation (DKG) & FROST Threshold Signing**: K-of-N threshold Ed25519 signing without reconstructing master private keys.
+3. **EVM Solidity Verifier & Smart Contracts**: Native generation of `DocuTrustVerifier.sol` smart contracts, ABI calldata encoding, and on-chain Merkle membership validation for Ethereum, Polygon, Arbitrum, Optimism, and Base.
+4. **Cryptographic Audit Bundles (`.dtbundle`)**: Tamper-evident packaging of HashChain transaction logs, Merkle Mountain Range (MMR) peaks, and RFC 3161 TSA timestamp tokens with automated SOC 2 Type II, ISO 27001, and eIDAS 2.0 compliance report generation.
+5. **W3C DataIntegrityProof 2026 Suite**: Native support for W3C Data Integrity specification with `eddsa-jcs-2022` and `ml-dsa-65-2026` post-quantum cryptosuites.
+6. **Full-Stack Parity & Interactive Studios**: REST API endpoints, TypeScript client SDK methods, comprehensive CLI commands, and 4 new interactive Web Studios (`AnonCredsStudio`, `DKGStudio`, `SmartContractStudio`, and `AuditBundleStudio`).
+
+---
+
+### 🛡️ Core Cryptographic Capabilities (`@docutrust/core`)
+- **AnonCreds 2.0 Blind Issuance Engine (`AnonCredsEngine`)**:
+  - `generateHolderMasterSecret`: Generates cryptographically secure holder master secrets.
+  - `createBlindRequest`: Creates Pedersen-style blinded commitments for schema registration.
+  - `issueBlindCredential`: Issues BBS+ blind signatures over blinded commitments and cleartext claims.
+  - `unblindCredential`: Holders unblind the credential signature with their local blinding factor.
+  - `createPresentation` & `verifyPresentation`: Derives zero-knowledge selective disclosure presentations bound to verifier nonces.
+- **FROST Distributed Key Generation Engine (`DKGEngine`)**:
+  - `runDKGCeremony`: Simulates multi-node round-robin secret sharing using polynomial commitments.
+  - `signShare`: Individual validator nodes produce partial signatures over message payloads.
+  - `aggregateSignatures`: Aggregates threshold K-of-N signature shares into a unified group signature.
+  - `verifyAggregatedSignature`: Cryptographically validates group signatures against the group public key.
+- **Solidity Smart Contract & Calldata Engine (`SolidityEngine`)**:
+  - `generateVerifierContract`: Generates gas-optimized Solidity (`^0.8.20`) smart contracts (`DocuTrustVerifier.sol`).
+  - `encodeVerificationCalldata`: Formats ABI-encoded calldata for calling `verifyMerkleProof` directly from Web3 dApps.
+- **Cryptographic Audit Bundle Engine (`AuditBundleEngine`)**:
+  - `createAuditBundle`: Packages HashChain head hashes, MMR peaks, and RFC 3161 TSA tokens into portable `.dtbundle` artifacts.
+  - `verifyAuditBundle`: Exhaustively validates all cryptographic anchors, signatures, and time assertions.
+  - `generateComplianceReport`: Produces formal markdown compliance certificates for SOC 2 and ISO 27001 auditors.
+- **W3C DataIntegrityProof Engine (`DataIntegrityEngine`)**:
+  - Signs and verifies credentials following W3C Data Integrity 1.0 with `eddsa-jcs-2022` and `ml-dsa-65-2026`.
+
+---
+
+### 🌐 REST API Server v4.0.0 (`apps/api`)
+- Added 13 new REST API endpoints:
+  - `POST /api/v1/anoncreds/blind-request`
+  - `POST /api/v1/anoncreds/blind-issue`
+  - `POST /api/v1/anoncreds/unblind`
+  - `POST /api/v1/anoncreds/create-presentation`
+  - `POST /api/v1/anoncreds/verify-presentation`
+  - `POST /api/v1/dkg/ceremony`
+  - `POST /api/v1/dkg/sign-share`
+  - `POST /api/v1/dkg/aggregate`
+  - `POST /api/v1/dkg/verify`
+  - `POST /api/v1/solidity/generate-verifier`
+  - `POST /api/v1/solidity/calldata`
+  - `POST /api/v1/audit/bundle/create`
+  - `POST /api/v1/audit/bundle/verify`
+  - `POST /api/v1/audit/bundle/report`
+  - `POST /api/v1/credentials/dataintegrity/issue`
+  - `POST /api/v1/credentials/dataintegrity/verify`
+- 100% test pass rate across 47 integration tests.
+
+---
+
+### 💻 Command-Line Interface v4.0.0 (`@docutrust/cli`)
+- Added subcommands:
+  - `anoncreds-blind-request`, `anoncreds-blind-issue`, `anoncreds-unblind`, `anoncreds-derive-proof`, `anoncreds-verify`
+  - `dkg-setup`, `dkg-sign-share`, `dkg-aggregate`, `dkg-verify`
+  - `solidity-export-verifier`, `solidity-calldata`
+  - `audit-bundle-create`, `audit-bundle-verify`
+  - `dataintegrity-issue`, `dataintegrity-verify`
+- 100% test pass rate across 36 CLI integration tests.
+
+---
+
+### 📦 TypeScript SDK v4.0.0 (`@docutrust/sdk`)
+- Complete type-safe client methods for all AnonCreds, DKG, Solidity, Audit Bundle, and DataIntegrity endpoints.
+
+---
+
+### 🎨 Web Studio Suite v4.0.0 (`apps/web`)
+- Added 4 new interactive studios:
+  - **AnonCredsStudio.jsx**: 5-step visual pipeline for blind requests, blind issuance, unblinding, and zero-knowledge presentation.
+  - **DKGStudio.jsx**: Interactive validator node setup, partial share signing, and threshold signature aggregation.
+  - **SmartContractStudio.jsx**: Solidity code preview, `.sol` file exporter, and Web3 ABI calldata generator.
+  - **AuditBundleStudio.jsx**: Portable `.dtbundle` packager, integrity diagnostics inspector, and SOC 2 compliance certificate generator.
+
+---
+
 ## [v3.0.0] - Sovereign Trust Mesh: Multi-Sig Threshold Senate, Universal DID Resolver, Schema Hardening & Full-Stack Parity - 2026-08-30
 
 ### 🌟 Release Overview (v3.0.0 - Major Milestone Release)

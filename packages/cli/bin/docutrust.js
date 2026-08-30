@@ -205,7 +205,7 @@ const command = args[0];
 
 function printHelp() {
   console.log(`
-\x1b[1m\x1b[36m🛡️ DocuTrust CLI v3.0.0\x1b[0m — Open-Source Sovereign Trust Stack
+\x1b[1m\x1b[36m🛡️ DocuTrust CLI v4.0.0\x1b[0m — Open-Source Sovereign Trust Stack
 
 \x1b[1mCORE COMMANDS:\x1b[0m
   \x1b[32mdemo / wizard\x1b[0m                                 Run interactive 10-second end-to-end credential issuance & verification
@@ -217,7 +217,30 @@ function printHelp() {
   \x1b[32mrender-pdf\x1b[0m --vc <file> [--out <file.pdf>]      Render tamper-evident visual PDF with embedded W3C VC metadata
   \x1b[32mverify-pdf\x1b[0m --pdf <file.pdf>                   Extract and verify embedded VC from PDF document
   \x1b[32mdid-resolve\x1b[0m --did <did_string>                 Resolve DID Document (did:key, did:pqc, did:kem, did:bbs, did:pkh, did:web)
+  \x1b[32mdataintegrity-issue\x1b[0m --claims <f> -k <k>        Issue W3C DataIntegrityProof VC (eddsa-jcs-2022 / ml-dsa-65-2026)
+  \x1b[32mdataintegrity-verify\x1b[0m --vc <file>               Verify W3C DataIntegrityProof VC
   \x1b[32mhelp\x1b[0m                                          Show this help menu
+
+\x1b[1mANONCREDS 2.0 ZERO-KNOWLEDGE PRIVACY:\x1b[0m
+  \x1b[32manoncreds-blind-request\x1b[0m --schema <s> --issuer <i> Create holder blind request with secret commitment
+  \x1b[32manoncreds-blind-issue\x1b[0m --req <f> --claims <c> -k <k> Issue BBS+ blind signed credential to holder
+  \x1b[32manoncreds-unblind\x1b[0m --cred <f> --secret <s> -b <b> Unblind credential and store with master secret
+  \x1b[32manoncreds-derive-proof\x1b[0m --cred <f> -r <k1,k2>  Derive unlinkable ZK selective disclosure presentation
+  \x1b[32manoncreds-verify\x1b[0m --pres <file>                Cryptographically verify AnonCreds ZK presentation
+
+\x1b[1mFROST DISTRIBUTED KEY GENERATION (DKG):\x1b[0m
+  \x1b[32mdkg-setup\x1b[0m --nodes <num> --threshold <k>        Run DKG ceremony and output group DID and node shares
+  \x1b[32mdkg-sign-share\x1b[0m --index <i> --share <hex> -m <msg> Sign partial signature share for message
+  \x1b[32mdkg-aggregate\x1b[0m --pub <hex> --shares <f1,f2>     Aggregate partial shares into valid group signature
+  \x1b[32mdkg-verify\x1b[0m --sig <file> -m <msg> --pub <hex>    Verify aggregated FROST threshold signature
+
+\x1b[1mEVM SOLIDITY ON-CHAIN SMART CONTRACTS:\x1b[0m
+  \x1b[32msolidity-export-verifier\x1b[0m [--name <str>] [--out <f>] Generate DocuTrustVerifier.sol EVM smart contract
+  \x1b[32msolidity-calldata\x1b[0m --leaf <h> --proof <f> -r <root> Encode verifyCredentialOnChain ABI calldata
+
+\x1b[1mCRYPTOGRAPHIC AUDIT BUNDLES (.dtbundle):\x1b[0m
+  \x1b[32maudit-bundle-create\x1b[0m --org <name> -k <key> [--out <f>] Export signed .dtbundle with HashChain & MMR
+  \x1b[32maudit-bundle-verify\x1b[0m --bundle <file.dtbundle>   Verify .dtbundle cryptographic integrity & TSA token
 
 \x1b[1mMULTI-SIGNATURE THRESHOLD (M-of-N):\x1b[0m
   \x1b[32mmultisig-draft\x1b[0m --vc <file> --policy <file>      Create unsigned Multi-Sig draft and canonical hash
@@ -274,6 +297,7 @@ function printHelp() {
   $ docutrust demo
   $ docutrust keygen --out keys.json
   $ docutrust verify --vc examples/certificates/stanford-degree-vc.json
+
 `);
 }
 
@@ -1690,6 +1714,297 @@ async function main() {
     }
     const doc = await core.DIDResolver.resolve(did);
     console.log(JSON.stringify(doc, null, 2));
+    return;
+  }
+
+  // ==========================================
+  // AnonCreds 2.0 CLI Handlers
+  // ==========================================
+  if (command === 'anoncreds-blind-request') {
+    const schemaId = getArgValue('--schema') || 'schema:degree:2026';
+    const issuerDid = getArgValue('--issuer') || 'did:key:zIssuer';
+    const secret = getArgValue('--secret') || core.AnonCredsEngine.generateHolderMasterSecret().masterSecret;
+    const outFile = getArgValue('--out') || 'blind-request.json';
+    
+    const { request, blindingFactor } = core.AnonCredsEngine.createBlindRequest(secret, schemaId, issuerDid);
+    const result = { masterSecret: secret, blindingFactor, request };
+    fs.writeFileSync(outFile, JSON.stringify(result, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m AnonCreds Blind Request generated at \x1b[1m${outFile}\x1b[0m`);
+    console.log(`  Commitment: ${request.blindedSecretCommitment.commitmentHex}`);
+    return;
+  }
+
+  if (command === 'anoncreds-blind-issue') {
+    const reqFile = getArgValue('--req') || getArgValue('-r');
+    const claimsFile = getArgValue('--claims') || getArgValue('-c');
+    const keyFile = getArgValue('--key') || getArgValue('-k');
+    const outFile = getArgValue('--out') || 'blind-credential.json';
+
+    if (!reqFile || !claimsFile || !keyFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --req <file>, --claims <file>, or --key <keyfile>');
+      process.exit(1);
+    }
+    const reqObj = JSON.parse(fs.readFileSync(reqFile, 'utf-8'));
+    const request = reqObj.request || reqObj;
+    const claims = JSON.parse(fs.readFileSync(claimsFile, 'utf-8'));
+    const keys = JSON.parse(fs.readFileSync(keyFile, 'utf-8'));
+
+    const blindCred = core.AnonCredsEngine.issueBlindCredential(
+      request,
+      claims,
+      { issuerDid: keys.did, publicKeyHex: keys.publicKeyHex, schemaId: request.schemaId },
+      keys
+    );
+    fs.writeFileSync(outFile, JSON.stringify(blindCred, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m AnonCreds Blind Credential issued at \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'anoncreds-unblind') {
+    const credFile = getArgValue('--cred') || getArgValue('-c');
+    const secret = getArgValue('--secret') || getArgValue('-s');
+    const blindingFactor = getArgValue('--blinding') || getArgValue('-b');
+    const outFile = getArgValue('--out') || 'unblinded-credential.json';
+
+    if (!credFile || !secret || !blindingFactor) {
+      console.error('\x1b[31mError:\x1b[0m Missing --cred <file>, --secret <str>, or --blinding <str>');
+      process.exit(1);
+    }
+    const blindCred = JSON.parse(fs.readFileSync(credFile, 'utf-8'));
+    const unblinded = core.AnonCredsEngine.unblindCredential(blindCred, secret, blindingFactor);
+    fs.writeFileSync(outFile, JSON.stringify(unblinded, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m AnonCreds Credential unblinded at \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'anoncreds-derive-proof') {
+    const credFile = getArgValue('--cred') || getArgValue('-c');
+    const secret = getArgValue('--secret') || getArgValue('-s');
+    const reveal = (getArgValue('--reveal') || getArgValue('-r') || '').split(',').filter(Boolean);
+    const nonce = getArgValue('--nonce') || 'verifier-nonce-' + Date.now();
+    const outFile = getArgValue('--out') || 'anoncreds-presentation.json';
+
+    if (!credFile || !secret) {
+      console.error('\x1b[31mError:\x1b[0m Missing --cred <file> or --secret <str>');
+      process.exit(1);
+    }
+    const cred = JSON.parse(fs.readFileSync(credFile, 'utf-8'));
+    const pres = core.AnonCredsEngine.createPresentation(cred, secret, reveal, nonce);
+    fs.writeFileSync(outFile, JSON.stringify(pres, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m AnonCreds ZK Presentation derived at \x1b[1m${outFile}\x1b[0m`);
+    console.log(`  Disclosed claims: ${Object.keys(pres.disclosedClaims).join(', ')}`);
+    return;
+  }
+
+  if (command === 'anoncreds-verify') {
+    const presFile = getArgValue('--pres') || getArgValue('-p');
+    const nonce = getArgValue('--nonce');
+    const issuerDid = getArgValue('--issuer');
+
+    if (!presFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --pres <presentation.json>');
+      process.exit(1);
+    }
+    const pres = JSON.parse(fs.readFileSync(presFile, 'utf-8'));
+    const result = core.AnonCredsEngine.verifyPresentation(pres, nonce, issuerDid);
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m AnonCreds Zero-Knowledge Presentation is \x1b[1m\x1b[32mVALID\x1b[0m`);
+      console.log(`  Disclosed: ${JSON.stringify(result.disclosedClaims)}`);
+    } else {
+      console.log(`\x1b[31m✖\x1b[0m AnonCreds Presentation Verification \x1b[1m\x1b[31mFAILED\x1b[0m: ${result.error}`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // ==========================================
+  // FROST DKG CLI Handlers
+  // ==========================================
+  if (command === 'dkg-setup') {
+    const nodesCount = parseInt(getArgValue('--nodes') || '3', 10);
+    const threshold = parseInt(getArgValue('--threshold') || '2', 10);
+    const outFile = getArgValue('--out') || 'dkg-ceremony.json';
+
+    const participants = [];
+    for (let i = 1; i <= nodesCount; i++) {
+      participants.push({ name: `Node-${i}` });
+    }
+    const ceremony = core.DKGEngine.runDKGCeremony(participants, threshold);
+    fs.writeFileSync(outFile, JSON.stringify(ceremony, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m DKG Ceremony completed. Group DID: \x1b[1m${ceremony.groupDid}\x1b[0m`);
+    console.log(`  Saved ${nodesCount} participant shares to \x1b[1m${outFile}\x1b[0m (Threshold: ${threshold}-of-${nodesCount})`);
+    return;
+  }
+
+  if (command === 'dkg-sign-share') {
+    const index = parseInt(getArgValue('--index') || '1', 10);
+    const shareHex = getArgValue('--share');
+    const signerDid = getArgValue('--did') || `did:node:${index}`;
+    const message = getArgValue('--msg') || getArgValue('-m');
+    const outFile = getArgValue('--out') || `share-${index}-sig.json`;
+
+    if (!shareHex || !message) {
+      console.error('\x1b[31mError:\x1b[0m Missing --share <hex> or --msg <text>');
+      process.exit(1);
+    }
+    const share = core.DKGEngine.signShare(index, shareHex, signerDid, message);
+    fs.writeFileSync(outFile, JSON.stringify(share, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m Partial signature share generated at \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'dkg-aggregate') {
+    const pubHex = getArgValue('--pub');
+    const did = getArgValue('--did') || 'did:key:zGroup';
+    const threshold = parseInt(getArgValue('--threshold') || '2', 10);
+    const sharesFiles = (getArgValue('--shares') || '').split(',').filter(Boolean);
+    const outFile = getArgValue('--out') || 'aggregated-signature.json';
+
+    if (!pubHex || sharesFiles.length === 0) {
+      console.error('\x1b[31mError:\x1b[0m Missing --pub <hex> or --shares <f1,f2>');
+      process.exit(1);
+    }
+    const shares = sharesFiles.map(f => JSON.parse(fs.readFileSync(f.trim(), 'utf-8')));
+    const signature = core.DKGEngine.aggregateSignatures(pubHex, did, threshold, shares);
+    fs.writeFileSync(outFile, JSON.stringify(signature, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m Aggregated FROST signature created at \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'dkg-verify') {
+    const sigFile = getArgValue('--sig');
+    const message = getArgValue('--msg') || getArgValue('-m');
+    const pubHex = getArgValue('--pub');
+
+    if (!sigFile || !message) {
+      console.error('\x1b[31mError:\x1b[0m Missing --sig <file> or --msg <text>');
+      process.exit(1);
+    }
+    const signature = JSON.parse(fs.readFileSync(sigFile, 'utf-8'));
+    const result = core.DKGEngine.verifyAggregatedSignature(signature, message, pubHex);
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m Aggregated Threshold Signature is \x1b[1m\x1b[32mVALID\x1b[0m (Threshold ${signature.thresholdMet}/${signature.totalParticipants})`);
+    } else {
+      console.log(`\x1b[31m✖\x1b[0m Signature Verification \x1b[1m\x1b[31mFAILED\x1b[0m: ${result.error}`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // ==========================================
+  // Solidity Verifier CLI Handlers
+  // ==========================================
+  if (command === 'solidity-export-verifier') {
+    const name = getArgValue('--name') || 'DocuTrustVerifier';
+    const owner = getArgValue('--owner');
+    const outFile = getArgValue('--out') || `${name}.sol`;
+
+    const code = core.SolidityEngine.generateVerifierContract({ contractName: name, ownerAddress: owner });
+    fs.writeFileSync(outFile, code, 'utf-8');
+    console.log(`\x1b[32m✔\x1b[0m Solidity Verifier Smart Contract exported to \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'solidity-calldata') {
+    const leaf = getArgValue('--leaf');
+    const proofFile = getArgValue('--proof');
+    const root = getArgValue('--root') || getArgValue('-r');
+
+    if (!leaf || !proofFile || !root) {
+      console.error('\x1b[31mError:\x1b[0m Missing --leaf <hash>, --proof <file>, or --root <hash>');
+      process.exit(1);
+    }
+    const proof = JSON.parse(fs.readFileSync(proofFile, 'utf-8'));
+    const calldata = core.SolidityEngine.encodeVerificationCalldata(leaf, proof, root);
+    console.log(JSON.stringify(calldata, null, 2));
+    return;
+  }
+
+  // ==========================================
+  // Cryptographic Audit Bundle CLI Handlers
+  // ==========================================
+  if (command === 'audit-bundle-create') {
+    const org = getArgValue('--org') || 'DocuTrust Sovereign Trust';
+    const keyFile = getArgValue('--key') || getArgValue('-k');
+    const outFile = getArgValue('--out') || 'audit-bundle.dtbundle';
+
+    const keys = keyFile ? JSON.parse(fs.readFileSync(keyFile, 'utf-8')) : core.generateKeyPair();
+    const bundle = core.AuditBundleEngine.createAuditBundle({
+      organization: org,
+      signerKeyPair: keys
+    });
+    fs.writeFileSync(outFile, JSON.stringify(bundle, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m Signed Cryptographic Audit Bundle (.dtbundle) exported to \x1b[1m${outFile}\x1b[0m`);
+    console.log(`  Bundle ID: ${bundle.id}`);
+    return;
+  }
+
+  if (command === 'audit-bundle-verify') {
+    const bundleFile = getArgValue('--bundle') || getArgValue('-b');
+    const pubHex = getArgValue('--pub');
+
+    if (!bundleFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --bundle <file.dtbundle>');
+      process.exit(1);
+    }
+    const bundle = JSON.parse(fs.readFileSync(bundleFile, 'utf-8'));
+    const result = core.AuditBundleEngine.verifyAuditBundle(bundle, pubHex);
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m Audit Bundle Verification \x1b[1m\x1b[32mPASSED\x1b[0m`);
+      console.log(`  Organization: ${result.organization}`);
+      console.log(`  HashChain Blocks: ${result.hashchainValid ? 'VALID' : 'INVALID'}`);
+      console.log(`  MMR Peaks: ${result.mmrValid ? 'VALID' : 'INVALID'}`);
+      console.log(`  TSA Oracle Token: ${result.tsaTimestampValid ? 'VALID' : 'INVALID'}`);
+    } else {
+      console.log(`\x1b[31m✖\x1b[0m Audit Bundle Verification \x1b[1m\x1b[31mFAILED\x1b[0m: ${result.errors?.join(', ') || result.error}`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // ==========================================
+  // W3C DataIntegrityProof CLI Handlers
+  // ==========================================
+  if (command === 'dataintegrity-issue') {
+    const claimsFile = getArgValue('--claims') || getArgValue('-c');
+    const keyFile = getArgValue('--key') || getArgValue('-k');
+    const cryptosuite = getArgValue('--suite') || 'eddsa-jcs-2022';
+    const outFile = getArgValue('--out') || 'dataintegrity-vc.json';
+
+    if (!claimsFile || !keyFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --claims <file> or --key <keyfile>');
+      process.exit(1);
+    }
+    const claims = JSON.parse(fs.readFileSync(claimsFile, 'utf-8'));
+    const keys = JSON.parse(fs.readFileSync(keyFile, 'utf-8'));
+
+    const vc = core.VerifiableCredentialsEngine.issueDataIntegrity({
+      issuer: { id: keys.did, name: 'Institutional Issuer' },
+      credentialSubject: claims,
+      cryptosuite,
+      keyPair: keys
+    });
+    fs.writeFileSync(outFile, JSON.stringify(vc, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m W3C DataIntegrityProof VC issued to \x1b[1m${outFile}\x1b[0m (Suite: ${cryptosuite})`);
+    return;
+  }
+
+  if (command === 'dataintegrity-verify') {
+    const vcFile = getArgValue('--vc');
+    if (!vcFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --vc <file.json>');
+      process.exit(1);
+    }
+    const vc = JSON.parse(fs.readFileSync(vcFile, 'utf-8'));
+    const result = await core.VerifiableCredentialsEngine.verify(vc);
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m W3C DataIntegrityProof VC is \x1b[1m\x1b[32mVALID\x1b[0m`);
+      console.log(`  Cryptosuite: ${vc.proof?.cryptosuite}`);
+      console.log(`  Issuer: ${result.issuer}`);
+    } else {
+      console.log(`\x1b[31m✖\x1b[0m DataIntegrity Verification \x1b[1m\x1b[31mFAILED\x1b[0m: ${result.error}`);
+      process.exit(1);
+    }
     return;
   }
 

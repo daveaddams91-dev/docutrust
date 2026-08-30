@@ -1032,6 +1032,161 @@ export class DocuTrustClient {
     const qs = params.toString();
     return this.request(`/vault/credentials${qs ? `?${qs}` : ''}`, 'GET');
   }
+
+  // ==========================================
+  // AnonCreds 2.0 & Blind Issuance Methods
+  // ==========================================
+
+  /**
+   * Holder creates a blind credential request binding a holder master secret.
+   */
+  public async createAnonCredsBlindRequest(schemaId: string, issuerDid: string, masterSecret?: string): Promise<any> {
+    return this.request('/anoncreds/blind-request', 'POST', { schemaId, issuerDid, masterSecret });
+  }
+
+  /**
+   * Issuer issues a blinded BBS+ credential bound to the holder's master secret commitment.
+   */
+  public async issueAnonCredsBlindCredential(
+    request: any,
+    claims: Record<string, any>,
+    issuerEdKeys: any,
+    issuerKeys?: any
+  ): Promise<any> {
+    return this.request('/anoncreds/blind-issue', 'POST', { request, claims, issuerEdKeys, issuerKeys });
+  }
+
+  /**
+   * Holder unblinds the blind credential and stores it with their master secret.
+   */
+  public async unblindAnonCredsCredential(blindCredential: any, masterSecret: string, blindingFactor: string): Promise<any> {
+    return this.request('/anoncreds/unblind', 'POST', { blindCredential, masterSecret, blindingFactor });
+  }
+
+  /**
+   * Holder generates an unlinkable Zero-Knowledge Presentation for a Verifier.
+   */
+  public async createAnonCredsPresentation(
+    credential: any,
+    masterSecret: string,
+    revealKeys: string[],
+    verifierNonce: string,
+    predicateProofs?: any[]
+  ): Promise<any> {
+    return this.request('/anoncreds/create-presentation', 'POST', {
+      credential,
+      masterSecret,
+      revealKeys,
+      verifierNonce,
+      predicateProofs
+    });
+  }
+
+  /**
+   * Verifier validates an AnonCreds Zero-Knowledge Presentation.
+   */
+  public async verifyAnonCredsPresentation(presentation: any, verifierNonce?: string, issuerDid?: string): Promise<any> {
+    return this.request('/anoncreds/verify-presentation', 'POST', { presentation, verifierNonce, issuerDid });
+  }
+
+  // ==========================================
+  // FROST DKG Distributed Key Generation
+  // ==========================================
+
+  /**
+   * Runs a complete Distributed Key Generation (DKG) setup ceremony.
+   */
+  public async runDKGCeremony(participants: Array<{ name: string; did?: string }>, threshold: number): Promise<any> {
+    return this.request('/dkg/ceremony', 'POST', { participants, threshold });
+  }
+
+  /**
+   * Generates a partial signature share for a message using participant private share.
+   */
+  public async signDKGShare(participantIndex: number, privateShareHex: string, signerDid: string, message: string): Promise<any> {
+    return this.request('/dkg/sign-share', 'POST', { participantIndex, privateShareHex, signerDid, message });
+  }
+
+  /**
+   * Aggregates partial signature shares into a valid group Ed25519 signature.
+   */
+  public async aggregateDKGSignatures(groupPublicKeyHex: string, groupDid: string, threshold: number, shares: any[]): Promise<any> {
+    return this.request('/dkg/aggregate', 'POST', { groupPublicKeyHex, groupDid, threshold, shares });
+  }
+
+  /**
+   * Verifies an aggregated FROST threshold signature.
+   */
+  public async verifyDKGSignature(signature: any, message: string, groupPublicKeyHex?: string): Promise<any> {
+    return this.request('/dkg/verify', 'POST', { signature, message, groupPublicKeyHex });
+  }
+
+  // ==========================================
+  // EVM Solidity Smart Contract Verifier
+  // ==========================================
+
+  /**
+   * Generates production-ready DocuTrustVerifier.sol Solidity source code.
+   */
+  public async generateSolidityVerifier(contractName?: string, ownerAddress?: string): Promise<any> {
+    return this.request('/solidity/generate-verifier', 'POST', { contractName, ownerAddress });
+  }
+
+  /**
+   * Encodes ABI calldata for calling on-chain verifyCredentialOnChain.
+   */
+  public async encodeSolidityCalldata(credentialHash: string, merkleProof: any[], rootHash: string): Promise<any> {
+    return this.request('/solidity/calldata', 'POST', { credentialHash, merkleProof, rootHash });
+  }
+
+  // ==========================================
+  // Cryptographic Audit Bundles (.dtbundle)
+  // ==========================================
+
+  /**
+   * Creates a signed cryptographic audit bundle (.dtbundle).
+   */
+  public async createAuditBundle(organization?: string, signerKeyPair?: any, complianceStandards?: string[]): Promise<any> {
+    return this.request('/audit/bundle/create', 'POST', { organization, signerKeyPair, complianceStandards });
+  }
+
+  /**
+   * Verifies a cryptographic audit bundle (.dtbundle).
+   */
+  public async verifyAuditBundle(bundle: any, expectedSignerPublicKeyHex?: string): Promise<any> {
+    return this.request('/audit/bundle/verify', 'POST', { bundle, expectedSignerPublicKeyHex });
+  }
+
+  /**
+   * Verifies an audit bundle and generates a formal Markdown compliance report.
+   */
+  public async getAuditBundleComplianceReport(bundle: any, expectedSignerPublicKeyHex?: string): Promise<any> {
+    return this.request('/audit/bundle/report', 'POST', { bundle, expectedSignerPublicKeyHex });
+  }
+
+  // ==========================================
+  // W3C DataIntegrityProof Cryptosuites
+  // ==========================================
+
+  /**
+   * Issues a W3C Verifiable Credential secured with DataIntegrityProof.
+   */
+  public async issueDataIntegrityCredential(options: {
+    issuer: any;
+    credentialSubject: any;
+    cryptosuite?: string;
+    keyPair: any;
+  }): Promise<any> {
+    return this.request('/credentials/dataintegrity/issue', 'POST', options);
+  }
+
+  /**
+   * Verifies a W3C DataIntegrityProof credential.
+   */
+  public async verifyDataIntegrityCredential(credential: any): Promise<any> {
+    return this.request('/credentials/dataintegrity/verify', 'POST', { credential });
+  }
 }
+
 
 

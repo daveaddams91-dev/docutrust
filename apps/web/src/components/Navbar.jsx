@@ -16,25 +16,27 @@ import {
   Network,
   Sparkles,
   GitMerge,
-  Layers
+  Layers,
+  Lock,
+  Code2,
+  Package
 } from 'lucide-react';
 
 export default function Navbar({ activeTab, setActiveTab }) {
   const navItems = [
     { id: 'hero', label: 'Overview', icon: ShieldCheck },
-    { id: 'mesh', label: 'Trust Mesh 3.0', icon: Network },
-    { id: 'sovereign', label: 'Sovereign Studio', icon: Layers },
-    { id: 'armor', label: 'Fortress Armor', icon: ShieldAlert },
-    { id: 'trustmesh', label: 'Social Recovery', icon: Network },
-    { id: 'bbs', label: 'BBS+ & Oracles', icon: Sparkles },
-    { id: 'didcomm', label: 'DIDComm & MMR', icon: GitMerge },
-    { id: 'issuer', label: 'Issuer Studio', icon: Key },
-    { id: 'designer', label: 'Visual Designer', icon: Palette },
-    { id: 'multisig', label: 'Multi-Sig (M-of-N)', icon: Users },
-    { id: 'scanner', label: 'Live Camera / PDF', icon: Scan },
-    { id: 'dashboard', label: 'Enterprise Hub', icon: Building2 },
-    { id: 'verify', label: 'Verification Hub', icon: FileCheck2 },
-    { id: 'privacy', label: 'ZK Disclosure', icon: EyeOff },
+    { id: 'anoncreds', label: 'AnonCreds 2.0', icon: Lock },
+    { id: 'dkg', label: 'FROST DKG', icon: Users },
+    { id: 'solidity', label: 'Solidity Verifier', icon: Code2 },
+    { id: 'bundle', label: 'Audit Bundles', icon: Package },
+    { id: 'mesh', label: 'Trust Mesh', icon: Network },
+    { id: 'sovereign', label: 'Sovereign Hub', icon: Layers },
+    { id: 'armor', label: 'Armor', icon: ShieldAlert },
+    { id: 'bbs', label: 'BBS+ Oracles', icon: Sparkles },
+    { id: 'issuer', label: 'Issuer', icon: Key },
+    { id: 'designer', label: 'Designer', icon: Palette },
+    { id: 'verify', label: 'Verify', icon: FileCheck2 },
+    { id: 'privacy', label: 'ZK Proofs', icon: EyeOff },
     { id: 'simulator', label: 'Sandbox', icon: Cpu },
     { id: 'developers', label: 'APIs', icon: Terminal }
   ];
@@ -55,7 +57,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
           <div>
             <div className="flex items-center gap-1.5">
               <span className="font-bold text-lg tracking-tight text-white font-sans">DocuTrust</span>
-              <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono">v3.0.0</span>
+              <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono">v4.0.0</span>
             </div>
             <span className="text-[10px] text-gray-400 tracking-wide block font-mono">Sovereign Trust Mesh</span>
           </div>

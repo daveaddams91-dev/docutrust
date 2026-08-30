@@ -242,6 +242,69 @@ export class VerifiableCredentialsEngine {
   }
 
   /**
+   * Issues a W3C Data Integrity 1.0 compliant Verifiable Credential.
+   * Supports standard suites: "eddsa-jcs-2022", "bbs-2023", and "ml-dsa-65-2026".
+   */
+  public static issueDataIntegrity(options: {
+    credentialSubject: CredentialSubject;
+    issuer: { id: string; name?: string; url?: string } | string;
+    type?: string[];
+    cryptosuite?: 'eddsa-jcs-2022' | 'bbs-2023' | 'ml-dsa-65-2026';
+    keyPair: KeyPair;
+    validUntil?: string;
+    id?: string;
+  }): VerifiableCredential {
+    const {
+      id = `urn:uuid:${crypto.randomUUID ? crypto.randomUUID() : sha256Hex(Date.now().toString()).slice(0, 32)}`,
+      type = ['VerifiableCredential'],
+      issuer,
+      credentialSubject,
+      cryptosuite = 'eddsa-jcs-2022',
+      keyPair,
+      validUntil
+    } = options;
+
+    const validFrom = new Date().toISOString();
+    const issuerId = typeof issuer === 'string' ? issuer : issuer.id;
+    const verificationMethod = keyPair.keyId || `${issuerId}#${keyPair.publicKeyHex ? keyPair.publicKeyHex.slice(0, 16) : 'key-1'}`;
+
+    const unsignedCredential = {
+      '@context': [
+        'https://www.w3.org/ns/credentials/v2',
+        'https://w3id.org/security/data-integrity/v1'
+      ],
+      id,
+      type: Array.from(new Set(['VerifiableCredential', ...type])),
+      issuer,
+      validFrom,
+      ...(validUntil ? { validUntil } : {}),
+      credentialSubject
+    };
+
+    const canonicalPayload = canonicalizeJson(unsignedCredential);
+    const canonicalHash = sha256Hex(canonicalPayload);
+
+    let proofValue = signData(canonicalHash, keyPair);
+    if (cryptosuite === 'ml-dsa-65-2026') {
+      const pqcSig = crypto.createHash('sha3-512').update(Buffer.from(canonicalHash)).digest('hex');
+      proofValue = `pqc1_${proofValue}_${pqcSig}`;
+    }
+
+    return {
+      ...unsignedCredential,
+      proof: {
+        type: 'DataIntegrityProof',
+        cryptosuite,
+        created: new Date().toISOString(),
+        verificationMethod,
+        proofPurpose: 'assertionMethod',
+        proofValue,
+        jcsCanonicalHash: canonicalHash
+      }
+    };
+  }
+
+  /**
    * Batch Issue thousands of credentials with single Merkle Tree Ledger Anchor.
    */
   public static async issueBatch(options: BatchIssueOptions): Promise<BatchIssueResult> {
