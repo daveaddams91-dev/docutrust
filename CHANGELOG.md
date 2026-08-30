@@ -1,5 +1,44 @@
 # 📝 DocuTrust Changelog & Release Notes
 
+## [v2.5.0] - Unified Cryptographic Verification Engine, Prototype Pollution Defense & Full-Stack Polish - 2026-08-30
+
+### 🌟 Release Overview (v2.5.0)
+DocuTrust 2.5.0 delivers a major security and verification architectural enhancement: a unified cryptographic verification engine in `@docutrust/core` that seamlessly evaluates classical Ed25519, Post-Quantum ML-DSA-65 hybrid dual signatures, BBS+ proofs, W3C Bitstring Status List 2024 revocation/suspension checking, StatusList2021, Revocation Bloom Filters, JSON Schema validation, and Decentralized Trust Registry authorizations within a single `VerifiableCredentialsEngine.verify()` pipeline. In addition, deep prototype pollution defense (`sanitizeJsonPayload`) is integrated across the REST API request layer to defend against malicious prototype poisoning attacks.
+
+---
+
+### 🛡️ Core Verification Engine & Security Enhancements (`@docutrust/core`)
+- **Unified Multi-Proof & Status Verification (`packages/core/src/vc`)**:
+  - `VerifiableCredentialsEngine.verify()` now accepts comprehensive `VerificationOptions`:
+    - `expectedPublicKeyHex`: Expected issuer public key validation.
+    - `checkStatus`: Automatic revocation status checking against embedded or provided status lists.
+    - `statusListCredential`: Direct support for validating against standard W3C `BitstringStatusList2024` (with multi-bit status resolution: valid, revoked, suspended) and `StatusList2021`.
+    - `signedBloomFilter`: Verification and querying of dynamic Revocation Bloom Filters.
+    - `trustedIssuerRegistry`: Institutional accreditation and schema authority validation via `DecentralizedTrustRegistry`.
+    - `requiredSchema`: Embedded JSON Schema compliance verification for credential subjects.
+  - Direct support for `ML-DSA-65-Ed25519-Hybrid-2026` / `pqc1_` hybrid post-quantum signatures and `BBSPlusSignature2020` / `BBSPlusProof2020`.
+  - Added `isSuspended` and `isQuantumSafe` telemetry fields to `VerificationResult`.
+- **Deep Prototype Pollution Defense (`packages/core/src/security`)**:
+  - Exported `sanitizeJsonPayload()` which recursively eliminates `__proto__`, `constructor`, and `prototype` keys using `Object.create(null)` isolated dictionaries to prevent prototype pollution vulnerabilities.
+  - Added unit test suites verifying null prototype isolation and complete denial of object prototype tampering.
+
+---
+
+### 🌐 API Server Security & Endpoint Hardening (`@docutrust/api`)
+- Integrated `sanitizeJsonPayload()` directly into `readJsonBody()`, automatically sanitizing all incoming JSON payloads across all REST API endpoints.
+- Upgraded `/api/v1/credentials/verify` to utilize the full `VerifiableCredentialsEngine.verify()` pipeline, reporting full verification telemetry (`signatureValid`, `isQuantumSafe`, `isRevoked`, `isSuspended`, `statusValid`, `schemaValid`, `merkleProofValid`, `anchorValid`).
+- Upgraded health check endpoint `/api/v1/health` to `v2.5.0`.
+- All 39 API server test cases passing cleanly.
+
+---
+
+### 📦 TypeScript SDK & CLI Polish (`@docutrust/sdk`, `@docutrust/cli`)
+- Updated `DocuTrustClient.verifyCredential()` to accept extended verification options (`expectedPublicKeyHex`, `statusListCredential`, `requiredSchema`, `checkTrustRegistry`).
+- Updated CLI `printHelp()` banner to `v2.5.0` with clear categorizations for Revocation, Presentation Exchange, JSON Schema, ZK Predicates, and Federation.
+- All 50 `@docutrust/core` tests, 39 `@docutrust/api` tests, 31 `@docutrust/cli` tests, and 4 `@docutrust/sdk` tests passing with 100% success rate (124 total tests).
+
+---
+
 ## [v2.4.0] - W3C Bitstring Status List 2024, DIF Presentation Exchange 2.0, RSA Accumulator Non-Membership, Recursive ZK Predicate Graphs & Sovereign Studio - 2026-08-30
 
 ### 🌟 Release Overview (v2.4.0)

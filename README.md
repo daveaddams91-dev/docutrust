@@ -4,7 +4,7 @@
 
 ### The Open-Source Sovereign Trust Stack for Verifiable Credentials, Bitstring Status List 2024, DIF Presentation Exchange 2.0, RSA Non-Membership Accumulators, Recursive ZK Predicate Graphs & Sovereign Studio
 
-[![Version](https://img.shields.io/badge/Version-v2.4.0-blue.svg)]()
+[![Version](https://img.shields.io/badge/Version-v2.5.0-blue.svg)]()
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CI Status](https://img.shields.io/badge/CI-100%25%20Passing-brightgreen.svg)]()
 [![Status List 2024](https://img.shields.io/badge/Revocation-W3C%20BitstringStatusList2024%20(Gzip%20Multibase)-blue.svg)]()

@@ -1625,6 +1625,128 @@ test('46. ZK Predicates: Recursive boolean graph (AND, OR, NOT, THRESHOLD) acros
   assert.equal(evalResult.satisfiedNodes.includes('node_salary'), true);
 });
 
+// 46. Unified VerifiableCredentialsEngine with PQC Hybrid Verification
+test('47. VerifiableCredentialsEngine: Unified verification of Post-Quantum ML-DSA-65 hybrid credentials', async () => {
+  const pqcKeys = generatePQCKeyPair();
+  const res = VerifiableCredentialsEngine.issue({
+    type: ['UniversityDegreeCredential'],
+    issuer: { id: pqcKeys.hybridDid, name: 'Quantum University' },
+    credentialSubject: {
+      id: 'did:key:z6MkuBobStudent999',
+      degree: 'M.Sc. Quantum Computing',
+      gpa: 4.0
+    },
+    keyPair: pqcKeys.classicalKeyPair,
+    enablePQC: true
+  });
+
+  assert.equal(res.credential.proof.type, 'ML-DSA-65-Ed25519-Hybrid-2026');
+  assert.ok(res.credential.proof.proofValue.startsWith('pqc1_'));
+
+  const audit = await VerifiableCredentialsEngine.verify(res.credential, {
+    expectedPublicKeyHex: pqcKeys.classicalKeyPair.publicKeyHex
+  });
+
+  assert.equal(audit.valid, true);
+  assert.equal(audit.signatureValid, true);
+  assert.equal(audit.isQuantumSafe, true);
+  assert.equal(audit.errors.length, 0);
+});
+
+// 47. Unified VerifiableCredentialsEngine with BitstringStatusList2024
+test('48. VerifiableCredentialsEngine: Status checking with BitstringStatusList2024 (valid, suspended, revoked)', async () => {
+  const issuerKeys = generateKeyPair();
+  const statusList = new BitstringStatusList2024(100, 2, 'revocation'); // 2-bit: 0=valid, 1=revoked, 2=suspended
+  statusList.setStatus(10, 1); // Index 10 is revoked
+  statusList.setStatus(20, 2); // Index 20 is suspended
+  statusList.setStatus(30, 0); // Index 30 is valid
+
+  const statusListCredential = statusList.generateCredential(
+    'https://example.edu/status/2026',
+    issuerKeys.did
+  );
+
+  // Credential 1: Valid
+  const validVc = VerifiableCredentialsEngine.issue({
+    type: ['EmploymentCredential'],
+    issuer: { id: issuerKeys.did, name: 'Tech Corp' },
+    credentialSubject: { employeeId: 'E-101', role: 'Engineer' },
+    credentialStatus: {
+      id: 'https://example.edu/status/2026#30',
+      type: 'BitstringStatusListEntry',
+      statusPurpose: 'revocation',
+      statusListIndex: 30,
+      statusSize: 2,
+      statusListCredential: 'https://example.edu/status/2026'
+    },
+    keyPair: issuerKeys
+  }).credential;
+
+  const validAudit = await VerifiableCredentialsEngine.verify(validVc, {
+    statusListCredential
+  });
+  assert.equal(validAudit.valid, true);
+  assert.equal(validAudit.isRevoked, false);
+  assert.equal(validAudit.isSuspended, false);
+
+  // Credential 2: Revoked
+  const revokedVc = VerifiableCredentialsEngine.issue({
+    type: ['EmploymentCredential'],
+    issuer: { id: issuerKeys.did, name: 'Tech Corp' },
+    credentialSubject: { employeeId: 'E-102', role: 'Intern' },
+    credentialStatus: {
+      id: 'https://example.edu/status/2026#10',
+      type: 'BitstringStatusListEntry',
+      statusPurpose: 'revocation',
+      statusListIndex: 10,
+      statusSize: 2,
+      statusListCredential: 'https://example.edu/status/2026'
+    },
+    keyPair: issuerKeys
+  }).credential;
+
+  const revokedAudit = await VerifiableCredentialsEngine.verify(revokedVc, {
+    statusListCredential
+  });
+  assert.equal(revokedAudit.valid, false);
+  assert.equal(revokedAudit.isRevoked, true);
+
+  // Credential 3: Suspended
+  const suspendedVc = VerifiableCredentialsEngine.issue({
+    type: ['EmploymentCredential'],
+    issuer: { id: issuerKeys.did, name: 'Tech Corp' },
+    credentialSubject: { employeeId: 'E-103', role: 'Contractor' },
+    credentialStatus: {
+      id: 'https://example.edu/status/2026#20',
+      type: 'BitstringStatusListEntry',
+      statusPurpose: 'revocation',
+      statusListIndex: 20,
+      statusSize: 2,
+      statusListCredential: 'https://example.edu/status/2026'
+    },
+    keyPair: issuerKeys
+  }).credential;
+
+  const suspendedAudit = await VerifiableCredentialsEngine.verify(suspendedVc, {
+    statusListCredential
+  });
+  assert.equal(suspendedAudit.valid, false);
+  assert.equal(suspendedAudit.isSuspended, true);
+});
+
+// 48. Prototype Pollution Defense
+test('49. Security: sanitizeJsonPayload strips prototype pollution attacks recursively', () => {
+  const maliciousInput = JSON.parse('{"valid": "data", "__proto__": {"polluted": true}, "nested": {"constructor": {"prototype": {"isAdmin": true}}}}');
+  const cleaned = sanitizeJsonPayload(maliciousInput);
+
+  assert.equal(cleaned.valid, 'data');
+  assert.equal(Object.prototype.polluted, undefined);
+  assert.equal(({}).polluted, undefined);
+  assert.equal(cleaned.__proto__, undefined);
+  assert.equal(cleaned.nested.constructor, undefined);
+  assert.equal(({}).isAdmin, undefined);
+});
+
 
 
 

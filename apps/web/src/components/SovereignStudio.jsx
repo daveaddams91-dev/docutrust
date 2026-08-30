@@ -200,7 +200,7 @@ export default function SovereignStudio() {
         <div>
           <div className="flex items-center gap-2 mb-2">
             <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono">
-              v2.4.0 Sovereign Suite
+              v2.5.0 Sovereign Suite
             </span>
             <span className="text-xs text-gray-500 font-mono">Zero-Knowledge Cryptography</span>
           </div>

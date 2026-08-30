@@ -176,8 +176,19 @@ export class DocuTrustClient {
   /**
    * Verifies a W3C Verifiable Credential against Ed25519 / Post-Quantum signatures and revocation status.
    */
-  public async verifyCredential(credential: Record<string, any>): Promise<any> {
-    return this.request('/credentials/verify', 'POST', { credential });
+  public async verifyCredential(
+    credential: Record<string, any>,
+    options: {
+      expectedPublicKeyHex?: string;
+      statusListCredential?: Record<string, any>;
+      requiredSchema?: Record<string, any>;
+      checkTrustRegistry?: boolean;
+    } = {}
+  ): Promise<any> {
+    return this.request('/credentials/verify', 'POST', {
+      credential,
+      ...options
+    });
   }
 
   /**

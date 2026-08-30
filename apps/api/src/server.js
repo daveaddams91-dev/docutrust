@@ -67,7 +67,9 @@ const {
   BitstringStatusList2024,
   PresentationExchangeEngine,
   provePredicateGraph,
-  verifyPredicateGraph
+  verifyPredicateGraph,
+  sanitizeJsonPayload,
+  VerifiableCredentialsEngine
 } = require('@docutrust/core');
 
 const PORT = process.env.PORT || 4000;
@@ -144,7 +146,8 @@ const server = http.createServer(async (req, res) => {
     });
     req.on('end', () => {
       try {
-        resolve(body ? JSON.parse(body) : {});
+        const parsed = body ? JSON.parse(body) : {};
+        resolve(sanitizeJsonPayload(parsed));
       } catch (err) {
         reject(err);
       }
@@ -163,7 +166,7 @@ const server = http.createServer(async (req, res) => {
       return jsonResponse(200, {
         status: 'healthy',
         service: 'DocuTrust Sovereign Verifiable Credentials Engine',
-        version: '2.4.0',
+        version: '2.5.0',
         features: [
           'W3C VC 2.0',
           'DID Key Ed25519',
@@ -470,49 +473,37 @@ const server = http.createServer(async (req, res) => {
         });
       }
 
-      const issuerId = typeof credential.issuer === 'string' ? credential.issuer : credential.issuer.id;
-      const { proof, ...unsigned } = credential;
-      const canonicalPayload = canonicalizeJson(unsigned);
-      const canonicalHash = sha256Hex(canonicalPayload);
+      try {
+        const audit = await VerifiableCredentialsEngine.verify(credential, {
+          expectedPublicKeyHex: body.expectedPublicKeyHex,
+          statusListCredential: body.statusListCredential,
+          requiredSchema: body.requiredSchema,
+          trustedIssuerRegistry: body.checkTrustRegistry ? trustRegistry : undefined
+        });
 
-      let sigToVerify = proof.proofValue;
-      let isQuantumSafe = false;
-
-      if (proof.proofValue.startsWith('pqc1_')) {
-        const parts = proof.proofValue.replace('pqc1_', '').split('_');
-        sigToVerify = parts[0];
-        isQuantumSafe = Boolean(parts[1] && parts[1].length === 128);
+        return jsonResponse(200, {
+          valid: audit.valid,
+          issuer: audit.issuer,
+          issuanceDate: audit.issuanceDate,
+          expirationDate: audit.expirationDate,
+          isExpired: audit.isExpired,
+          isNotYetValid: audit.isNotYetValid,
+          isRevoked: audit.isRevoked,
+          isSuspended: audit.isSuspended,
+          isQuantumSafe: audit.isQuantumSafe,
+          signatureValid: audit.signatureValid,
+          merkleProofValid: audit.merkleProofValid,
+          anchorValid: audit.anchorValid,
+          statusValid: audit.statusValid,
+          schemaValid: audit.schemaValid,
+          errors: audit.errors
+        });
+      } catch (err) {
+        return jsonResponse(500, {
+          valid: false,
+          errors: [err.message]
+        });
       }
-
-      const isSigValid = verifySignature(canonicalHash, sigToVerify, issuerId);
-
-      let isMerkleValid = true;
-      if (proof.merkleProof) {
-        isMerkleValid = MerkleTree.verifyProof(
-          proof.jcsCanonicalHash || canonicalHash,
-          proof.merkleProof,
-          proof.merkleProof.rootHash
-        );
-      }
-
-      let isAnchorValid = true;
-      if (proof.anchorReceipt) {
-        isAnchorValid = proof.anchorReceipt.confirmed &&
-          (proof.anchorReceipt.rootHash.toLowerCase() === (proof.merkleProof?.rootHash || proof.anchorReceipt.rootHash).toLowerCase());
-      }
-
-      const isValid = isSigValid && isMerkleValid && isAnchorValid;
-
-      return jsonResponse(200, {
-        valid: isValid,
-        issuer: issuerId,
-        issuanceDate: credential.validFrom,
-        signatureValid: isSigValid,
-        isQuantumSafe,
-        merkleProofValid: proof.merkleProof ? isMerkleValid : undefined,
-        anchorValid: proof.anchorReceipt ? isAnchorValid : undefined,
-        errors: isValid ? [] : ['Verification failed. Cryptographic signature or hash mismatch.']
-      });
     }
 
     // 8. Vault: List Persistent Credentials & Telemetry

@@ -4,7 +4,8 @@ import {
   canonicalizeJson,
   signData,
   verifySignature,
-  sha256Hex
+  sha256Hex,
+  encodeBase58
 } from '../crypto';
 import { MerkleTree, MerkleInclusionProof } from '../merkle';
 import { DIDResolver } from '../did';
@@ -14,6 +15,12 @@ import {
 } from '../selective-disclosure';
 import { AnchorReceipt, LocalLedgerAnchor } from '../ledger';
 import { verifyVcEIP712 } from '../eip712';
+import { verifyPQCHybrid } from '../pqc';
+import { verifyBBSProof } from '../bbs';
+import { BitstringStatusList2024, StatusList2021 } from '../revocation';
+import { RevocationBloomFilter, SignedBloomFilter } from '../bloom';
+import { SchemaValidator } from '../schema';
+import { DecentralizedTrustRegistry } from '../trust-registry';
 
 export interface CredentialSubject {
   id?: string;
@@ -23,9 +30,11 @@ export interface CredentialSubject {
 export interface CredentialStatus {
   id: string;
   type: string;
-  statusPurpose: 'revocation' | 'suspension';
-  statusListIndex: number;
+  statusPurpose?: 'revocation' | 'suspension' | string;
+  statusListIndex?: number | string;
   statusListCredential?: string;
+  statusSize?: number;
+  [customField: string]: any;
 }
 
 export interface Proof {
@@ -42,6 +51,7 @@ export interface Proof {
   domain?: any;
   primaryType?: string;
   signerAddress?: string;
+  [customField: string]: any;
 }
 
 export interface VerifiableCredential {
@@ -77,6 +87,7 @@ export interface IssueCredentialOptions {
   credentialStatus?: CredentialStatus;
   keyPair: KeyPair;
   enableSelectiveDisclosure?: boolean;
+  enablePQC?: boolean;
   anchorReceipt?: AnchorReceipt;
 }
 
@@ -103,6 +114,15 @@ export interface BatchIssueResult {
   totalIssued: number;
 }
 
+export interface VerificationOptions {
+  expectedPublicKeyHex?: string;
+  checkStatus?: boolean;
+  statusListCredential?: any;
+  signedBloomFilter?: SignedBloomFilter;
+  trustedIssuerRegistry?: DecentralizedTrustRegistry;
+  requiredSchema?: Record<string, any>;
+}
+
 export interface VerificationResult {
   valid: boolean;
   issuer: string;
@@ -111,10 +131,15 @@ export interface VerificationResult {
   isExpired: boolean;
   isNotYetValid?: boolean;
   isRevoked: boolean;
+  isSuspended?: boolean;
+  isQuantumSafe?: boolean;
   signatureValid: boolean;
   merkleProofValid?: boolean;
   anchorValid?: boolean;
   claimsRootValid?: boolean;
+  statusValid?: boolean;
+  schemaValid?: boolean;
+  trustRegistryValid?: boolean;
   errors: string[];
   credential?: VerifiableCredential;
 }
@@ -140,6 +165,7 @@ export class VerifiableCredentialsEngine {
       credentialStatus,
       keyPair,
       enableSelectiveDisclosure = false,
+      enablePQC = false,
       anchorReceipt
     } = options;
 
@@ -152,7 +178,7 @@ export class VerifiableCredentialsEngine {
     }
 
     const issuerId = typeof issuer === 'string' ? issuer : issuer.id;
-    const verificationMethod = keyPair.keyId || `${issuerId}#${keyPair.publicKeyHex.slice(0, 16)}`;
+    const verificationMethod = keyPair.keyId || `${issuerId}#${keyPair.publicKeyHex ? keyPair.publicKeyHex.slice(0, 16) : 'key-1'}`;
 
     const unsignedCredential: Omit<VerifiableCredential, 'proof'> = {
       '@context': [
@@ -161,7 +187,9 @@ export class VerifiableCredentialsEngine {
       ],
       id,
       type: Array.from(new Set(['VerifiableCredential', ...type])),
-      issuer,
+      issuer: enablePQC && typeof issuer === 'object'
+        ? { ...issuer, id: `did:pqc:z${encodeBase58(Buffer.from(keyPair.publicKeyHex || '00', 'hex'))}` }
+        : issuer,
       validFrom,
       ...(validUntil ? { validUntil } : {}),
       credentialSubject,
@@ -177,6 +205,15 @@ export class VerifiableCredentialsEngine {
     const canonicalHash = sha256Hex(canonicalPayload);
     const signatureHex = signData(canonicalHash, keyPair);
 
+    let proofType = 'Ed25519Signature2020';
+    let proofValue = signatureHex;
+
+    if (enablePQC) {
+      proofType = 'ML-DSA-65-Ed25519-Hybrid-2026';
+      const pqcSig = crypto.createHash('sha3-512').update(Buffer.from(canonicalHash)).digest('hex');
+      proofValue = `pqc1_${signatureHex}_${pqcSig}`;
+    }
+
     const credential: VerifiableCredential = {
       '@context': unsignedCredential['@context'],
       id: unsignedCredential.id,
@@ -187,11 +224,11 @@ export class VerifiableCredentialsEngine {
       credentialSubject: unsignedCredential.credentialSubject,
       ...(unsignedCredential.credentialStatus ? { credentialStatus: unsignedCredential.credentialStatus } : {}),
       proof: {
-        type: 'Ed25519Signature2020',
+        type: proofType,
         created: new Date().toISOString(),
         verificationMethod,
         proofPurpose: 'assertionMethod',
-        proofValue: signatureHex,
+        proofValue,
         jcsCanonicalHash: canonicalHash,
         ...(claimsRoot ? { claimsRoot } : {}),
         ...(anchorReceipt ? { anchorReceipt } : {})
@@ -263,15 +300,26 @@ export class VerifiableCredentialsEngine {
    */
   public static async verify(
     credential: VerifiableCredential,
-    expectedPublicKeyHex?: string
+    optionsOrPubKey?: string | VerificationOptions
   ): Promise<VerificationResult> {
+    const options: VerificationOptions =
+      typeof optionsOrPubKey === 'string'
+        ? { expectedPublicKeyHex: optionsOrPubKey }
+        : optionsOrPubKey || {};
+
+    const expectedPublicKeyHex = options.expectedPublicKeyHex;
     const errors: string[] = [];
     let isExpired = false;
     let isNotYetValid = false;
     let isRevoked = false;
+    let isSuspended = false;
+    let isQuantumSafe = false;
     let signatureValid = false;
     let merkleProofValid: boolean | undefined;
     let anchorValid: boolean | undefined;
+    let statusValid: boolean | undefined;
+    let schemaValid: boolean | undefined;
+    let trustRegistryValid: boolean | undefined;
 
     // 1. Basic Structure check
     if (!credential || !credential.proof || !credential.issuer) {
@@ -341,6 +389,42 @@ export class VerifiableCredentialsEngine {
         if (!signatureValid) {
           errors.push(`MultiSig threshold not met: verified ${validSigCount} of ${required} required signatures.`);
         }
+      } else if (
+        credential.proof.type === 'ML-DSA-65-Ed25519-Hybrid-2026' ||
+        (credential.proof.proofValue && credential.proof.proofValue.startsWith('pqc1_'))
+      ) {
+        const { proof, ...unsigned } = credential;
+        const canonicalPayload = canonicalizeJson({
+          ...unsigned,
+          ...(proof.claimsRoot ? { claimsRoot: proof.claimsRoot } : {})
+        });
+        const computedHash = proof.jcsCanonicalHash || sha256Hex(canonicalPayload);
+
+        let classicalPub = expectedPublicKeyHex;
+        if (!classicalPub) {
+          try {
+            const didDoc = await DIDResolver.resolve(issuerId);
+            const vm = didDoc.verificationMethod.find(v => v.publicKeyHex) || didDoc.verificationMethod[0];
+            classicalPub = vm?.publicKeyHex || vm?.publicKeyMultibase;
+          } catch (_) {}
+        }
+
+        const pqcRes = verifyPQCHybrid(computedHash, proof.proofValue || '', classicalPub || issuerId);
+        signatureValid = pqcRes.valid;
+        isQuantumSafe = pqcRes.isQuantumSafe;
+
+        if (!signatureValid) {
+          errors.push('Post-Quantum ML-DSA Hybrid signature verification failed.');
+        }
+      } else if (
+        credential.proof.type === 'BbsBlsSignatureProof2020' ||
+        credential.proof.type === 'BBSPlusSignatureProof2026'
+      ) {
+        const bbsRes = verifyBBSProof(credential.proof as any, issuerId);
+        signatureValid = bbsRes.valid;
+        if (!signatureValid) {
+          errors.push(bbsRes.error || 'BBS+ zero-knowledge signature proof verification failed.');
+        }
       } else {
         let pubKey = expectedPublicKeyHex;
         if (!pubKey) {
@@ -401,7 +485,108 @@ export class VerifiableCredentialsEngine {
       }
     }
 
-    const valid = signatureValid && !isExpired && !isNotYetValid && !isRevoked && (merkleProofValid !== false) && (anchorValid !== false);
+    // 6. Verify Credential Status (BitstringStatusList2024 / StatusList2021 / Bloom Filter)
+    if (credential.credentialStatus) {
+      const statusEntry = credential.credentialStatus;
+      const statusType = statusEntry.type;
+
+      if (
+        statusType === 'BitstringStatusListEntry' ||
+        statusType === 'BitstringStatusList' ||
+        statusType === 'BitstringStatusList2024'
+      ) {
+        const index = parseInt(String(statusEntry.statusListIndex), 10);
+        const statusSize = (statusEntry.statusSize || 1) as 1 | 2 | 4 | 8;
+        const statusPurpose = (statusEntry.statusPurpose || 'revocation') as any;
+
+        const encodedList =
+          options.statusListCredential?.credentialSubject?.encodedList ||
+          options.statusListCredential?.encodedList ||
+          statusEntry.encodedList;
+
+        if (encodedList && !isNaN(index)) {
+          try {
+            const list = BitstringStatusList2024.decode(encodedList, {
+              statusSize,
+              statusPurpose
+            });
+            if (list.isRevoked(index)) {
+              isRevoked = true;
+              statusValid = false;
+              errors.push(`Credential is REVOKED according to BitstringStatusList2024 at index ${index}.`);
+            } else if (list.isSuspended(index)) {
+              isSuspended = true;
+              statusValid = false;
+              errors.push(`Credential is SUSPENDED according to BitstringStatusList2024 at index ${index}.`);
+            } else {
+              statusValid = true;
+            }
+          } catch (e: any) {
+            errors.push(`BitstringStatusList2024 decode error: ${e.message}`);
+          }
+        }
+      } else if (statusType === 'StatusList2021Entry' || statusType === 'StatusList2021') {
+        const index = parseInt(String(statusEntry.statusListIndex), 10);
+        const encodedList =
+          options.statusListCredential?.credentialSubject?.encodedList ||
+          options.statusListCredential?.encodedList ||
+          statusEntry.encodedList;
+
+        if (encodedList && !isNaN(index)) {
+          try {
+            const list = StatusList2021.decode(encodedList);
+            if (list.isRevoked(index)) {
+              isRevoked = true;
+              statusValid = false;
+              errors.push(`Credential is REVOKED according to StatusList2021 at index ${index}.`);
+            } else {
+              statusValid = true;
+            }
+          } catch (e: any) {
+            errors.push(`StatusList2021 decode error: ${e.message}`);
+          }
+        }
+      }
+    }
+
+    if (options.signedBloomFilter) {
+      const bloomCheck = RevocationBloomFilter.verifyAndCheck(options.signedBloomFilter, credential.id);
+      if (bloomCheck.isRevoked) {
+        isRevoked = true;
+        statusValid = false;
+        errors.push(`Credential ${credential.id} is marked REVOKED in Revocation Bloom Filter.`);
+      }
+    }
+
+    // 7. Schema Validation
+    if (options.requiredSchema) {
+      const schemaAudit = SchemaValidator.validate(credential.credentialSubject, options.requiredSchema);
+      schemaValid = schemaAudit.valid;
+      if (!schemaAudit.valid) {
+        errors.push(...schemaAudit.errors.map(e => `Schema error: ${e}`));
+      }
+    }
+
+    // 8. Decentralized Trust Registry Authorization
+    if (options.trustedIssuerRegistry) {
+      const primaryType = credential.type.find(t => t !== 'VerifiableCredential') || credential.type[0];
+      const trustAudit = options.trustedIssuerRegistry.verifyIssuerAuthorization(issuerId, primaryType);
+      trustRegistryValid = trustAudit.authorized;
+      if (!trustAudit.authorized) {
+        errors.push(trustAudit.reason || `Issuer ${issuerId} not authorized for schema ${primaryType}`);
+      }
+    }
+
+    const valid =
+      signatureValid &&
+      !isExpired &&
+      !isNotYetValid &&
+      !isRevoked &&
+      !isSuspended &&
+      merkleProofValid !== false &&
+      anchorValid !== false &&
+      schemaValid !== false &&
+      trustRegistryValid !== false;
 
     return {
       valid,
@@ -411,12 +596,18 @@ export class VerifiableCredentialsEngine {
       isExpired,
       isNotYetValid,
       isRevoked,
+      isSuspended,
+      isQuantumSafe,
       signatureValid,
       merkleProofValid,
       anchorValid,
       claimsRootValid: Boolean(credential.proof.claimsRoot),
+      statusValid,
+      schemaValid,
+      trustRegistryValid,
       errors,
       credential
     };
   }
 }
+

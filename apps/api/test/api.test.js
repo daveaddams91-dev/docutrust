@@ -60,7 +60,7 @@ test('API Server Suite', async (t) => {
     const res = await makeRequest('GET', '/api/v1/health');
     assert.equal(res.status, 200);
     assert.equal(res.body.status, 'healthy');
-    assert.equal(res.body.version, '2.4.0');
+    assert.equal(res.body.version, '2.5.0');
     assert.ok(Array.isArray(res.body.features));
     assert.ok(res.body.systemDid.startsWith('did:key:z6M'));
   });
@@ -878,6 +878,36 @@ test('API Server Suite', async (t) => {
     });
     assert.equal(verifyRes.status, 200);
     assert.equal(verifyRes.body.result.valid, true);
+  });
+
+  await t.test('37. POST /api/v1/credentials/verify handles PQC hybrid signatures', async () => {
+    const pqcRes = await makeRequest('POST', '/api/v1/keys/generate-pqc');
+    const pqcKeys = pqcRes.body.pqcKeyPair;
+
+    const issueRes = await makeRequest('POST', '/api/v1/credentials/issue', {
+      type: ['QuantumCredential'],
+      issuerName: 'Quantum Center',
+      keyPair: pqcKeys.classicalKeyPair,
+      enablePQC: true,
+      credentialSubject: { quantumId: 'Q-9000' }
+    });
+    assert.equal(issueRes.status, 200);
+
+    const verifyRes = await makeRequest('POST', '/api/v1/credentials/verify', {
+      credential: issueRes.body.credential,
+      expectedPublicKeyHex: pqcKeys.classicalKeyPair.publicKeyHex
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.valid, true);
+    assert.equal(verifyRes.body.isQuantumSafe, true);
+  });
+
+  await t.test('38. Security: readJsonBody prototype pollution defense in API', async () => {
+    const maliciousPayload = '{"__proto__": {"injected": true}, "normalKey": "safe"}';
+    const res = await makeRequest('POST', '/api/v1/keys/generate', maliciousPayload);
+    assert.equal(res.status, 200);
+    assert.equal(Object.prototype.injected, undefined);
+    assert.equal(({}).injected, undefined);
   });
 });
 

@@ -205,7 +205,7 @@ const command = args[0];
 
 function printHelp() {
   console.log(`
-\x1b[1m\x1b[36m🛡️ DocuTrust CLI v2.3.0\x1b[0m — Open-Source Sovereign Trust Stack
+\x1b[1m\x1b[36m🛡️ DocuTrust CLI v2.5.0\x1b[0m — Open-Source Sovereign Trust Stack
 
 \x1b[1mCORE COMMANDS:\x1b[0m
   \x1b[32mdemo / wizard\x1b[0m                                 Run interactive 10-second end-to-end credential issuance & verification
@@ -216,9 +216,23 @@ function printHelp() {
   \x1b[32mverify\x1b[0m --vc <file>                            Verify cryptographic signature, Merkle proof & ledger anchor
   \x1b[32mhelp\x1b[0m                                          Show this help menu
 
+\x1b[1mREVOCATION & ACCUMULATORS:\x1b[0m
+  \x1b[32mstatuslist-create\x1b[0m --size <num> --bits <1|2|4|8> Create W3C Bitstring StatusList2024 Credential
+  \x1b[32mstatuslist-check\x1b[0m --list <file> --index <num>    Check revocation/suspension status at index
+  \x1b[32mstatuslist-update\x1b[0m --list <file> --index <i> -s <s> Update status in BitstringStatusList2024
+  \x1b[32maccumulator-create\x1b[0m --members <csv>             Initialize RSA dynamic accumulator
+  \x1b[32maccumulator-non-membership-witness\x1b[0m --elem <e>   Compute Bezout constant-size non-membership witness
+  \x1b[32maccumulator-verify-non-membership\x1b[0m --witness <w> Verify accumulator non-membership witness
+
+\x1b[1mDIF PRESENTATION EXCHANGE & JSON SCHEMA:\x1b[0m
+  \x1b[32mpe-definition-create\x1b[0m --id <id> --descriptors <f> Create Presentation Definition v2.0
+  \x1b[32mpe-evaluate\x1b[0m --presentation <f> --definition <f>  Evaluate VP against Presentation Definition
+  \x1b[32mschema-validate-credential\x1b[0m --vc <f> --schema <f> Validate credential subject against JSON Schema
+
 \x1b[1mPRIVACY & ZERO-KNOWLEDGE:\x1b[0m
-  \x1b[32mencrypt\x1b[0m --data <str> --pass <pass>             Encrypt data with AES-256-GCM authenticated envelope
-  \x1b[32mdecrypt\x1b[0m --payload <file> --pass <pass>         Decrypt AES-256-GCM envelope payload
+  \x1b[32mzk-graph-prove\x1b[0m --id <id> --root <graph.json>    Generate Recursive ZK Predicate Graph Proof
+  \x1b[32mzk-graph-verify\x1b[0m --proof <file>                 Verify Recursive ZK Predicate Graph Proof
+  \x1b[32mzk-composite\x1b[0m --proofs <f1,f2> --op <AND|OR>   Combine ZK Predicates into composite proof
   \x1b[32mzk-range\x1b[0m --val <num> --min <num> --max <num>   Generate ZK Range Proof with hidden commitment
   \x1b[32mzk-age\x1b[0m --dob <YYYY-MM-DD> --min-age <num>     Generate ZK Age Predicate Proof (e.g. Age >= 21)
   \x1b[32mzk-date\x1b[0m --date <str> --min <str> --max <str>  Generate ZK Date Range Proof
@@ -237,6 +251,8 @@ function printHelp() {
   \x1b[32mpop-challenge\x1b[0m --aud <audience>                 Create Proof-of-Possession challenge
   \x1b[32mshamir-split\x1b[0m --secret <text> -n 5 -k 3         Split secret into K-of-N Shamir polynomial shares
   \x1b[32mshamir-combine\x1b[0m --shares <file>                 Reconstruct secret from Shamir shares
+  \x1b[32mjwe-encrypt\x1b[0m --data <str> --recipients <keys>   Encrypt multi-recipient General JWE
+  \x1b[32mjwe-decrypt\x1b[0m --jwe <file> --key <privHex>      Decrypt multi-recipient General JWE
 
 \x1b[1mFEDERATION & STREAMING LEDGER:\x1b[0m
   \x1b[32mmultichain-anchor\x1b[0m --chain <eth|sol|btc> --root <h> Generate anchor calldata / payload
