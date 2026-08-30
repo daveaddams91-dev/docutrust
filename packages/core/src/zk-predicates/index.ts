@@ -575,3 +575,184 @@ export function verifyCompositePredicate(
     errors
   };
 }
+
+export type PredicateOperator = 'AND' | 'OR' | 'NOT' | 'THRESHOLD';
+
+export interface ZKPredicateNode {
+  id: string;
+  operator?: PredicateOperator;
+  threshold?: number; // for THRESHOLD operator (k of n)
+  children?: ZKPredicateNode[];
+  proof?: AnyZKPredicateProof;
+}
+
+export interface ZKPredicateGraphProof {
+  type: 'ZKPredicateGraphProof2026';
+  graphId: string;
+  root: ZKPredicateNode;
+  graphRootHash: string;
+  timestamp: string;
+}
+
+export interface ZKPredicateGraphEvaluationResult {
+  valid: boolean;
+  graphId: string;
+  nodeResults: Record<string, { valid: boolean; error?: string }>;
+  satisfiedNodes: string[];
+  unsatisfiedNodes: string[];
+  errors: string[];
+}
+
+function computeNodeHash(node: ZKPredicateNode): string {
+  const parts: string[] = [node.id];
+  if (node.operator) parts.push(node.operator);
+  if (node.threshold !== undefined) parts.push(String(node.threshold));
+  if (node.proof) parts.push(node.proof.commitment);
+  if (node.children && node.children.length > 0) {
+    parts.push(node.children.map(computeNodeHash).join('|'));
+  }
+  return sha256Hex(parts.join('::'));
+}
+
+/**
+ * Builds a cryptographic proof of a recursive ZK predicate graph structure.
+ */
+export function provePredicateGraph(graphId: string, root: ZKPredicateNode): ZKPredicateGraphProof {
+  const graphRootHash = computeNodeHash(root);
+  return {
+    type: 'ZKPredicateGraphProof2026',
+    graphId,
+    root,
+    graphRootHash,
+    timestamp: new Date().toISOString()
+  };
+}
+
+/**
+ * Recursively evaluates and verifies a ZK Predicate Graph against boolean rules and cryptographic subproofs.
+ */
+export function verifyPredicateGraph(
+  graphProof: ZKPredicateGraphProof,
+  context?: { allowedSets?: Record<string, string[]>; restrictedSets?: Record<string, string[]> }
+): ZKPredicateGraphEvaluationResult {
+  if (graphProof.type !== 'ZKPredicateGraphProof2026' || !graphProof.root) {
+    return {
+      valid: false,
+      graphId: graphProof.graphId || 'unknown',
+      nodeResults: {},
+      satisfiedNodes: [],
+      unsatisfiedNodes: [],
+      errors: ['Invalid ZKPredicateGraphProof payload.']
+    };
+  }
+
+  const nodeResults: Record<string, { valid: boolean; error?: string }> = {};
+  const satisfiedNodes: string[] = [];
+  const unsatisfiedNodes: string[] = [];
+  const errors: string[] = [];
+
+  function evaluateSingleProof(proof: AnyZKPredicateProof): { valid: boolean; error?: string } {
+    if (proof.type === 'ZKRangePredicateProof2026') {
+      const res = verifyRangeProof(proof);
+      return res.valid ? { valid: true } : { valid: false, error: res.error };
+    }
+    if (proof.type === 'ZKSetMembershipProof2026') {
+      const allowed = context?.allowedSets?.[proof.claimKey] || [];
+      if (allowed.length > 0) {
+        const res = verifySetMembershipProof(proof, allowed);
+        return res.valid ? { valid: true } : { valid: false, error: res.error };
+      }
+      return { valid: true };
+    }
+    if (proof.type === 'ZKSetNonMembershipProof2026') {
+      const restricted = context?.restrictedSets?.[proof.claimKey] || [];
+      if (restricted.length > 0) {
+        const res = verifySetNonMembershipProof(proof, restricted);
+        return res.valid ? { valid: true } : { valid: false, error: res.error };
+      }
+      return { valid: true };
+    }
+    if (proof.type === 'ZKSetIntersectionProof2026') {
+      const target = context?.allowedSets?.[proof.claimKey] || [];
+      if (target.length > 0) {
+        const res = verifySetIntersectionProof(proof, target);
+        return res.valid ? { valid: true } : { valid: false, error: res.error };
+      }
+      return { valid: true };
+    }
+    if (proof.type === 'ZKAgePredicateProof2026') {
+      const res = verifyAgeProof(proof);
+      return res.valid ? { valid: true } : { valid: false, error: res.error };
+    }
+    if (proof.type === 'ZKDatePredicateProof2026') {
+      const res = verifyDateRangeProof(proof);
+      return res.valid ? { valid: true } : { valid: false, error: res.error };
+    }
+    return { valid: false, error: `Unknown proof type ${(proof as any).type}` };
+  }
+
+  function evaluateNode(node: ZKPredicateNode): boolean {
+    if (node.proof) {
+      const proofRes = evaluateSingleProof(node.proof);
+      nodeResults[node.id] = proofRes;
+      if (proofRes.valid) {
+        satisfiedNodes.push(node.id);
+        return true;
+      } else {
+        unsatisfiedNodes.push(node.id);
+        if (proofRes.error) errors.push(`[Node ${node.id}] ${proofRes.error}`);
+        return false;
+      }
+    }
+
+    if (!node.operator || !node.children || node.children.length === 0) {
+      nodeResults[node.id] = { valid: false, error: 'Node must have either a proof or operator with children' };
+      unsatisfiedNodes.push(node.id);
+      return false;
+    }
+
+    const childResults = node.children.map(c => evaluateNode(c));
+
+    let nodeValid = false;
+    switch (node.operator) {
+      case 'AND':
+        nodeValid = childResults.every(Boolean);
+        break;
+      case 'OR':
+        nodeValid = childResults.some(Boolean);
+        break;
+      case 'NOT':
+        nodeValid = childResults.length > 0 ? !childResults[0] : false;
+        break;
+      case 'THRESHOLD': {
+        const required = node.threshold !== undefined ? node.threshold : node.children.length;
+        const passCount = childResults.filter(Boolean).length;
+        nodeValid = passCount >= required;
+        break;
+      }
+    }
+
+    nodeResults[node.id] = nodeValid
+      ? { valid: true }
+      : { valid: false, error: `Operator ${node.operator} condition unsatisfied.` };
+
+    if (nodeValid) {
+      satisfiedNodes.push(node.id);
+    } else {
+      unsatisfiedNodes.push(node.id);
+    }
+
+    return nodeValid;
+  }
+
+  const overallValid = evaluateNode(graphProof.root);
+
+  return {
+    valid: overallValid,
+    graphId: graphProof.graphId,
+    nodeResults,
+    satisfiedNodes,
+    unsatisfiedNodes,
+    errors
+  };
+}

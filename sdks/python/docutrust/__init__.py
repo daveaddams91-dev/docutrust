@@ -33,14 +33,18 @@ from .eip712 import (
 from .social_recovery import SocialRecoveryEngine
 from .multichain import MultiChainLedgerAnchor
 from .schema import SchemaValidator
-from .accumulator import CryptographicAccumulator
+from .accumulator import CryptographicAccumulator, extended_gcd
 from .jwe import MultiRecipientJWE
+from .status_list import BitstringStatusList2024
+from .presentation_exchange import PresentationExchangeEngine
 from .zk_predicates import (
     prove_set_intersection,
-    verify_set_intersection_proof
+    verify_set_intersection_proof,
+    prove_predicate_graph,
+    verify_predicate_graph
 )
 
-__version__ = "2.3.0"
+__version__ = "2.4.0"
 __all__ = [
     "DocuTrustClient",
     "canonicalize_json",
@@ -64,6 +68,8 @@ __all__ = [
     "verify_set_intersection_proof",
     "prove_composite_predicate",
     "verify_composite_predicate",
+    "prove_predicate_graph",
+    "verify_predicate_graph",
     "generate_kem_keypair",
     "split_secret",
     "combine_shares",
@@ -84,6 +90,9 @@ __all__ = [
     "MultiChainLedgerAnchor",
     "SchemaValidator",
     "CryptographicAccumulator",
-    "MultiRecipientJWE"
+    "extended_gcd",
+    "MultiRecipientJWE",
+    "BitstringStatusList2024",
+    "PresentationExchangeEngine"
 ]
 

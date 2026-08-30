@@ -74,7 +74,75 @@ class SchemaValidator:
         return SchemaValidator.validate(subject, schema, "$.credentialSubject")
 
     @classmethod
-    def _validate_node(cls, value: Any, prop: Dict[str, Any], path: str, errors: List[str]) -> None:
+    def _resolve_ref(cls, ref: str, root_schema: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        if not ref.startswith("#/"):
+            return None
+        parts = ref[2:].split("/")
+        current = root_schema
+        for part in parts:
+            if not isinstance(current, dict) or part not in current:
+                return None
+            current = current[part]
+        return current if isinstance(current, dict) else None
+
+    @classmethod
+    def _validate_node(
+        cls,
+        value: Any,
+        prop: Dict[str, Any],
+        path: str,
+        errors: List[str],
+        root_schema: Optional[Dict[str, Any]] = None
+    ) -> None:
+        root = root_schema or prop
+
+        # Resolve $ref pointer
+        if "$ref" in prop and isinstance(prop["$ref"], str):
+            resolved = cls._resolve_ref(prop["$ref"], root)
+            if resolved:
+                cls._validate_node(value, resolved, path, errors, root)
+                return
+            else:
+                errors.append(f"{path}: unresolved schema $ref pointer '{prop['$ref']}'")
+                return
+
+        # Combinators: allOf, anyOf, oneOf, not
+        if "allOf" in prop and isinstance(prop["allOf"], list):
+            for idx, sub_schema in enumerate(prop["allOf"]):
+                sub_errors: List[str] = []
+                cls._validate_node(value, sub_schema, f"{path}.allOf[{idx}]", sub_errors, root)
+                errors.extend(sub_errors)
+
+        if "anyOf" in prop and isinstance(prop["anyOf"], list):
+            matched_any = False
+            for idx, sub_schema in enumerate(prop["anyOf"]):
+                sub_errors: List[str] = []
+                cls._validate_node(value, sub_schema, f"{path}.anyOf[{idx}]", sub_errors, root)
+                if len(sub_errors) == 0:
+                    matched_any = True
+                    break
+            if not matched_any:
+                errors.append(f"{path}: value failed to match any schema in 'anyOf'")
+
+        if "oneOf" in prop and isinstance(prop["oneOf"], list):
+            matched_count = 0
+            for idx, sub_schema in enumerate(prop["oneOf"]):
+                sub_errors: List[str] = []
+                cls._validate_node(value, sub_schema, f"{path}.oneOf[{idx}]", sub_errors, root)
+                if len(sub_errors) == 0:
+                    matched_count += 1
+            if matched_count != 1:
+                errors.append(f"{path}: expected exactly 1 match for 'oneOf', but matched {matched_count}")
+
+        if "not" in prop and isinstance(prop["not"], dict):
+            sub_errors: List[str] = []
+            cls._validate_node(value, prop["not"], path, sub_errors, root)
+            if len(sub_errors) == 0:
+                errors.append(f"{path}: value matched disallowed 'not' schema condition")
+
+        if value is None:
+            return
+
         # 1. Type check
         expected_types = prop.get("type")
         if expected_types:
@@ -102,9 +170,6 @@ class SchemaValidator:
                 actual_type = "null" if value is None else "array" if isinstance(value, list) else type(value).__name__
                 errors.append(f"{path}: expected type {' | '.join(expected_types)}, got {actual_type}")
                 return
-
-        if value is None:
-            return
 
         # 2. Enum check
         if "enum" in prop and isinstance(prop["enum"], list):
@@ -145,7 +210,7 @@ class SchemaValidator:
                 errors.append(f"{path}: array length {len(value)} exceeds maxItems {prop['maxItems']}")
             if "items" in prop and isinstance(prop["items"], dict):
                 for idx, item in enumerate(value):
-                    cls._validate_node(item, prop["items"], f"{path}[{idx}]", errors)
+                    cls._validate_node(item, prop["items"], f"{path}[{idx}]", errors, root)
 
         # 6. Object validations
         if isinstance(value, dict):
@@ -157,7 +222,7 @@ class SchemaValidator:
             if "properties" in prop and isinstance(prop["properties"], dict):
                 for k, sub_prop in prop["properties"].items():
                     if k in value:
-                        cls._validate_node(value[k], sub_prop, f"{path}.{k}", errors)
+                        cls._validate_node(value[k], sub_prop, f"{path}.{k}", errors, root)
 
             if prop.get("additionalProperties") is False and "properties" in prop:
                 declared_keys = set(prop["properties"].keys())
@@ -168,7 +233,7 @@ class SchemaValidator:
                 declared_keys = set(prop.get("properties", {}).keys())
                 for k, v in value.items():
                     if k not in declared_keys:
-                        cls._validate_node(v, prop["additionalProperties"], f"{path}.{k}", errors)
+                        cls._validate_node(v, prop["additionalProperties"], f"{path}.{k}", errors, root)
 
     @classmethod
     def _validate_format(cls, val: str, fmt: str, path: str, errors: List[str]) -> None:
@@ -178,12 +243,30 @@ class SchemaValidator:
         elif fmt == "uri":
             if not re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:[^\s]*$", val):
                 errors.append(f"{path}: value is not a valid URI")
+        elif fmt == "uri-reference":
+            if not re.match(r"^[a-zA-Z0-9+.-]*:[^\s]*|^(\/[^\s]*)?$", val):
+                errors.append(f"{path}: value is not a valid URI reference")
         elif fmt == "did":
             if not re.match(r"^did:[a-z0-9]+:[a-zA-Z0-9.\-_:%]+$", val):
                 errors.append(f"{path}: value is not a valid W3C DID string")
+        elif fmt == "uuid":
+            if not re.match(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", val):
+                errors.append(f"{path}: value is not a valid UUID")
+        elif fmt == "ipv4":
+            if not re.match(r"^(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)$", val):
+                errors.append(f"{path}: value is not a valid IPv4 address")
+        elif fmt == "ipv6":
+            if not re.match(r"^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$|^::1$", val):
+                errors.append(f"{path}: value is not a valid IPv6 address")
+        elif fmt == "hostname":
+            if not re.match(r"^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$", val):
+                errors.append(f"{path}: value is not a valid hostname")
         elif fmt == "date":
             if not re.match(r"^\d{4}-\d{2}-\d{2}$", val):
                 errors.append(f"{path}: value is not a valid YYYY-MM-DD date")
+        elif fmt == "time":
+            if not re.match(r"^\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?$", val):
+                errors.append(f"{path}: value is not a valid time string")
         elif fmt == "date-time":
             if not re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", val):
                 errors.append(f"{path}: value is not a valid ISO 8601 date-time string")

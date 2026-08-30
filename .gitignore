@@ -25,6 +25,7 @@ venv/
 .env.production.local
 *.pem
 *private-keys*.json
+.docutrust_*.json
 data/
 **/data/
 

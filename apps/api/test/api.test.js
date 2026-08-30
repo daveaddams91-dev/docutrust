@@ -60,7 +60,7 @@ test('API Server Suite', async (t) => {
     const res = await makeRequest('GET', '/api/v1/health');
     assert.equal(res.status, 200);
     assert.equal(res.body.status, 'healthy');
-    assert.equal(res.body.version, '2.2.0');
+    assert.equal(res.body.version, '2.4.0');
     assert.ok(Array.isArray(res.body.features));
     assert.ok(res.body.systemDid.startsWith('did:key:z6M'));
   });
@@ -730,6 +730,154 @@ test('API Server Suite', async (t) => {
     });
     assert.equal(verifyRes.status, 200);
     assert.equal(verifyRes.body.valid, true);
+  });
+
+  await t.test('33. POST /api/v1/accumulator (Non-Membership Witness & Verify)', async () => {
+    const accId = 'acc_api_non_member_test';
+    await makeRequest('POST', '/api/v1/accumulator/create', { id: accId });
+    const addRes = await makeRequest('POST', '/api/v1/accumulator/add', {
+      id: accId,
+      elements: ['user_alpha_1', 'user_beta_2']
+    });
+    assert.equal(addRes.status, 200);
+
+    const nonMember = 'user_gamma_3';
+    const nonMemRes = await makeRequest('POST', '/api/v1/accumulator/non-membership-witness', {
+      id: accId,
+      element: nonMember
+    });
+    assert.equal(nonMemRes.status, 200);
+    assert.equal(nonMemRes.body.witness.element, nonMember);
+
+    const verifyRes = await makeRequest('POST', '/api/v1/accumulator/verify-non-membership', {
+      witness: nonMemRes.body.witness,
+      currentAccumulatorHex: addRes.body.state.accumulator,
+      generatorHex: addRes.body.state.generator,
+      modulusHex: addRes.body.state.modulus
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.valid, true);
+  });
+
+  await t.test('34. POST /api/v1/statuslist2024 endpoints (create, check, update)', async () => {
+    const createRes = await makeRequest('POST', '/api/v1/statuslist2024/create', {
+      length: 1000,
+      statusSize: 2,
+      statusPurpose: 'revocation',
+      id: 'https://api.docutrust.org/status/2024-01',
+      issuerDid: 'did:key:z6MkuMockIssuer'
+    });
+    assert.equal(createRes.status, 200);
+    assert.ok(createRes.body.encodedList.startsWith('u'));
+    assert.equal(createRes.body.statusSize, 2);
+
+    // Initial check (index 10 is Valid: 0)
+    const checkRes = await makeRequest('POST', '/api/v1/statuslist2024/check', {
+      encodedList: createRes.body.encodedList,
+      index: 10,
+      length: 1000,
+      statusSize: 2
+    });
+    assert.equal(checkRes.status, 200);
+    assert.equal(checkRes.body.valid, true);
+    assert.equal(checkRes.body.revoked, false);
+
+    // Update index 10 to Revoked (1)
+    const updateRes = await makeRequest('POST', '/api/v1/statuslist2024/update', {
+      encodedList: createRes.body.encodedList,
+      index: 10,
+      status: 1,
+      length: 1000,
+      statusSize: 2
+    });
+    assert.equal(updateRes.status, 200);
+
+    // Check again
+    const checkAfterUpdate = await makeRequest('POST', '/api/v1/statuslist2024/check', {
+      encodedList: updateRes.body.encodedList,
+      index: 10,
+      length: 1000,
+      statusSize: 2
+    });
+    assert.equal(checkAfterUpdate.status, 200);
+    assert.equal(checkAfterUpdate.body.valid, false);
+    assert.equal(checkAfterUpdate.body.revoked, true);
+  });
+
+  await t.test('35. POST /api/v1/pe endpoints (definition, submission, evaluate)', async () => {
+    const defRes = await makeRequest('POST', '/api/v1/pe/definition/create', {
+      id: 'kyc_income_def',
+      inputDescriptors: [
+        {
+          id: 'income_descriptor',
+          schema: [{ uri: 'IncomeVerificationCredential' }],
+          constraints: {
+            fields: [
+              { path: ['$.credentialSubject.annualIncome'], filter: { type: 'number', minimum: 50000 } }
+            ]
+          }
+        }
+      ]
+    });
+    assert.equal(defRes.status, 200);
+    assert.equal(defRes.body.definition.id, 'kyc_income_def');
+
+    const subRes = await makeRequest('POST', '/api/v1/pe/submission/create', {
+      definitionId: 'kyc_income_def',
+      descriptorMap: [
+        { id: 'income_descriptor', format: 'ldp_vc', path: '$.verifiableCredential[0]' }
+      ]
+    });
+    assert.equal(subRes.status, 200);
+
+    const presentation = {
+      type: ['VerifiablePresentation'],
+      verifiableCredential: [
+        {
+          type: ['VerifiableCredential', 'IncomeVerificationCredential'],
+          credentialSubject: { annualIncome: 95000 }
+        }
+      ]
+    };
+
+    const evalRes = await makeRequest('POST', '/api/v1/pe/evaluate', {
+      presentation,
+      definition: defRes.body.definition,
+      submission: subRes.body.submission
+    });
+    assert.equal(evalRes.status, 200);
+    assert.equal(evalRes.body.result.valid, true);
+    assert.equal(evalRes.body.result.matchedDescriptors.length, 1);
+  });
+
+  await t.test('36. POST /api/v1/zk/prove-graph and /verify-graph', async () => {
+    const proveAge = await makeRequest('POST', '/api/v1/credentials/zk-predicate/prove-age', {
+      claimKey: 'dob',
+      birthDate: '1995-06-20',
+      minAgeYears: 18
+    });
+    assert.equal(proveAge.status, 200);
+
+    const root = {
+      id: 'kyc_graph_root',
+      operator: 'AND',
+      children: [
+        { id: 'leaf_age', proof: proveAge.body.proof }
+      ]
+    };
+
+    const graphRes = await makeRequest('POST', '/api/v1/zk/prove-graph', {
+      graphId: 'kyc_composite_graph_01',
+      root
+    });
+    assert.equal(graphRes.status, 200);
+    assert.equal(graphRes.body.proof.type, 'ZKPredicateGraphProof2026');
+
+    const verifyRes = await makeRequest('POST', '/api/v1/zk/verify-graph', {
+      graphProof: graphRes.body.proof
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.result.valid, true);
   });
 });
 

@@ -94,3 +94,5 @@ export * from './accumulator';
 // Export Multi-Recipient JSON Web Encryption (General JWE)
 export * from './jwe';
 
+// Export DIF Presentation Exchange v2.0 Engine
+export * from './presentation-exchange';

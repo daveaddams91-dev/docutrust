@@ -639,6 +639,115 @@ class DocuTrustClient:
         from .zk_predicates import verify_set_intersection_proof
         return verify_set_intersection_proof(proof, target_set, expected_commitment)
 
+    def create_status_list_2024(
+        self,
+        length: int = 100000,
+        status_size: int = 1,
+        status_purpose: str = "revocation"
+    ):
+        """Creates a W3C BitstringStatusList2024 instance."""
+        from .status_list import BitstringStatusList2024
+        return BitstringStatusList2024(length, status_size, status_purpose)
+
+    def check_status_list_2024(
+        self,
+        encoded_list: str,
+        index: int,
+        status_size: int = 1,
+        length: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Decodes and checks status at index in a BitstringStatusList2024."""
+        from .status_list import BitstringStatusList2024
+        opts = {"status_size": status_size}
+        if length:
+            opts["length"] = length
+        list_inst = BitstringStatusList2024.decode(encoded_list, opts)
+        status_val = list_inst.get_status(index)
+        return {
+            "index": index,
+            "status": status_val,
+            "statusSize": status_size,
+            "isValid": list_inst.is_valid(index),
+            "isRevoked": list_inst.is_revoked(index),
+            "isSuspended": list_inst.is_suspended(index)
+        }
+
+    def update_status_list_2024(
+        self,
+        encoded_list: str,
+        index: int,
+        status: int,
+        status_size: int = 1,
+        length: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Updates status at index in a BitstringStatusList2024."""
+        from .status_list import BitstringStatusList2024
+        opts = {"status_size": status_size}
+        if length:
+            opts["length"] = length
+        list_inst = BitstringStatusList2024.decode(encoded_list, opts)
+        list_inst.set_status(index, status)
+        new_encoded = list_inst.encode(True)
+        return {
+            "index": index,
+            "status": status,
+            "encodedList": new_encoded
+        }
+
+    def create_presentation_definition(
+        self,
+        definition_id: str,
+        input_descriptors: List[Dict[str, Any]],
+        name: Optional[str] = None,
+        purpose: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Creates a DIF Presentation Exchange 2.0 Presentation Definition."""
+        from .presentation_exchange import PresentationExchangeEngine
+        opts = {}
+        if name:
+            opts["name"] = name
+        if purpose:
+            opts["purpose"] = purpose
+        return PresentationExchangeEngine.create_definition(definition_id, input_descriptors, opts)
+
+    def create_presentation_submission(
+        self,
+        submission_id: str,
+        definition_id: str,
+        descriptor_map: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Creates a DIF Presentation Exchange 2.0 Presentation Submission."""
+        from .presentation_exchange import PresentationExchangeEngine
+        return PresentationExchangeEngine.create_submission(submission_id, definition_id, descriptor_map)
+
+    def evaluate_presentation_exchange(
+        self,
+        presentation: Dict[str, Any],
+        definition: Dict[str, Any],
+        submission: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Evaluates a Verifiable Presentation against a DIF Presentation Definition."""
+        from .presentation_exchange import PresentationExchangeEngine
+        return PresentationExchangeEngine.evaluate_presentation(presentation, definition, submission)
+
+    def prove_zk_predicate_graph(
+        self,
+        graph_id: str,
+        root_node: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Generates a recursive Zero-Knowledge Predicate Graph Proof."""
+        from .zk_predicates import prove_predicate_graph
+        return prove_predicate_graph(graph_id, root_node)
+
+    def verify_zk_predicate_graph(
+        self,
+        graph_proof: Dict[str, Any],
+        context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Verifies a recursive Zero-Knowledge Predicate Graph Proof."""
+        from .zk_predicates import verify_predicate_graph
+        return verify_predicate_graph(graph_proof, context)
+
 
 
 

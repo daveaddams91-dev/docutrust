@@ -1,5 +1,66 @@
 # 📝 DocuTrust Changelog & Release Notes
 
+## [v2.4.0] - W3C Bitstring Status List 2024, DIF Presentation Exchange 2.0, RSA Accumulator Non-Membership, Recursive ZK Predicate Graphs & Sovereign Studio - 2026-08-30
+
+### 🌟 Release Overview (v2.4.0)
+DocuTrust 2.4.0 introduces official W3C Bitstring Status List 2024 support with Gzip-compressed multibase (`u`) encoding and multi-bit resolution (revocation, suspension, review), DIF Presentation Exchange 2.0 evaluation engine for verifiable claim querying, Extended Euclidean Bezout Non-Membership witnesses for RSA dynamic accumulators, Recursive Zero-Knowledge Predicate Graphs supporting arbitrary boolean policy trees (AND/OR/NOT/THRESHOLD), and the interactive Sovereign Studio in the Web application.
+
+---
+
+### 🛡️ Core Cryptographic & Protocol Implementations (`@docutrust/core`)
+- **W3C Bitstring Status List 2024 (`packages/core/src/status-list`)**:
+  - Implemented `BitstringStatusList2024` with configurable bit resolution (1, 2, 4, 8 bits) and Gzip multibase (`u`) encoding.
+  - Multi-state tracking: Active (0), Revoked (1), Suspended (2), Under Review (3).
+  - Standard W3C StatusList2024 credential generator (`generateCredential`) with `@context` binding.
+- **DIF Presentation Exchange 2.0 Engine (`packages/core/src/presentation-exchange`)**:
+  - Implemented `PresentationExchangeEngine` supporting Presentation Definitions, input descriptors, JSONPath field queries, schema matching, constraint validation, and deterministic SHA-256 audit digest generation.
+  - Presentation Submission generator and validator.
+- **RSA Accumulator Non-Membership Witnesses (`packages/core/src/accumulator`)**:
+  - Implemented Extended Euclidean GCD (`extendedGCD`) for computing Bezout coefficients $a, b$ such that $a \cdot x + b \cdot \prod p_i = 1$.
+  - Implemented `createNonMembershipWitness` generating $O(1)$ constant-size witnesses $(d, b)$ and `verifyNonMembershipWitness` verifying $(d^x \cdot V^b) \equiv g \pmod N$ in constant time.
+- **Recursive Zero-Knowledge Predicate Graphs (`packages/core/src/zk-predicates`)**:
+  - Implemented `provePredicateGraph` and `verifyPredicateGraph` supporting hierarchical tree policies with `AND`, `OR`, `NOT`, and `THRESHOLD` operators over heterogeneous leaf proofs (Range, Age, Date, Membership, Non-Membership, Set Intersection, Composite).
+  - Deterministic canonical RFC 8785 graph root hashing and node evaluation traces.
+
+---
+
+### 💻 CLI & Developer Binaries (`@docutrust/cli`)
+- Added 17 new CLI subcommands:
+  - `statuslist-create`, `statuslist-check`, `statuslist-update`
+  - `pe-definition-create`, `pe-evaluate`
+  - `accumulator-create`, `accumulator-add`, `accumulator-delete`, `accumulator-witness`, `accumulator-verify`, `accumulator-non-membership-witness`, `accumulator-verify-non-membership`
+  - `zk-membership`, `zk-composite`, `zk-graph-prove`, `zk-graph-verify`, `schema-validate-credential`
+- All 31 CLI integration tests passing with zero failures.
+
+---
+
+### 🌐 REST API Endpoints (`@docutrust/api`)
+- Added/Updated endpoints for StatusList2024, Presentation Exchange 2.0, Non-Membership Accumulators, and Predicate Graphs.
+- All 37 API server test cases passing with zero failures.
+
+---
+
+### 🐍 Python SDK Parity (`docutrust` v2.4.0)
+- Added `BitstringStatusList2024` in `docutrust.status_list`.
+- Added `PresentationExchangeEngine` in `docutrust.presentation_exchange`.
+- Added Extended Euclidean Bezout non-membership calculations in `docutrust.accumulator`.
+- Added `prove_predicate_graph` and `verify_predicate_graph` in `docutrust.zk_predicates`.
+- Extended `SchemaValidator` with `$ref`, `$defs`, combinators (`allOf`, `anyOf`, `oneOf`, `not`), and formats (`uuid`, `ipv4`, `ipv6`, `hostname`, `uri-reference`, `time`).
+- Added client methods in `DocuTrustClient`.
+- All 42 Python unit tests passing cleanly.
+
+---
+
+### 🎨 Web Platform Sovereign Studio (`@docutrust/web`)
+- Created `SovereignStudio.jsx` featuring interactive tabs for:
+  - W3C Bitstring Status List 2024 visual compressor and status slot simulator.
+  - DIF Presentation Exchange 2.0 definition builder and live evaluation engine.
+  - RSA Accumulator Non-Membership Bezout witness generator and verifier.
+  - Recursive ZK Predicate Graph policy tree evaluator.
+- Integrated into `App.jsx`, `Navbar.jsx` and updated architecture documentation to v2.4.0.
+
+---
+
 ## [v2.3.0] - W3C Credential JSON Schema Engine, Dynamic RSA Accumulators, Multi-Recipient General JWE & ZK Set Intersection - 2026-08-29
 
 ### 🌟 Release Overview (v2.3.0)

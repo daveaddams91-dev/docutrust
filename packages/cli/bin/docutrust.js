@@ -1137,6 +1137,406 @@ async function main() {
     return;
   }
 
+  // Dynamic Accumulator Commands
+  const ACC_STORE_FILE = path.join(process.cwd(), '.docutrust_accumulators.json');
+  function loadAccStore() {
+    if (fs.existsSync(ACC_STORE_FILE)) {
+      try { return JSON.parse(fs.readFileSync(ACC_STORE_FILE, 'utf-8')); } catch (e) {}
+    }
+    return {};
+  }
+  function saveAccStore(store) {
+    fs.writeFileSync(ACC_STORE_FILE, JSON.stringify(store, null, 2), 'utf-8');
+  }
+
+  if (command === 'accumulator-create') {
+    const id = getArgValue('--id') || `acc_${crypto.randomBytes(4).toString('hex')}`;
+    const store = loadAccStore();
+    const acc = new core.CryptographicAccumulator(id);
+    store[id] = { state: acc.exportState(), members: [] };
+    saveAccStore(store);
+    console.log(`\x1b[32m✔\x1b[0m Dynamic Cryptographic Accumulator initialized: \x1b[1m${id}\x1b[0m`);
+    console.log(JSON.stringify(store[id].state, null, 2));
+    return;
+  }
+
+  if (command === 'accumulator-add') {
+    const id = getArgValue('--id');
+    const elementsStr = getArgValue('--elements') || getArgValue('-e');
+    if (!id || !elementsStr) {
+      console.error('\x1b[31mError:\x1b[0m Missing --id <id> or --elements <e1,e2,...>');
+      process.exit(1);
+    }
+    const store = loadAccStore();
+    if (!store[id]) {
+      console.error(`\x1b[31mError:\x1b[0m Accumulator '${id}' not found in local store.`);
+      process.exit(1);
+    }
+    const acc = new core.CryptographicAccumulator(id, store[id].state.modulus, store[id].state.generator);
+    const existingMembers = store[id].members || [];
+    for (const m of existingMembers) acc.add(m);
+    const newElements = elementsStr.split(',').map(s => s.trim());
+    for (const el of newElements) {
+      acc.add(el);
+      if (!existingMembers.includes(el)) existingMembers.push(el);
+    }
+    store[id].state = acc.exportState();
+    store[id].members = existingMembers;
+    saveAccStore(store);
+    console.log(`\x1b[32m✔\x1b[0m Added ${newElements.length} element(s) to accumulator \x1b[1m${id}\x1b[0m`);
+    console.log(JSON.stringify(store[id].state, null, 2));
+    return;
+  }
+
+  if (command === 'accumulator-delete') {
+    const id = getArgValue('--id');
+    const element = getArgValue('--element') || getArgValue('-e');
+    if (!id || !element) {
+      console.error('\x1b[31mError:\x1b[0m Missing --id <id> or --element <e>');
+      process.exit(1);
+    }
+    const store = loadAccStore();
+    if (!store[id]) {
+      console.error(`\x1b[31mError:\x1b[0m Accumulator '${id}' not found.`);
+      process.exit(1);
+    }
+    const acc = new core.CryptographicAccumulator(id, store[id].state.modulus, store[id].state.generator);
+    const existingMembers = (store[id].members || []).filter(m => m !== element);
+    for (const m of existingMembers) acc.add(m);
+    store[id].state = acc.exportState();
+    store[id].members = existingMembers;
+    saveAccStore(store);
+    console.log(`\x1b[32m✔\x1b[0m Deleted '${element}' from accumulator \x1b[1m${id}\x1b[0m`);
+    console.log(JSON.stringify(store[id].state, null, 2));
+    return;
+  }
+
+  if (command === 'accumulator-witness') {
+    const id = getArgValue('--id');
+    const element = getArgValue('--element') || getArgValue('-e');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+    if (!id || !element) {
+      console.error('\x1b[31mError:\x1b[0m Missing --id <id> or --element <e>');
+      process.exit(1);
+    }
+    const store = loadAccStore();
+    if (!store[id]) {
+      console.error(`\x1b[31mError:\x1b[0m Accumulator '${id}' not found.`);
+      process.exit(1);
+    }
+    const acc = new core.CryptographicAccumulator(id, store[id].state.modulus, store[id].state.generator);
+    for (const m of store[id].members || []) acc.add(m);
+    const witness = acc.createWitness(element);
+    const outStr = JSON.stringify(witness, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m Membership Witness saved to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    return;
+  }
+
+  if (command === 'accumulator-verify') {
+    const witnessFile = getArgValue('--witness') || getArgValue('-w');
+    const accHex = getArgValue('--acc') || getArgValue('-a');
+    const modHex = getArgValue('--mod') || getArgValue('-m');
+    if (!witnessFile || !accHex) {
+      console.error('\x1b[31mError:\x1b[0m Missing --witness <file.json> or --acc <hex>');
+      process.exit(1);
+    }
+    const witness = JSON.parse(fs.readFileSync(witnessFile, 'utf-8'));
+    const valid = core.CryptographicAccumulator.verifyWitness(witness, accHex, modHex || undefined);
+    if (valid) {
+      console.log(`\x1b[32m✔\x1b[0m Accumulator Membership Witness is \x1b[1m\x1b[32mVALID\x1b[0m (Cryptographically Verified)`);
+    } else {
+      console.log(`\x1b[31m✖\x1b[0m Accumulator Membership Witness is \x1b[1m\x1b[31mINVALID\x1b[0m`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  if (command === 'accumulator-non-membership-witness') {
+    const id = getArgValue('--id');
+    const element = getArgValue('--element') || getArgValue('-e');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+    if (!id || !element) {
+      console.error('\x1b[31mError:\x1b[0m Missing --id <id> or --element <e>');
+      process.exit(1);
+    }
+    const store = loadAccStore();
+    if (!store[id]) {
+      console.error(`\x1b[31mError:\x1b[0m Accumulator '${id}' not found.`);
+      process.exit(1);
+    }
+    const acc = new core.CryptographicAccumulator(id, store[id].state.modulus, store[id].state.generator);
+    for (const m of store[id].members || []) acc.add(m);
+    const witness = acc.createNonMembershipWitness(element);
+    const outStr = JSON.stringify(witness, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m Non-Membership Witness saved to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    return;
+  }
+
+  if (command === 'accumulator-verify-non-membership') {
+    const witnessFile = getArgValue('--witness') || getArgValue('-w');
+    const accHex = getArgValue('--acc') || getArgValue('-a');
+    const genHex = getArgValue('--gen') || getArgValue('-g');
+    const modHex = getArgValue('--mod') || getArgValue('-m');
+    if (!witnessFile || !accHex) {
+      console.error('\x1b[31mError:\x1b[0m Missing --witness <file.json> or --acc <hex>');
+      process.exit(1);
+    }
+    const witness = JSON.parse(fs.readFileSync(witnessFile, 'utf-8'));
+    const valid = core.CryptographicAccumulator.verifyNonMembershipWitness(witness, accHex, genHex || undefined, modHex || undefined);
+    if (valid) {
+      console.log(`\x1b[32m✔\x1b[0m Accumulator Non-Membership Witness is \x1b[1m\x1b[32mVALID\x1b[0m (Cryptographically Verified)`);
+    } else {
+      console.log(`\x1b[31m✖\x1b[0m Accumulator Non-Membership Witness is \x1b[1m\x1b[31mINVALID\x1b[0m`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // W3C BitstringStatusList2024 Commands
+  if (command === 'statuslist-create') {
+    const length = parseInt(getArgValue('--length') || getArgValue('-l') || '100000');
+    const statusSize = parseInt(getArgValue('--size') || getArgValue('-s') || '1');
+    const statusPurpose = getArgValue('--purpose') || getArgValue('-p') || 'revocation';
+    const id = getArgValue('--id');
+    const issuer = getArgValue('--issuer');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    const list = new core.BitstringStatusList2024(length, statusSize, statusPurpose);
+    const encoded = list.encode(true);
+    let outputData = {
+      encodedList: encoded,
+      length,
+      statusSize,
+      statusPurpose
+    };
+    if (id && issuer) {
+      outputData.credential = list.generateCredential(id, issuer);
+    }
+    const outStr = JSON.stringify(outputData, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m W3C BitstringStatusList2024 generated and saved to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    return;
+  }
+
+  if (command === 'statuslist-check') {
+    const listArg = getArgValue('--list') || getArgValue('-l');
+    const index = parseInt(getArgValue('--index') || getArgValue('-i') || '0');
+    const statusSize = parseInt(getArgValue('--size') || getArgValue('-s') || '1');
+    const length = getArgValue('--length') ? parseInt(getArgValue('--length')) : undefined;
+
+    if (!listArg) {
+      console.error('\x1b[31mError:\x1b[0m Missing --list <encoded|file>');
+      process.exit(1);
+    }
+    let encoded = listArg;
+    if (fs.existsSync(listArg)) {
+      const parsed = JSON.parse(fs.readFileSync(listArg, 'utf-8'));
+      encoded = parsed.encodedList || parsed.credentialSubject?.encodedList || parsed;
+    }
+    const list = core.BitstringStatusList2024.decode(encoded, { length, statusSize });
+    const status = list.getStatus(index);
+    console.log(`\x1b[32m✔\x1b[0m Status at index ${index}: \x1b[1m${status}\x1b[0m (Valid: ${list.isValid(index)}, Revoked: ${list.isRevoked(index)}, Suspended: ${list.isSuspended(index)})`);
+    return;
+  }
+
+  if (command === 'statuslist-update') {
+    const listArg = getArgValue('--list') || getArgValue('-l');
+    const index = parseInt(getArgValue('--index') || getArgValue('-i') || '0');
+    const status = parseInt(getArgValue('--status') || getArgValue('-v') || '1');
+    const statusSize = parseInt(getArgValue('--size') || getArgValue('-s') || '1');
+    const length = getArgValue('--length') ? parseInt(getArgValue('--length')) : undefined;
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!listArg) {
+      console.error('\x1b[31mError:\x1b[0m Missing --list <encoded|file>');
+      process.exit(1);
+    }
+    let encoded = listArg;
+    let fileJson = null;
+    if (fs.existsSync(listArg)) {
+      fileJson = JSON.parse(fs.readFileSync(listArg, 'utf-8'));
+      encoded = fileJson.encodedList || fileJson.credentialSubject?.encodedList || fileJson;
+    }
+    const list = core.BitstringStatusList2024.decode(encoded, { length, statusSize });
+    list.setStatus(index, status);
+    const newEncoded = list.encode(true);
+    if (fileJson && typeof fileJson === 'object') {
+      if (fileJson.encodedList) fileJson.encodedList = newEncoded;
+      if (fileJson.credentialSubject?.encodedList) fileJson.credentialSubject.encodedList = newEncoded;
+    }
+    const outResult = fileJson || { encodedList: newEncoded, index, status };
+    const outStr = JSON.stringify(outResult, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m Updated status list saved to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    return;
+  }
+
+  // DIF Presentation Exchange Commands
+  if (command === 'pe-definition-create') {
+    const id = getArgValue('--id') || `pe_def_${crypto.randomBytes(4).toString('hex')}`;
+    const descFile = getArgValue('--descriptors') || getArgValue('-d');
+    const name = getArgValue('--name') || getArgValue('-n');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!descFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --descriptors <file.json>');
+      process.exit(1);
+    }
+    const descriptors = JSON.parse(fs.readFileSync(descFile, 'utf-8'));
+    const def = core.PresentationExchangeEngine.createDefinition(id, descriptors, { name });
+    const outStr = JSON.stringify(def, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m DIF Presentation Definition saved to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    return;
+  }
+
+  if (command === 'pe-evaluate') {
+    const presFile = getArgValue('--presentation') || getArgValue('-p');
+    const defFile = getArgValue('--definition') || getArgValue('-d');
+    const subFile = getArgValue('--submission') || getArgValue('-s');
+
+    if (!presFile || !defFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --presentation <file.json> or --definition <file.json>');
+      process.exit(1);
+    }
+    const presentation = JSON.parse(fs.readFileSync(presFile, 'utf-8'));
+    const definition = JSON.parse(fs.readFileSync(defFile, 'utf-8'));
+    const submission = subFile ? JSON.parse(fs.readFileSync(subFile, 'utf-8')) : undefined;
+
+    const result = core.PresentationExchangeEngine.evaluatePresentation(presentation, definition, submission);
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m Presentation Exchange Evaluation PASSED. Matched descriptors: [${result.matchedDescriptors.join(', ')}]`);
+    } else {
+      console.log(`\x1b[31m✖\x1b[0m Presentation Exchange Evaluation FAILED. Errors:\n` + result.errors.map(e => `  - ${e}`).join('\n'));
+      process.exit(1);
+    }
+    return;
+  }
+
+  // ZK Membership, Composite & Graph Commands
+  if (command === 'zk-membership') {
+    const claimKey = getArgValue('--key') || getArgValue('-k') || 'role';
+    const val = getArgValue('--val') || getArgValue('-v');
+    const salt = getArgValue('--salt') || crypto.randomBytes(16).toString('hex');
+    const allowedStr = getArgValue('--allowed') || getArgValue('-a');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!val || !allowedStr) {
+      console.error('\x1b[31mError:\x1b[0m Missing --val <value> or --allowed <a,b,c>');
+      process.exit(1);
+    }
+    const allowedSet = allowedStr.split(',').map(s => s.trim());
+    const proof = core.proveSetMembership(claimKey, val, salt, allowedSet);
+    const outStr = JSON.stringify(proof, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m ZK Membership Proof saved to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    return;
+  }
+
+  if (command === 'zk-composite') {
+    const proofsStr = getArgValue('--proofs') || getArgValue('-p');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+    if (!proofsStr) {
+      console.error('\x1b[31mError:\x1b[0m Missing --proofs <file1.json,file2.json>');
+      process.exit(1);
+    }
+    const proofFiles = proofsStr.split(',').map(s => s.trim());
+    const proofs = proofFiles.map(f => JSON.parse(fs.readFileSync(f, 'utf-8')));
+    const composite = core.proveCompositePredicate(proofs);
+    const outStr = JSON.stringify(composite, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m ZK Composite Proof saved to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    return;
+  }
+
+  if (command === 'zk-graph-prove') {
+    const id = getArgValue('--id') || `graph_${crypto.randomBytes(4).toString('hex')}`;
+    const rootFile = getArgValue('--root') || getArgValue('-r');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+    if (!rootFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --root <file.json>');
+      process.exit(1);
+    }
+    const root = JSON.parse(fs.readFileSync(rootFile, 'utf-8'));
+    const proof = core.provePredicateGraph(id, root);
+    const outStr = JSON.stringify(proof, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m Recursive ZK Predicate Graph Proof saved to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    return;
+  }
+
+  if (command === 'zk-graph-verify') {
+    const proofFile = getArgValue('--proof') || getArgValue('-p');
+    const ctxFile = getArgValue('--context') || getArgValue('-c');
+    if (!proofFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --proof <file.json>');
+      process.exit(1);
+    }
+    const graphProof = JSON.parse(fs.readFileSync(proofFile, 'utf-8'));
+    const context = ctxFile ? JSON.parse(fs.readFileSync(ctxFile, 'utf-8')) : undefined;
+    const result = core.verifyPredicateGraph(graphProof, context);
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m Recursive ZK Predicate Graph is \x1b[1m\x1b[32mVALID\x1b[0m (Satisfied nodes: ${result.satisfiedNodes.join(', ')})`);
+    } else {
+      console.log(`\x1b[31m✖\x1b[0m Recursive ZK Predicate Graph is \x1b[1m\x1b[31mINVALID\x1b[0m. Errors:\n` + result.errors.map(e => `  - ${e}`).join('\n'));
+      process.exit(1);
+    }
+    return;
+  }
+
+  if (command === 'schema-validate-credential') {
+    const credFile = getArgValue('--credential') || getArgValue('-c');
+    const schemaFile = getArgValue('--schema') || getArgValue('-s');
+    if (!credFile || !schemaFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --credential <file.json> or --schema <file.json>');
+      process.exit(1);
+    }
+    const cred = JSON.parse(fs.readFileSync(credFile, 'utf-8'));
+    const schema = JSON.parse(fs.readFileSync(schemaFile, 'utf-8'));
+    const result = core.SchemaValidator.validateCredentialSubject(cred, schema);
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m Credential Subject Schema validation \x1b[1m\x1b[32mPASSED\x1b[0m`);
+    } else {
+      console.log(`\x1b[31m✖\x1b[0m Credential Subject Schema validation \x1b[1m\x1b[31mFAILED\x1b[0m. Errors:\n` + result.errors.map(e => `  - ${e}`).join('\n'));
+      process.exit(1);
+    }
+    return;
+  }
+
   console.log(`Unknown command: ${command}. Run 'docutrust help' for usage.`);
 }
 

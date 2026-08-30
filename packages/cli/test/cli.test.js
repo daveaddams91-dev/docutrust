@@ -348,6 +348,123 @@ test('CLI Suite', async (t) => {
     const proof = JSON.parse(fs.readFileSync(zkInterFile, 'utf-8'));
     assert.equal(proof.type, 'ZKSetIntersectionProof2026');
   });
+
+  const accWitnessFile = path.join(tempDir, 'acc-witness.json');
+  const accNonMemWitnessFile = path.join(tempDir, 'acc-nonmem-witness.json');
+  await t.test('26. docutrust accumulator commands (create, add, witness, verify, non-membership)', () => {
+    const accId = 'cli_acc_test_suite';
+    const createOut = execSync(`node "${cliPath}" accumulator-create --id "${accId}"`).toString();
+    assert.ok(createOut.includes('Dynamic Cryptographic Accumulator initialized'));
+
+    const addOut = execSync(`node "${cliPath}" accumulator-add --id "${accId}" --elements "member_alpha,member_beta"`).toString();
+    assert.ok(addOut.includes('Added 2 element(s)'));
+    const storeObj = JSON.parse(addOut.slice(addOut.indexOf('{')));
+
+    // Membership witness
+    execSync(`node "${cliPath}" accumulator-witness --id "${accId}" --element "member_alpha" --out "${accWitnessFile}"`);
+    assert.ok(fs.existsSync(accWitnessFile));
+
+    const verifyOut = execSync(`node "${cliPath}" accumulator-verify --witness "${accWitnessFile}" --acc "${storeObj.accumulator}"`).toString();
+    assert.ok(verifyOut.includes('VALID'));
+
+    // Non-membership witness
+    execSync(`node "${cliPath}" accumulator-non-membership-witness --id "${accId}" --element "outsider_gamma" --out "${accNonMemWitnessFile}"`);
+    assert.ok(fs.existsSync(accNonMemWitnessFile));
+
+    const verifyNonMemOut = execSync(`node "${cliPath}" accumulator-verify-non-membership --witness "${accNonMemWitnessFile}" --acc "${storeObj.accumulator}"`).toString();
+    assert.ok(verifyNonMemOut.includes('VALID'));
+  });
+
+  const slFile = path.join(tempDir, 'statuslist2024.json');
+  await t.test('27. docutrust statuslist-create, statuslist-check, and statuslist-update', () => {
+    execSync(`node "${cliPath}" statuslist-create --length 1000 --size 2 --purpose revocation --out "${slFile}"`);
+    assert.ok(fs.existsSync(slFile));
+
+    const checkOut = execSync(`node "${cliPath}" statuslist-check --list "${slFile}" --index 15 --size 2`).toString();
+    assert.ok(checkOut.includes('Status at index 15:') && checkOut.includes('Valid: true'));
+
+    execSync(`node "${cliPath}" statuslist-update --list "${slFile}" --index 15 --status 1 --size 2 --out "${slFile}"`);
+    const checkAfterUpdate = execSync(`node "${cliPath}" statuslist-check --list "${slFile}" --index 15 --size 2`).toString();
+    assert.ok(checkAfterUpdate.includes('Status at index 15:') && checkAfterUpdate.includes('Revoked: true'));
+  });
+
+  const peDefFile = path.join(tempDir, 'pe-def.json');
+  const peDescFile = path.join(tempDir, 'pe-desc.json');
+  const presFile = path.join(tempDir, 'presentation.json');
+  await t.test('28. docutrust pe-definition-create and pe-evaluate', () => {
+    fs.writeFileSync(peDescFile, JSON.stringify([
+      {
+        id: 'university_degree_desc',
+        schema: [{ uri: 'UniversityDegreeCredential' }],
+        constraints: {
+          fields: [{ path: ['$.credentialSubject.degree'] }]
+        }
+      }
+    ]), 'utf-8');
+
+    execSync(`node "${cliPath}" pe-definition-create --id "employment_def" --descriptors "${peDescFile}" --name "Employment Check" --out "${peDefFile}"`);
+    assert.ok(fs.existsSync(peDefFile));
+
+    fs.writeFileSync(presFile, JSON.stringify({
+      type: ['VerifiablePresentation'],
+      verifiableCredential: [
+        {
+          type: ['VerifiableCredential', 'UniversityDegreeCredential'],
+          credentialSubject: { degree: 'M.Sc. Cybersecurity' }
+        }
+      ]
+    }), 'utf-8');
+
+    const evalOut = execSync(`node "${cliPath}" pe-evaluate --presentation "${presFile}" --definition "${peDefFile}"`).toString();
+    assert.ok(evalOut.includes('Presentation Exchange Evaluation PASSED'));
+  });
+
+  const zkMemProofFile = path.join(tempDir, 'zk-mem-proof.json');
+  const zkCompFile = path.join(tempDir, 'zk-comp-proof.json');
+  await t.test('29. docutrust zk-membership and zk-composite', () => {
+    execSync(`node "${cliPath}" zk-membership --key role --val AUDITOR --allowed "ADMIN,AUDITOR,DEV" --out "${zkMemProofFile}"`);
+    assert.ok(fs.existsSync(zkMemProofFile));
+
+    execSync(`node "${cliPath}" zk-composite --proofs "${zkMemProofFile},${zkInterFile}" --out "${zkCompFile}"`);
+    assert.ok(fs.existsSync(zkCompFile));
+    const compProof = JSON.parse(fs.readFileSync(zkCompFile, 'utf-8'));
+    assert.equal(compProof.type, 'ZKCompositePredicateProof2026');
+    assert.equal(compProof.proofs.length, 2);
+  });
+
+  const zkGraphProofFile = path.join(tempDir, 'zk-graph-proof.json');
+  const zkGraphRootFile = path.join(tempDir, 'zk-graph-root.json');
+  await t.test('30. docutrust zk-graph-prove, zk-graph-verify, and schema-validate-credential', () => {
+    const memProof = JSON.parse(fs.readFileSync(zkMemProofFile, 'utf-8'));
+    fs.writeFileSync(zkGraphRootFile, JSON.stringify({
+      id: 'root_policy',
+      operator: 'AND',
+      children: [
+        { id: 'leaf_mem', proof: memProof }
+      ]
+    }), 'utf-8');
+
+    execSync(`node "${cliPath}" zk-graph-prove --id "graph_cli_01" --root "${zkGraphRootFile}" --out "${zkGraphProofFile}"`);
+    assert.ok(fs.existsSync(zkGraphProofFile));
+
+    const verifyOut = execSync(`node "${cliPath}" zk-graph-verify --proof "${zkGraphProofFile}"`).toString();
+    assert.ok(verifyOut.includes('VALID'));
+
+    // schema-validate-credential
+    const diplomaSchemaFile = path.join(tempDir, 'diploma-schema.json');
+    fs.writeFileSync(diplomaSchemaFile, JSON.stringify({
+      $id: 'https://schema.docutrust.org/diploma.json',
+      type: 'object',
+      required: ['name', 'degree'],
+      properties: {
+        name: { type: 'string' },
+        degree: { type: 'string' },
+        year: { type: 'string' }
+      }
+    }), 'utf-8');
+    const valCredOut = execSync(`node "${cliPath}" schema-validate-credential --credential "${vcFile}" --schema "${diplomaSchemaFile}"`).toString();
+    assert.ok(valCredOut.includes('PASSED'));
+  });
 });
 
 

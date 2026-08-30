@@ -382,3 +382,141 @@ def verify_composite_predicate(
     }
 
 
+def prove_predicate_graph(graph_id: str, root_node: Dict[str, Any]) -> Dict[str, Any]:
+    """Generates a recursive Zero-Knowledge Predicate Graph Proof."""
+    if not root_node or not isinstance(root_node, dict):
+        raise ValueError("Invalid root_node for predicate graph proof.")
+
+    graph_root_hash = sha256_hex(canonicalize_json(root_node))
+
+    return {
+        "type": "ZKPredicateGraphProof2026",
+        "graphId": graph_id,
+        "graphRootHash": graph_root_hash,
+        "root": root_node,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+
+def verify_predicate_graph(
+    graph_proof: Dict[str, Any],
+    context: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """Verifies a recursive Zero-Knowledge Predicate Graph Proof."""
+    if graph_proof.get("type") != "ZKPredicateGraphProof2026":
+        return {"valid": False, "verifiedCount": 0, "errors": ["Invalid graph proof type: expected 'ZKPredicateGraphProof2026'."]}
+
+    root = graph_proof.get("root")
+    if not root or not isinstance(root, dict):
+        return {"valid": False, "verifiedCount": 0, "errors": ["Missing or malformed root node in graph proof."]}
+
+    expected_hash = sha256_hex(canonicalize_json(root))
+    if graph_proof.get("graphRootHash") and graph_proof["graphRootHash"] != expected_hash:
+        return {"valid": False, "verifiedCount": 0, "errors": ["Graph root hash tampering detected: mismatch with canonicalized root."]}
+
+    errors: List[str] = []
+    node_evaluations: List[Dict[str, Any]] = []
+    ctx = context or {}
+
+    def evaluate_node(node: Dict[str, Any]) -> bool:
+        node_id = node.get("id", f"node_{len(node_evaluations)}")
+        operator = node.get("operator")
+        children = node.get("children", [])
+        proof = node.get("proof")
+
+        if proof:
+            # Leaf node evaluation
+            ptype = proof.get("type")
+            claim_key = proof.get("claimKey", "")
+            is_leaf_valid = False
+            leaf_error = None
+
+            if ptype == "ZKRangePredicateProof2026":
+                res = verify_range_proof(proof)
+                is_leaf_valid = res["valid"]
+                leaf_error = res.get("error")
+            elif ptype == "ZKAgePredicateProof2026":
+                res = verify_age_proof(proof)
+                is_leaf_valid = res["valid"]
+                leaf_error = res.get("error")
+            elif ptype == "ZKDatePredicateProof2026":
+                res = verify_date_range_proof(proof)
+                is_leaf_valid = res["valid"]
+                leaf_error = res.get("error")
+            elif ptype == "ZKSetMembershipProof2026":
+                allowed = ctx.get("allowedSets", {}).get(claim_key, [])
+                if allowed:
+                    res = verify_set_membership_proof(proof, allowed)
+                    is_leaf_valid = res["valid"]
+                    leaf_error = res.get("error")
+                else:
+                    is_leaf_valid = True
+            elif ptype == "ZKSetNonMembershipProof2026":
+                restricted = ctx.get("restrictedSets", {}).get(claim_key, [])
+                if restricted:
+                    res = verify_set_non_membership_proof(proof, restricted)
+                    is_leaf_valid = res["valid"]
+                    leaf_error = res.get("error")
+                else:
+                    is_leaf_valid = True
+            elif ptype == "ZKSetIntersectionProof2026":
+                target = ctx.get("allowedSets", {}).get(claim_key, [])
+                if target:
+                    res = verify_set_intersection_proof(proof, target)
+                    is_leaf_valid = res["valid"]
+                    leaf_error = res.get("error")
+                else:
+                    is_leaf_valid = True
+            elif ptype == "ZKCompositePredicateProof2026":
+                res = verify_composite_predicate(proof, ctx)
+                is_leaf_valid = res["valid"]
+                leaf_error = "; ".join(res.get("errors", [])) if not is_leaf_valid else None
+            else:
+                leaf_error = f"Unsupported proof type: {ptype}"
+
+            if not is_leaf_valid:
+                errors.append(f"Leaf [{node_id}]: {leaf_error or 'Verification failed'}")
+
+            node_evaluations.append({"id": node_id, "valid": is_leaf_valid, "proofType": ptype})
+            return is_leaf_valid
+
+        # Intermediate operator node
+        child_results = [evaluate_node(c) for c in children]
+        op_upper = (operator or "AND").upper()
+        op_valid = False
+
+        if op_upper == "AND":
+            op_valid = len(child_results) > 0 and all(child_results)
+            if not op_valid:
+                errors.append(f"Operator [{node_id} - AND]: Not all child conditions satisfied.")
+        elif op_upper == "OR":
+            op_valid = any(child_results)
+            if not op_valid:
+                errors.append(f"Operator [{node_id} - OR]: No child conditions satisfied.")
+        elif op_upper == "NOT":
+            op_valid = len(child_results) == 1 and not child_results[0]
+            if not op_valid:
+                errors.append(f"Operator [{node_id} - NOT]: Child condition inversion failed.")
+        elif op_upper == "THRESHOLD":
+            required = node.get("threshold", 1)
+            satisfied = sum(1 for r in child_results if r)
+            op_valid = satisfied >= required
+            if not op_valid:
+                errors.append(f"Operator [{node_id} - THRESHOLD]: Met {satisfied}/{required} conditions.")
+        else:
+            errors.append(f"Operator [{node_id}]: Unknown operator '{operator}'.")
+
+        node_evaluations.append({"id": node_id, "operator": op_upper, "valid": op_valid})
+        return op_valid
+
+    is_overall_valid = evaluate_node(root)
+    verified_count = sum(1 for n in node_evaluations if n["valid"])
+
+    return {
+        "valid": is_overall_valid and len(errors) == 0,
+        "verifiedCount": verified_count,
+        "nodeEvaluations": node_evaluations,
+        "errors": errors
+    }
+
+

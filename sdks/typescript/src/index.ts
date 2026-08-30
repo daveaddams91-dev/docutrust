@@ -784,5 +784,160 @@ export class DocuTrustClient {
       expectedCommitment
     });
   }
+
+  /**
+   * Generates a cryptographic Non-Membership Witness for an element not present in the accumulator.
+   */
+  public async createAccumulatorNonMembershipWitness(
+    id: string,
+    element: string
+  ): Promise<any> {
+    return this.request('/accumulator/non-membership-witness', 'POST', { id, element });
+  }
+
+  /**
+   * Verifies an accumulator Non-Membership Witness.
+   */
+  public async verifyAccumulatorNonMembership(
+    witness: Record<string, any>,
+    currentAccumulatorHex: string,
+    generatorHex?: string,
+    modulusHex?: string
+  ): Promise<any> {
+    return this.request('/accumulator/verify-non-membership', 'POST', {
+      witness,
+      currentAccumulatorHex,
+      generatorHex,
+      modulusHex
+    });
+  }
+
+  /**
+   * Creates a W3C BitstringStatusList2024 bitstring instance and optional StatusList2024Credential.
+   */
+  public async createStatusList2024(
+    length: number = 100000,
+    statusSize: 1 | 2 | 4 | 8 = 1,
+    statusPurpose: 'revocation' | 'suspension' = 'revocation',
+    id?: string,
+    issuer?: string
+  ): Promise<any> {
+    return this.request('/statuslist2024/create', 'POST', {
+      length,
+      statusSize,
+      statusPurpose,
+      id,
+      issuer
+    });
+  }
+
+  /**
+   * Checks status at specified index within a BitstringStatusList2024.
+   */
+  public async checkStatusList2024(
+    encodedList: string,
+    index: number,
+    statusSize: number = 1,
+    length?: number
+  ): Promise<any> {
+    return this.request('/statuslist2024/check', 'POST', {
+      encodedList,
+      index,
+      statusSize,
+      length
+    });
+  }
+
+  /**
+   * Updates status at specified index within a BitstringStatusList2024.
+   */
+  public async updateStatusList2024(
+    encodedList: string,
+    index: number,
+    status: number,
+    statusSize: number = 1,
+    length?: number
+  ): Promise<any> {
+    return this.request('/statuslist2024/update', 'POST', {
+      encodedList,
+      index,
+      status,
+      statusSize,
+      length
+    });
+  }
+
+  /**
+   * Creates a DIF Presentation Exchange 2.0 Presentation Definition.
+   */
+  public async createPresentationDefinition(
+    id: string,
+    inputDescriptors: any[],
+    name?: string,
+    purpose?: string
+  ): Promise<any> {
+    return this.request('/pe/definition/create', 'POST', {
+      id,
+      inputDescriptors,
+      name,
+      purpose
+    });
+  }
+
+  /**
+   * Creates a DIF Presentation Exchange 2.0 Presentation Submission.
+   */
+  public async createPresentationSubmission(
+    id: string,
+    definitionId: string,
+    descriptorMap: any[]
+  ): Promise<any> {
+    return this.request('/pe/submission/create', 'POST', {
+      id,
+      definitionId,
+      descriptorMap
+    });
+  }
+
+  /**
+   * Evaluates a Verifiable Presentation against a DIF Presentation Definition and optional Submission.
+   */
+  public async evaluatePresentationExchange(
+    presentation: Record<string, any>,
+    definition: Record<string, any>,
+    submission?: Record<string, any>
+  ): Promise<any> {
+    return this.request('/pe/evaluate', 'POST', {
+      presentation,
+      definition,
+      submission
+    });
+  }
+
+  /**
+   * Generates a recursive Zero-Knowledge Predicate Graph Proof.
+   */
+  public async proveZKPredicateGraph(
+    graphId: string,
+    root: Record<string, any>
+  ): Promise<any> {
+    return this.request('/zk/prove-graph', 'POST', {
+      graphId,
+      root
+    });
+  }
+
+  /**
+   * Verifies a recursive Zero-Knowledge Predicate Graph Proof.
+   */
+  public async verifyZKPredicateGraph(
+    graphProof: Record<string, any>,
+    context?: Record<string, any>
+  ): Promise<any> {
+    return this.request('/zk/verify-graph', 'POST', {
+      graphProof,
+      context
+    });
+  }
 }
 

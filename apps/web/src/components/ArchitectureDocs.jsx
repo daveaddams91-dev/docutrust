@@ -158,6 +158,32 @@ export default function ArchitectureDocs() {
           Implements General JWE with X25519 ECDH-ES key agreement, HKDF-SHA256 key wrapping, and AES-256-GCM authenticated payload encryption for multi-party federations, coupled with Zero-Knowledge Set Intersection proofs for private credential authorization.
         </p>
       </div>
+
+      {/* 11. W3C Bitstring Status List 2024 & DIF Presentation Exchange 2.0 */}
+      <div className="glass-card p-6 sm:p-8 rounded-2xl border border-gray-800 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center">
+            <Layers className="w-4 h-4" />
+          </div>
+          <h3 className="text-lg font-bold text-white">11. W3C Bitstring Status List 2024 & DIF Presentation Exchange 2.0</h3>
+        </div>
+        <p className="text-sm text-gray-300 leading-relaxed">
+          Embeds official W3C Bitstring Status List 2024 with configurable 1/2/4/8-bit resolution, Gzip-compressed multibase <code className="text-blue-400 bg-gray-900 px-1.5 py-0.5 rounded font-mono text-xs">u</code> encoding for multi-state revocation and suspension, alongside a compliant DIF Presentation Exchange 2.0 evaluation engine supporting JSONPath constraint filters.
+        </p>
+      </div>
+
+      {/* 12. RSA Non-Membership Accumulators & Recursive ZK Predicate Graphs */}
+      <div className="glass-card p-6 sm:p-8 rounded-2xl border border-gray-800 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center">
+            <GitBranch className="w-4 h-4" />
+          </div>
+          <h3 className="text-lg font-bold text-white">12. RSA Bezout Non-Membership & Recursive ZK Predicate Graphs</h3>
+        </div>
+        <p className="text-sm text-gray-300 leading-relaxed">
+          Enables constant-time proof that an identity is NOT part of a restricted set via Extended Euclidean Bezout coefficients (<code className="text-purple-400 bg-gray-900 px-1.5 py-0.5 rounded font-mono text-xs">d^x * V^b = g mod N</code>), and provides a recursive Zero-Knowledge Predicate Graph engine capable of verifying arbitrary hierarchical boolean trees (AND, OR, NOT, THRESHOLD) over heterogeneous atomic ZK proofs.
+        </p>
+      </div>
     </div>
   );
 }

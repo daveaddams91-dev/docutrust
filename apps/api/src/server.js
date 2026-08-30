@@ -63,7 +63,11 @@ const {
   CryptographicAccumulator,
   MultiRecipientJWE,
   proveSetIntersection,
-  verifySetIntersectionProof
+  verifySetIntersectionProof,
+  BitstringStatusList2024,
+  PresentationExchangeEngine,
+  provePredicateGraph,
+  verifyPredicateGraph
 } = require('@docutrust/core');
 
 const PORT = process.env.PORT || 4000;
@@ -159,7 +163,7 @@ const server = http.createServer(async (req, res) => {
       return jsonResponse(200, {
         status: 'healthy',
         service: 'DocuTrust Sovereign Verifiable Credentials Engine',
-        version: '2.2.0',
+        version: '2.4.0',
         features: [
           'W3C VC 2.0',
           'DID Key Ed25519',
@@ -168,7 +172,10 @@ const server = http.createServer(async (req, res) => {
           'BBS+ Unlinkable Multi-Message Signatures',
           'Verifiable PDF 2.0 with Steganographic Metadata',
           'Persistent Vault & Auto-Batch Anchoring Worker',
-          'StatusList2021 Bitstrings'
+          'W3C Bitstring StatusList2024',
+          'DIF Presentation Exchange 2.0',
+          'RSA Accumulator Non-Membership Witnesses',
+          'Recursive Zero-Knowledge Predicate Graphs'
         ],
         systemDid: systemKeyPair.did,
         uptime: process.uptime()
@@ -1223,6 +1230,164 @@ const server = http.createServer(async (req, res) => {
       }
       const result = verifySetIntersectionProof(proof, targetSet, expectedCommitment);
       return jsonResponse(200, result);
+    }
+
+    // 39. Accumulator Non-Membership Endpoints
+    if (pathname === '/api/v1/accumulator/non-membership-witness' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { id, element } = body;
+      if (!id || !element) {
+        return jsonResponse(400, { error: 'Missing id or element.' });
+      }
+      const acc = accumulatorStore.get(id);
+      if (!acc) return jsonResponse(404, { error: `Accumulator '${id}' not found.` });
+      try {
+        const witness = acc.createNonMembershipWitness(element);
+        return jsonResponse(200, { success: true, witness });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/accumulator/verify-non-membership' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { witness, currentAccumulatorHex, generatorHex, modulusHex } = body;
+      if (!witness || !currentAccumulatorHex) {
+        return jsonResponse(400, { error: 'Missing witness or currentAccumulatorHex.' });
+      }
+      const valid = CryptographicAccumulator.verifyNonMembershipWitness(
+        witness,
+        currentAccumulatorHex,
+        generatorHex,
+        modulusHex
+      );
+      return jsonResponse(200, { valid });
+    }
+
+    // 40. W3C BitstringStatusList2024 Endpoints
+    if (pathname === '/api/v1/statuslist2024/create' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { length = 100000, statusSize = 1, statusPurpose = 'revocation', id, issuerDid } = body;
+      try {
+        const list = new BitstringStatusList2024(length, statusSize, statusPurpose);
+        const encodedList = list.encode(true);
+        let credential = null;
+        if (id && issuerDid) {
+          credential = list.generateCredential(id, issuerDid);
+        }
+        return jsonResponse(200, { success: true, encodedList, length, statusSize, statusPurpose, credential });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/statuslist2024/check' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { encodedList, index, length, statusSize = 1, statusPurpose = 'revocation' } = body;
+      if (!encodedList || index === undefined) {
+        return jsonResponse(400, { error: 'Missing encodedList or index.' });
+      }
+      try {
+        const list = BitstringStatusList2024.decode(encodedList, { length, statusSize, statusPurpose });
+        const status = list.getStatus(index);
+        return jsonResponse(200, {
+          index,
+          status,
+          valid: list.isValid(index),
+          revoked: list.isRevoked(index),
+          suspended: list.isSuspended(index)
+        });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/statuslist2024/update' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { encodedList, index, status, length, statusSize = 1, statusPurpose = 'revocation' } = body;
+      if (!encodedList || index === undefined || status === undefined) {
+        return jsonResponse(400, { error: 'Missing encodedList, index, or status.' });
+      }
+      try {
+        const list = BitstringStatusList2024.decode(encodedList, { length, statusSize, statusPurpose });
+        list.setStatus(index, status);
+        const newEncodedList = list.encode(true);
+        return jsonResponse(200, { success: true, encodedList: newEncodedList, index, status });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // 41. DIF Presentation Exchange v2.0 Endpoints
+    if (pathname === '/api/v1/pe/definition/create' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { id, inputDescriptors, name, purpose, format } = body;
+      if (!id || !inputDescriptors || !Array.isArray(inputDescriptors)) {
+        return jsonResponse(400, { error: 'Missing id or inputDescriptors array.' });
+      }
+      try {
+        const definition = PresentationExchangeEngine.createDefinition(id, inputDescriptors, { name, purpose, format });
+        return jsonResponse(200, { success: true, definition });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/pe/submission/create' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { definitionId, descriptorMap, id } = body;
+      if (!definitionId || !descriptorMap || !Array.isArray(descriptorMap)) {
+        return jsonResponse(400, { error: 'Missing definitionId or descriptorMap array.' });
+      }
+      try {
+        const submission = PresentationExchangeEngine.createSubmission(definitionId, descriptorMap, id);
+        return jsonResponse(200, { success: true, submission });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/pe/evaluate' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { presentation, definition, submission } = body;
+      if (!presentation || !definition) {
+        return jsonResponse(400, { error: 'Missing presentation or definition.' });
+      }
+      try {
+        const result = PresentationExchangeEngine.evaluatePresentation(presentation, definition, submission);
+        return jsonResponse(200, { success: true, result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // 42. Recursive ZK Predicate Graph Endpoints
+    if (pathname === '/api/v1/zk/prove-graph' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { graphId, root } = body;
+      if (!graphId || !root) {
+        return jsonResponse(400, { error: 'Missing graphId or root node.' });
+      }
+      try {
+        const proof = provePredicateGraph(graphId, root);
+        return jsonResponse(200, { success: true, proof });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/zk/verify-graph' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { graphProof, context } = body;
+      if (!graphProof) {
+        return jsonResponse(400, { error: 'Missing graphProof payload.' });
+      }
+      try {
+        const result = verifyPredicateGraph(graphProof, context);
+        return jsonResponse(200, { success: true, result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
     }
 
     // Default 404

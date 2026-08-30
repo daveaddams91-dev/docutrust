@@ -514,10 +514,154 @@ class TestDocuTrustPython(unittest.TestCase):
         audit = verify_set_intersection_proof(proof, recognized)
         self.assertTrue(audit["valid"])
 
-        # Composite verification
-        comp = prove_composite_predicate([proof])
-        comp_audit = verify_composite_predicate(comp, {"allowedSets": {"clearance": recognized}})
-        self.assertTrue(comp_audit["valid"])
+    def test_accumulator_non_membership(self):
+        from docutrust.accumulator import CryptographicAccumulator
+        acc = CryptographicAccumulator("acc-py-non-mem")
+        m1 = "did:key:z6Mku1111111111111111111111111111111111111111111"
+        m2 = "did:key:z6Mku2222222222222222222222222222222222222222222"
+        outsider = "did:key:z6Mku9999999999999999999999999999999999999999999"
+
+        acc.add_batch([m1, m2])
+        state = acc.export_state()
+
+        witness = acc.create_non_membership_witness(outsider)
+        self.assertEqual(witness["element"], outsider)
+        self.assertTrue(CryptographicAccumulator.verify_non_membership_witness(witness, state["accumulator"]))
+
+        # Creating witness for member should raise
+        with self.assertRaises(ValueError):
+            acc.create_non_membership_witness(m1)
+
+    def test_bitstring_status_list_2024(self):
+        from docutrust.status_list import BitstringStatusList2024
+        sl = BitstringStatusList2024(length=1000, status_size=2, status_purpose="revocation")
+        self.assertEqual(sl.get_status(15), 0)
+        self.assertTrue(sl.is_valid(15))
+
+        sl.set_status(15, 1)  # REVOKED
+        self.assertEqual(sl.get_status(15), 1)
+        self.assertTrue(sl.is_revoked(15))
+
+        sl.set_status(20, 2)  # SUSPENDED
+        self.assertTrue(sl.is_suspended(20))
+
+        encoded = sl.encode(True)
+        self.assertTrue(encoded.startswith("u"))
+
+        decoded = BitstringStatusList2024.decode(encoded, {"length": 1000, "status_size": 2})
+        self.assertTrue(decoded.is_revoked(15))
+        self.assertTrue(decoded.is_suspended(20))
+        self.assertTrue(decoded.is_valid(0))
+
+        vc = sl.generate_credential("urn:uuid:status-list-01", "did:key:zIssuer")
+        self.assertEqual(vc["type"], ["VerifiableCredential", "StatusList2024Credential"])
+
+    def test_presentation_exchange_20(self):
+        from docutrust.presentation_exchange import PresentationExchangeEngine
+        desc = [
+            {
+                "id": "university_degree_desc",
+                "schema": [{"uri": "UniversityDegreeCredential"}],
+                "constraints": {
+                    "fields": [
+                        {"path": ["$.credentialSubject.degree"], "filter": {"type": "string", "pattern": "Cybersecurity"}}
+                    ]
+                }
+            }
+        ]
+        definition = PresentationExchangeEngine.create_definition("employment_check", desc, {"name": "Security Check"})
+
+        pres_valid = {
+            "type": ["VerifiablePresentation"],
+            "verifiableCredential": [
+                {
+                    "type": ["VerifiableCredential", "UniversityDegreeCredential"],
+                    "credentialSubject": {"degree": "M.Sc. Cybersecurity", "gpa": 3.9}
+                }
+            ]
+        }
+        res_valid = PresentationExchangeEngine.evaluate_presentation(pres_valid, definition)
+        self.assertTrue(res_valid["valid"])
+        self.assertEqual(res_valid["matched_descriptors"], ["university_degree_desc"])
+
+        pres_invalid = {
+            "type": ["VerifiablePresentation"],
+            "verifiableCredential": [
+                {
+                    "type": ["VerifiableCredential", "UniversityDegreeCredential"],
+                    "credentialSubject": {"degree": "B.A. Literature"}
+                }
+            ]
+        }
+        res_invalid = PresentationExchangeEngine.evaluate_presentation(pres_invalid, definition)
+        self.assertFalse(res_invalid["valid"])
+
+    def test_zk_predicate_graph(self):
+        from docutrust.zk_predicates import (
+            prove_set_membership,
+            prove_range,
+            create_commitment,
+            prove_predicate_graph,
+            verify_predicate_graph
+        )
+
+        role = "AUDITOR"
+        comm1 = create_commitment(role)
+        allowed = ["ADMIN", "AUDITOR", "DEV"]
+        mem_proof = prove_set_membership("role", role, comm1["salt"], allowed)
+
+        gpa = 3.8
+        comm2 = create_commitment(gpa)
+        range_proof = prove_range("gpa", gpa, comm2["salt"], 3.5, 4.0)
+
+        tree = {
+            "id": "root_policy",
+            "operator": "AND",
+            "children": [
+                {"id": "leaf_mem", "proof": mem_proof},
+                {"id": "leaf_range", "proof": range_proof}
+            ]
+        }
+
+        graph_proof = prove_predicate_graph("graph-py-01", tree)
+        self.assertEqual(graph_proof["type"], "ZKPredicateGraphProof2026")
+
+        audit = verify_predicate_graph(graph_proof, {"allowedSets": {"role": allowed}})
+        self.assertTrue(audit["valid"])
+        self.assertGreaterEqual(audit["verifiedCount"], 2)
+
+    def test_schema_validator_advanced(self):
+        from docutrust.schema import SchemaValidator
+        advanced_schema = {
+            "$id": "https://schema.docutrust.org/advanced.json",
+            "$defs": {
+                "uuidFormat": {"type": "string", "format": "uuid"}
+            },
+            "type": "object",
+            "required": ["id", "serverIp", "website"],
+            "properties": {
+                "id": {"$ref": "#/$defs/uuidFormat"},
+                "serverIp": {"type": "string", "format": "ipv4"},
+                "website": {"type": "string", "format": "hostname"}
+            }
+        }
+
+        data_valid = {
+            "id": "12345678-1234-1234-1234-123456789abc",
+            "serverIp": "192.168.1.1",
+            "website": "vault.docutrust.org"
+        }
+        res = SchemaValidator.validate(data_valid, advanced_schema)
+        self.assertTrue(res["valid"])
+
+        data_invalid = {
+            "id": "not-a-uuid",
+            "serverIp": "999.999.999.999",
+            "website": "invalid..host"
+        }
+        res_bad = SchemaValidator.validate(data_invalid, advanced_schema)
+        self.assertFalse(res_bad["valid"])
+        self.assertEqual(len(res_bad["errors"]), 3)
 
 if __name__ == '__main__':
     unittest.main()

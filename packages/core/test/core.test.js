@@ -116,7 +116,14 @@ const {
   MultiRecipientJWE,
   // ZK Set Intersection
   proveSetIntersection,
-  verifySetIntersectionProof
+  verifySetIntersectionProof,
+  // BitstringStatusList2024
+  BitstringStatusList2024,
+  // DIF Presentation Exchange v2.0
+  PresentationExchangeEngine,
+  // Recursive ZK Graph
+  provePredicateGraph,
+  verifyPredicateGraph
 } = require('../dist/index.js');
 
 // 1. Cryptography Tests
@@ -1355,6 +1362,267 @@ test('41. ZK Predicates: Set Intersection Proof & Composite Verification', () =>
     allowedSets: { accreditation: recognizedCertifications }
   });
   assert.equal(compAudit.valid, true);
+});
+
+// 41. W3C BitstringStatusList2024 Multi-State Revocation & Suspension
+test('42. Revocation: W3C BitstringStatusList2024 with 2-bit multi-state and multibase encoding', () => {
+  // Create 2-bit status list: 00=Valid, 01=Revoked, 10=Suspended, 11=Under Review
+  const statusList = new BitstringStatusList2024(1000, 2, 'revocation');
+  assert.equal(statusList.length, 1000);
+  assert.equal(statusList.statusSize, 2);
+
+  // Set various statuses
+  statusList.setStatus(0, 0); // Valid
+  statusList.setStatus(5, 1); // Revoked
+  statusList.setStatus(12, 2); // Suspended
+  statusList.setStatus(42, 3); // Custom/Under Review
+
+  assert.equal(statusList.isValid(0), true);
+  assert.equal(statusList.isRevoked(5), true);
+  assert.equal(statusList.isSuspended(12), true);
+  assert.equal(statusList.getStatus(42), 3);
+
+  // Multibase serialization
+  const encoded = statusList.encode(true);
+  assert.ok(encoded.startsWith('u'));
+
+  // Decoding
+  const decoded = BitstringStatusList2024.decode(encoded, { length: 1000, statusSize: 2 });
+  assert.equal(decoded.isValid(0), true);
+  assert.equal(decoded.isRevoked(5), true);
+  assert.equal(decoded.isSuspended(12), true);
+  assert.equal(decoded.getStatus(42), 3);
+
+  // W3C VC 2.0 Credential generation
+  const issuerKp = generateKeyPair();
+  const cred = statusList.generateCredential('https://registry.example.com/status/list-2024-01', issuerKp.did);
+  assert.equal(cred.type.includes('BitstringStatusListCredential'), true);
+  assert.equal(cred.credentialSubject.statusSize, 2);
+  assert.equal(cred.credentialSubject.encodedList, encoded);
+
+  const entry = BitstringStatusList2024.createEntry('https://registry.example.com/status/list-2024-01', 5, 'revocation', 2);
+  assert.equal(entry.statusListIndex, '5');
+  assert.equal(entry.statusSize, 2);
+});
+
+// 42. DIF Presentation Exchange v2.0 Engine
+test('43. Presentation Exchange 2.0: Definition, constraints, submission, and evaluation', () => {
+  const definition = PresentationExchangeEngine.createDefinition('def_kyc_and_degree', [
+    {
+      id: 'degree_descriptor',
+      purpose: 'Verify higher education degree',
+      schema: [{ uri: 'UniversityDegreeCredential' }],
+      constraints: {
+        fields: [
+          {
+            path: ['$.credentialSubject.degree', '$.degree'],
+            filter: { type: 'string', minLength: 2 }
+          }
+        ]
+      }
+    }
+  ], { name: 'Employment Application Verification' });
+
+  assert.equal(definition.id, 'def_kyc_and_degree');
+  assert.equal(definition.input_descriptors.length, 1);
+
+  // Valid credential presentation
+  const mockPresentation = {
+    '@context': ['https://www.w3.org/ns/credentials/v2'],
+    type: ['VerifiablePresentation'],
+    verifiableCredential: [
+      {
+        type: ['VerifiableCredential', 'UniversityDegreeCredential'],
+        credentialSubject: {
+          id: 'did:key:z6MkuXYZ',
+          name: 'Elena Rostova',
+          degree: 'Master of Science in Cryptography'
+        }
+      }
+    ]
+  };
+
+  const submission = PresentationExchangeEngine.createSubmission('def_kyc_and_degree', [
+    {
+      id: 'degree_descriptor',
+      format: 'ldp_vc',
+      path: '$.verifiableCredential[0]'
+    }
+  ]);
+
+  const evalResult = PresentationExchangeEngine.evaluatePresentation(mockPresentation, definition, submission);
+  assert.equal(evalResult.valid, true);
+  assert.equal(evalResult.matchedDescriptors.length, 1);
+  assert.equal(evalResult.matchedDescriptors[0], 'degree_descriptor');
+  assert.ok(evalResult.auditHash.length === 64);
+
+  // Mismatched presentation fails evaluation
+  const failingPresentation = {
+    type: ['VerifiablePresentation'],
+    verifiableCredential: [
+      {
+        type: ['VerifiableCredential', 'DriverLicenseCredential'],
+        credentialSubject: { licenseNumber: 'DL-99182' }
+      }
+    ]
+  };
+  const failResult = PresentationExchangeEngine.evaluatePresentation(failingPresentation, definition);
+  assert.equal(failResult.valid, false);
+  assert.equal(failResult.unmatchedDescriptors.includes('degree_descriptor'), true);
+});
+
+// 43. RSA Accumulator Non-Membership Witnesses
+test('44. Accumulator: O(1) Non-Membership Witnesses via Bezout Extended Euclidean Algorithm', () => {
+  const acc = new CryptographicAccumulator('acc_revocation_pool_002');
+  acc.add('member_alice_001');
+  acc.add('member_bob_002');
+  acc.add('member_charlie_003');
+
+  const state = acc.exportState();
+
+  // Create non-membership witness for an element that was NEVER added
+  const nonMember = 'outsider_eve_999';
+  const nonMemWitness = acc.createNonMembershipWitness(nonMember);
+  assert.equal(nonMemWitness.element, nonMember);
+  assert.ok(nonMemWitness.d);
+  assert.ok(nonMemWitness.b);
+
+  // Constant-time verification
+  const isValidNonMember = CryptographicAccumulator.verifyNonMembershipWitness(
+    nonMemWitness,
+    state.accumulator,
+    state.generator,
+    state.modulus
+  );
+  assert.equal(isValidNonMember, true);
+
+  // Adding Eve makes the non-membership witness invalid
+  acc.add(nonMember);
+  const updatedState = acc.exportState();
+  const isStillNonMember = CryptographicAccumulator.verifyNonMembershipWitness(
+    nonMemWitness,
+    updatedState.accumulator,
+    updatedState.generator,
+    updatedState.modulus
+  );
+  assert.equal(isStillNonMember, false);
+});
+
+// 44. Schema Composition & Advanced Formats
+test('45. Schema: Composition with $defs, $ref, combinators (allOf, oneOf, not) & formats (uuid, ipv4)', () => {
+  const compositeSchema = {
+    $id: 'https://schema.docutrust.org/identity-v2',
+    $defs: {
+      EmailAddress: {
+        type: 'string',
+        format: 'email'
+      },
+      ServerEndpoint: {
+        type: 'object',
+        required: ['ip', 'uuid'],
+        properties: {
+          ip: { type: 'string', format: 'ipv4' },
+          uuid: { type: 'string', format: 'uuid' }
+        }
+      }
+    },
+    type: 'object',
+    required: ['user', 'contact'],
+    properties: {
+      user: {
+        type: 'string',
+        minLength: 3
+      },
+      contact: {
+        $ref: '#/$defs/EmailAddress'
+      },
+      server: {
+        $ref: '#/$defs/ServerEndpoint'
+      },
+      paymentOption: {
+        oneOf: [
+          { type: 'object', required: ['creditCard'], properties: { creditCard: { type: 'string' } } },
+          { type: 'object', required: ['cryptoAddress'], properties: { cryptoAddress: { type: 'string', format: 'did' } } }
+        ]
+      }
+    }
+  };
+
+  const validPayload = {
+    user: 'alice_wonder',
+    contact: 'alice@wonderland.org',
+    server: {
+      ip: '192.168.1.1',
+      uuid: '123e4567-e89b-12d3-a456-426614174000'
+    },
+    paymentOption: {
+      cryptoAddress: 'did:key:z6MkuXYZ'
+    }
+  };
+
+  const validationResult = SchemaValidator.validate(validPayload, compositeSchema);
+  assert.equal(validationResult.valid, true);
+  assert.equal(validationResult.errors.length, 0);
+
+  // Invalid payload (bad IPv4 and bad email)
+  const invalidPayload = {
+    user: 'al',
+    contact: 'not-an-email',
+    server: {
+      ip: '999.999.999.999',
+      uuid: 'invalid-uuid'
+    },
+    paymentOption: {
+      creditCard: '1234',
+      cryptoAddress: 'did:key:z6MkuXYZ' // Violates oneOf (both present)
+    }
+  };
+
+  const invalidResult = SchemaValidator.validate(invalidPayload, compositeSchema);
+  assert.equal(invalidResult.valid, false);
+  assert.ok(invalidResult.errors.length >= 3);
+});
+
+// 45. Recursive ZK Predicate Graph Evaluator
+test('46. ZK Predicates: Recursive boolean graph (AND, OR, NOT, THRESHOLD) across heterogeneous proofs', () => {
+  // Generate individual ZK proofs
+  const ageProof = proveAgeAbove('dateOfBirth', '2000-01-15', 21);
+  const salaryRangeProof = proveRange('salary', 125000, createCommitment(125000).salt, 100000, 200000);
+  const regionProof = proveSetMembership('country', 'CH', createCommitment('CH').salt, ['CH', 'DE', 'FR', 'AT']);
+
+  // Build recursive graph: (Age >= 21 AND Salary in [100k, 200k]) OR Country in Allowed
+  const graphRoot = {
+    id: 'root_policy',
+    operator: 'OR',
+    children: [
+      {
+        id: 'financial_maturity_and',
+        operator: 'AND',
+        children: [
+          { id: 'node_age', proof: ageProof },
+          { id: 'node_salary', proof: salaryRangeProof }
+        ]
+      },
+      {
+        id: 'node_region',
+        proof: regionProof
+      }
+    ]
+  };
+
+  const graphProof = provePredicateGraph('graph_access_policy_001', graphRoot);
+  assert.equal(graphProof.type, 'ZKPredicateGraphProof2026');
+  assert.ok(graphProof.graphRootHash);
+
+  const evalResult = verifyPredicateGraph(graphProof, {
+    allowedSets: { country: ['CH', 'DE', 'FR', 'AT'] }
+  });
+
+  assert.equal(evalResult.valid, true);
+  assert.equal(evalResult.satisfiedNodes.includes('root_policy'), true);
+  assert.equal(evalResult.satisfiedNodes.includes('financial_maturity_and'), true);
+  assert.equal(evalResult.satisfiedNodes.includes('node_age'), true);
+  assert.equal(evalResult.satisfiedNodes.includes('node_salary'), true);
 });
 
 

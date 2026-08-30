@@ -1,6 +1,6 @@
 {
   "name": "@docutrust/core",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "Core cryptographic, Post-Quantum, Multi-Sig, Merkle, and Verifiable Credentials engine",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

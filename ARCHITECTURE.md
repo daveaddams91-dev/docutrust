@@ -46,10 +46,25 @@ When generating a Verifiable Presentation:
 2. Hidden claims are omitted, only their sibling hashes in the audit path are revealed.
 3. The verifier reconstructs $\text{ClaimsRoot}$ and verifies the Issuer's signature over it.
 
-### 2.4 High-Performance Revocation (StatusList2021)
-Credentials specify a `statusListIndex`. The authority publishes an encoded bitstring where bit $i = 0$ indicates valid and bit $i = 1$ indicates revoked:
-$$\text{RevocationHeader} = \text{Base64Url}(\text{GZIP}(\text{Bitstring}))$$
-Up to 1,000,000 credentials are represented in under 30KB of compressed bandwidth.
+### 2.4 High-Performance Revocation & Status (StatusList2021 & W3C Bitstring Status List 2024)
+Credentials specify status entries pointing to compressed bitstrings. In W3C Bitstring Status List 2024:
+$$\text{EncodedList} = \text{"u"} \parallel \text{Base64Url}(\text{GZIP}(\text{Bitstring}))$$
+Supporting 1-bit (valid/revoked), 2-bit (valid/revoked/suspended/review), 4-bit, and 8-bit multi-state tracking for 100,000+ credentials in under 2KB of compressed space.
+
+### 2.5 DIF Presentation Exchange 2.0 Engine
+Automates verifiable presentation querying through JSONPath filters, schema matching, constraint validation, and deterministic SHA-256 audit digest generation:
+$$\text{AuditHash} = \text{SHA-256}(\text{JCS}(\{\text{definitionId}, \text{matchedDescriptors}, \text{submission}\}))$$
+
+### 2.6 Dynamic RSA Accumulators & Bezout Non-Membership Proofs
+Accumulates member primes $p_i$ into an RSA modulus $N$:
+$$V = g^{\prod_{i=1}^n p_i} \pmod N$$
+Non-membership of an element $x \notin S$ is proven in $O(1)$ constant size using Bezout coefficients $(a, b)$ from the Extended Euclidean Algorithm:
+$$a \cdot x + b \cdot \prod_{i=1}^n p_i = \gcd\left(x, \prod p_i\right) = 1 \implies d = g^a \pmod N$$
+$$\text{Verification: } (d^x \cdot V^b) \equiv g \pmod N$$
+
+### 2.7 Recursive Zero-Knowledge Predicate Graphs
+Hierarchical boolean DAGs (AND, OR, NOT, THRESHOLD) evaluated recursively over heterogeneous ZK atomic proofs (Range, Age, Date, Membership, Non-Membership, Set Intersection, Composite):
+$$\text{GraphRootHash} = \text{SHA-256}(\text{JCS}(\text{RootNode}))$$
 
 ---
 

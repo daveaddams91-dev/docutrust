@@ -4,7 +4,7 @@ import * as crypto from 'crypto';
 import { VerifiableCredential } from '../vc';
 import { AnchorReceipt, LocalLedgerAnchor } from '../ledger';
 import { MerkleTree } from '../merkle';
-import { sha256Hex } from '../crypto';
+import { sha256Hex, canonicalizeJson } from '../crypto';
 
 export interface StoredCredentialRecord {
   id: string;
@@ -193,7 +193,7 @@ export class CredentialVault {
     const unanchored = this.getUnanchored();
     if (unanchored.length === 0) return null;
 
-    const leaves = unanchored.map(u => u.rawCredential.proof.jcsCanonicalHash || sha256Hex(JSON.stringify(u.rawCredential)));
+    const leaves = unanchored.map(u => u.rawCredential.proof.jcsCanonicalHash || sha256Hex(canonicalizeJson(u.rawCredential)));
     const tree = new MerkleTree(leaves);
     const root = tree.getRoot();
 

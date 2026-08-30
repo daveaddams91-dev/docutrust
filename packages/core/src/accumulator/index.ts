@@ -21,6 +21,14 @@ export interface MembershipWitness {
   accumulatorId: string;
 }
 
+export interface NonMembershipWitness {
+  element: string;
+  primeRepresentative: string; // hex
+  d: string; // hex (d = g^a mod N)
+  b: string; // string representation of BigInt Bezout coefficient b
+  accumulatorId: string;
+}
+
 export class CryptographicAccumulator {
   // High-entropy 1024-bit RSA composite default modulus (or configurable)
   public static readonly DEFAULT_MODULUS_HEX =
@@ -107,43 +115,75 @@ export class CryptographicAccumulator {
   }
 
   /**
-   * Fast Modular Exponentiation: (base^exp) % mod
+   * Modular exponentiation: (base^exp) mod mod
    */
   public static modPow(base: bigint, exp: bigint, mod: bigint): bigint {
     let res = 1n;
     base = base % mod;
+    if (base === 0n) return 0n;
+
     while (exp > 0n) {
       if (exp % 2n === 1n) {
         res = (res * base) % mod;
       }
+      exp = exp / 2n;
       base = (base * base) % mod;
-      exp /= 2n;
     }
     return res;
   }
 
   /**
-   * Adds an element to the accumulator.
+   * Extended Euclidean Algorithm for BigInt: computes { gcd, x, y } such that a*x + b*y = gcd.
    */
-  public add(element: string): { primeRepresentative: string; newAccumulator: string } {
+  public static extendedGCD(a: bigint, b: bigint): { gcd: bigint; x: bigint; y: bigint } {
+    let oldR = a, r = b;
+    let oldS = 1n, s = 0n;
+    let oldT = 0n, t = 1n;
+
+    while (r !== 0n) {
+      const q = oldR / r;
+      const tempR = oldR - q * r;
+      oldR = r;
+      r = tempR;
+
+      const tempS = oldS - q * s;
+      oldS = s;
+      s = tempS;
+
+      const tempT = oldT - q * t;
+      oldT = t;
+      t = tempT;
+    }
+
+    return { gcd: oldR, x: oldS, y: oldT };
+  }
+
+  /**
+   * Adds an element to the dynamic accumulator.
+   */
+  public add(element: string): { newAccumulator: string; primeRepresentative: string } {
     if (this.members.has(element)) {
-      const prime = this.primeMap.get(element)!;
-      return { primeRepresentative: prime.toString(16), newAccumulator: this.V.toString(16) };
+      return {
+        newAccumulator: this.V.toString(16),
+        primeRepresentative: this.primeMap.get(element)!.toString(16)
+      };
     }
 
     const prime = CryptographicAccumulator.elementToPrime(element);
     this.members.add(element);
     this.primeMap.set(element, prime);
+
+    // V' = V^prime mod N
     this.V = CryptographicAccumulator.modPow(this.V, prime, this.N);
 
     return {
-      primeRepresentative: prime.toString(16),
-      newAccumulator: this.V.toString(16)
+      newAccumulator: this.V.toString(16),
+      primeRepresentative: prime.toString(16)
     };
   }
 
   /**
-   * Adds a batch of elements to the accumulator.
+   * Adds a batch of elements to the dynamic accumulator.
    */
   public addBatch(elements: string[]): { newAccumulator: string; addedCount: number } {
     let count = 0;
@@ -210,6 +250,90 @@ export class CryptographicAccumulator {
       witness: W.toString(16),
       accumulatorId: this.id
     };
+  }
+
+  /**
+   * Generates an O(1) constant-size Non-Membership witness using Bezout's identity: a*x + b*P = 1.
+   */
+  public createNonMembershipWitness(element: string): NonMembershipWitness {
+    if (this.members.has(element)) {
+      throw new Error(`Cannot create non-membership witness: element "${element}" is currently a member.`);
+    }
+
+    const x = CryptographicAccumulator.elementToPrime(element);
+
+    // Compute P = product of all member primes
+    let P = 1n;
+    for (const p of this.primeMap.values()) {
+      P *= p;
+    }
+
+    // Extended Euclidean algorithm: a*x + b*P = 1
+    const { gcd, x: aCoeff, y: bCoeff } = CryptographicAccumulator.extendedGCD(x, P);
+    if (gcd !== 1n) {
+      throw new Error('GCD of non-member prime and accumulator product is not 1.');
+    }
+
+    // Adjust a to be positive by adding k*P (and subtracting k*x from b)
+    let a = aCoeff;
+    let b = bCoeff;
+    if (a < 0n) {
+      const k = (-a / P) + 1n;
+      a += k * P;
+      b -= k * x;
+    }
+
+    // d = g^a mod N
+    const d = CryptographicAccumulator.modPow(this.g, a, this.N);
+
+    return {
+      element,
+      primeRepresentative: x.toString(16),
+      d: d.toString(16),
+      b: b.toString(),
+      accumulatorId: this.id
+    };
+  }
+
+  /**
+   * Verifies an O(1) Non-Membership witness:
+   * When b >= 0: (d^x * V^b) mod N === g mod N
+   * When b < 0:  d^x mod N === (g * V^(-b)) mod N
+   */
+  public static verifyNonMembershipWitness(
+    witness: NonMembershipWitness,
+    currentAccumulatorHex: string,
+    generatorHex: string = CryptographicAccumulator.DEFAULT_GENERATOR_HEX,
+    modulusHex: string = CryptographicAccumulator.DEFAULT_MODULUS_HEX
+  ): boolean {
+    try {
+      const N = BigInt('0x' + modulusHex);
+      const g = BigInt('0x' + generatorHex) % N;
+      const V = BigInt('0x' + currentAccumulatorHex) % N;
+      const x = BigInt('0x' + witness.primeRepresentative);
+      const d = BigInt('0x' + witness.d) % N;
+      const b = BigInt(witness.b);
+
+      // Verify element prime mapping
+      const expectedPrime = this.elementToPrime(witness.element);
+      if (expectedPrime !== x) return false;
+
+      // Compute d^x mod N
+      const dx = this.modPow(d, x, N);
+
+      if (b >= 0n) {
+        const vb = this.modPow(V, b, N);
+        const lhs = (dx * vb) % N;
+        return lhs === g;
+      } else {
+        const absB = -b;
+        const vAbsB = this.modPow(V, absB, N);
+        const rhs = (g * vAbsB) % N;
+        return dx === rhs;
+      }
+    } catch {
+      return false;
+    }
   }
 
   /**
