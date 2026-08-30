@@ -205,7 +205,7 @@ const command = args[0];
 
 function printHelp() {
   console.log(`
-\x1b[1m\x1b[36m🛡️ DocuTrust CLI v2.5.0\x1b[0m — Open-Source Sovereign Trust Stack
+\x1b[1m\x1b[36m🛡️ DocuTrust CLI v3.0.0\x1b[0m — Open-Source Sovereign Trust Stack
 
 \x1b[1mCORE COMMANDS:\x1b[0m
   \x1b[32mdemo / wizard\x1b[0m                                 Run interactive 10-second end-to-end credential issuance & verification
@@ -214,7 +214,16 @@ function printHelp() {
   \x1b[32missue\x1b[0m  --subject <file> --key <keyfile>       Issue a cryptographically signed W3C Verifiable Credential
   \x1b[32mbatch\x1b[0m  --csv <file> --key <keyfile>           Batch issue credentials from CSV with Polygon Merkle Tree Anchor
   \x1b[32mverify\x1b[0m --vc <file>                            Verify cryptographic signature, Merkle proof & ledger anchor
+  \x1b[32mrender-pdf\x1b[0m --vc <file> [--out <file.pdf>]      Render tamper-evident visual PDF with embedded W3C VC metadata
+  \x1b[32mverify-pdf\x1b[0m --pdf <file.pdf>                   Extract and verify embedded VC from PDF document
+  \x1b[32mdid-resolve\x1b[0m --did <did_string>                 Resolve DID Document (did:key, did:pqc, did:kem, did:bbs, did:pkh, did:web)
   \x1b[32mhelp\x1b[0m                                          Show this help menu
+
+\x1b[1mMULTI-SIGNATURE THRESHOLD (M-of-N):\x1b[0m
+  \x1b[32mmultisig-draft\x1b[0m --vc <file> --policy <file>      Create unsigned Multi-Sig draft and canonical hash
+  \x1b[32mmultisig-sign\x1b[0m --hash <h> --did <d> -r <role> -k <k> Sign canonical hash as an authorized authority
+  \x1b[32mmultisig-assemble\x1b[0m --vc <f> -p <pol> -s <sigs> Assemble finalized M-of-N MultiSig Verifiable Credential
+  \x1b[32mmultisig-verify\x1b[0m --vc <file> --policy <file>    Verify M-of-N threshold signatures on credential
 
 \x1b[1mREVOCATION & ACCUMULATORS:\x1b[0m
   \x1b[32mstatuslist-create\x1b[0m --size <num> --bits <1|2|4|8> Create W3C Bitstring StatusList2024 Credential
@@ -1550,6 +1559,137 @@ async function main() {
       console.log(`\x1b[31m✖\x1b[0m Credential Subject Schema validation \x1b[1m\x1b[31mFAILED\x1b[0m. Errors:\n` + result.errors.map(e => `  - ${e}`).join('\n'));
       process.exit(1);
     }
+    return;
+  }
+
+  if (command === 'multisig-draft') {
+    const vcFile = getArgValue('--vc');
+    const policyFile = getArgValue('--policy') || getArgValue('-p');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+    if (!vcFile || !policyFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --vc <file.json> or --policy <file.json>');
+      process.exit(1);
+    }
+    const vc = JSON.parse(fs.readFileSync(vcFile, 'utf-8'));
+    const policy = JSON.parse(fs.readFileSync(policyFile, 'utf-8'));
+    const draft = core.MultiSigThresholdEngine.createDraft(vc, policy);
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(draft, null, 2), 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m MultiSig Draft generated at \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(draft, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'multisig-sign') {
+    const hash = getArgValue('--hash');
+    const did = getArgValue('--did') || getArgValue('-d');
+    const role = getArgValue('--role') || getArgValue('-r') || 'Trustee';
+    const keyFile = getArgValue('--key') || getArgValue('-k');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+    if (!hash || !did || !keyFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --hash <hex>, --did <did>, or --key <keyfile.json>');
+      process.exit(1);
+    }
+    const keyData = JSON.parse(fs.readFileSync(keyFile, 'utf-8'));
+    const sigEntry = core.MultiSigThresholdEngine.signAsAuthority(hash, did, role, keyData.privateKeyHex);
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(sigEntry, null, 2), 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m Authority Signature saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(sigEntry, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'multisig-assemble') {
+    const vcFile = getArgValue('--vc');
+    const policyFile = getArgValue('--policy') || getArgValue('-p');
+    const sigsFile = getArgValue('--signatures') || getArgValue('-s');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+    if (!vcFile || !policyFile || !sigsFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --vc <file.json>, --policy <file.json>, or --signatures <sigs.json>');
+      process.exit(1);
+    }
+    const vc = JSON.parse(fs.readFileSync(vcFile, 'utf-8'));
+    const policy = JSON.parse(fs.readFileSync(policyFile, 'utf-8'));
+    const sigs = JSON.parse(fs.readFileSync(sigsFile, 'utf-8'));
+    const signatures = Array.isArray(sigs) ? sigs : (sigs.signatures || [sigs]);
+    const finalizedVc = core.MultiSigThresholdEngine.assembleMultiSigCredential(vc, policy, signatures);
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(finalizedVc, null, 2), 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m MultiSig Credential assembled at \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(finalizedVc, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'multisig-verify') {
+    const vcFile = getArgValue('--vc');
+    const policyFile = getArgValue('--policy') || getArgValue('-p');
+    if (!vcFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --vc <file.json>');
+      process.exit(1);
+    }
+    const vc = JSON.parse(fs.readFileSync(vcFile, 'utf-8'));
+    const policy = policyFile ? JSON.parse(fs.readFileSync(policyFile, 'utf-8')) : undefined;
+    const report = core.MultiSigThresholdEngine.verifyMultiSigCredential(vc, policy);
+    if (report.valid) {
+      console.log(`\x1b[32m✔\x1b[0m MultiSig Credential is \x1b[1m\x1b[32mVALID\x1b[0m (${report.validSignaturesCount}/${report.threshold} signatures satisfied)`);
+      console.log(`  Policy ID: ${report.policyId}`);
+      console.log(`  Signers: ${report.signers.join(', ')}`);
+    } else {
+      console.log(`\x1b[31m✖\x1b[0m MultiSig Verification \x1b[1m\x1b[31mFAILED\x1b[0m: ${report.error}`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  if (command === 'render-pdf') {
+    const vcFile = getArgValue('--vc');
+    const title = getArgValue('--title') || 'Verifiable Certificate';
+    const outFile = getArgValue('--out') || getArgValue('-o') || 'verifiable-credential.pdf';
+    if (!vcFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --vc <file.json>');
+      process.exit(1);
+    }
+    const vc = JSON.parse(fs.readFileSync(vcFile, 'utf-8'));
+    const pdfBytes = core.VerifiablePDFGenerator.generatePDF(vc, { title });
+    fs.writeFileSync(outFile, Buffer.from(pdfBytes));
+    console.log(`\x1b[32m✔\x1b[0m Verifiable PDF rendered at \x1b[1m${outFile}\x1b[0m (${pdfBytes.length} bytes)`);
+    return;
+  }
+
+  if (command === 'verify-pdf') {
+    const pdfFile = getArgValue('--pdf') || getArgValue('-f');
+    if (!pdfFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --pdf <file.pdf>');
+      process.exit(1);
+    }
+    const pdfBytes = fs.readFileSync(pdfFile);
+    const report = core.VerifiablePDFGenerator.extractAndVerify(pdfBytes);
+    if (report.valid) {
+      console.log(`\x1b[32m✔\x1b[0m Embedded Verifiable Credential in PDF is \x1b[1m\x1b[32mVALID\x1b[0m`);
+      console.log(`  Issuer: ${report.issuer}`);
+      console.log(`  Recipient: ${report.recipientName || report.recipientDid}`);
+      console.log(`  Type: ${Array.isArray(report.credential?.type) ? report.credential.type.join(', ') : report.credential?.type}`);
+    } else {
+      console.log(`\x1b[31m✖\x1b[0m Embedded PDF Verification \x1b[1m\x1b[31mFAILED\x1b[0m: ${report.error}`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  if (command === 'did-resolve') {
+    const did = getArgValue('--did') || getArgValue('-d');
+    if (!did) {
+      console.error('\x1b[31mError:\x1b[0m Missing --did <did_string>');
+      process.exit(1);
+    }
+    const doc = await core.DIDResolver.resolve(did);
+    console.log(JSON.stringify(doc, null, 2));
     return;
   }
 

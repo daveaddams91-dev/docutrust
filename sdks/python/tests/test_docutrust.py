@@ -663,8 +663,81 @@ class TestDocuTrustPython(unittest.TestCase):
         self.assertFalse(res_bad["valid"])
         self.assertEqual(len(res_bad["errors"]), 3)
 
+    def test_multisig_threshold_engine(self):
+        from cryptography.hazmat.primitives.asymmetric import ed25519
+        from docutrust.crypto import encode_base58
+        from docutrust.multisig import MultiSigEngine
+
+        # Generate 2 signer keys
+        sk1 = ed25519.Ed25519PrivateKey.generate()
+        pk1_bytes = sk1.public_key().public_bytes_raw()
+        did1 = f"did:key:z{encode_base58(bytes([0xed, 0x01]) + pk1_bytes)}"
+
+        sk2 = ed25519.Ed25519PrivateKey.generate()
+        pk2_bytes = sk2.public_key().public_bytes_raw()
+        did2 = f"did:key:z{encode_base58(bytes([0xed, 0x01]) + pk2_bytes)}"
+
+        policy = {
+            "policyId": "policy-phd-2026",
+            "threshold": 2,
+            "authorities": [
+                {"did": did1, "role": "Dean"},
+                {"did": did2, "role": "Registrar"}
+            ]
+        }
+
+        cred = {
+            "@context": ["https://www.w3.org/ns/credentials/v2"],
+            "id": "urn:uuid:py-multisig-001",
+            "type": ["VerifiableCredential", "PhDDiploma"],
+            "issuer": "did:org:stanford",
+            "credentialSubject": {"recipient": "Dave", "degree": "Computer Science"}
+        }
+
+        draft = MultiSigEngine.create_multisig_draft(cred, policy)
+        self.assertTrue(bool(draft["canonicalHash"]))
+
+        sig1 = MultiSigEngine.sign_as_authority(
+            draft["canonicalHash"],
+            did1,
+            "Dean",
+            sk1.private_bytes_raw().hex()
+        )
+        sig2 = MultiSigEngine.sign_as_authority(
+            draft["canonicalHash"],
+            did2,
+            "Registrar",
+            sk2.private_bytes_raw().hex()
+        )
+
+        assembled = MultiSigEngine.assemble_multisig_credential(cred, policy, [sig1, sig2])
+        self.assertIn("proof", assembled)
+        self.assertEqual(assembled["proof"]["type"], "MultiSigThresholdSignature2026")
+
+        verify_res = MultiSigEngine.verify_multisig_credential(assembled, policy)
+        self.assertTrue(verify_res["valid"])
+        self.assertEqual(verify_res["validSignaturesCount"], 2)
+
+    def test_did_resolver(self):
+        from cryptography.hazmat.primitives.asymmetric import ed25519
+        from docutrust.crypto import encode_base58
+        from docutrust.did import DIDResolver
+
+        sk = ed25519.Ed25519PrivateKey.generate()
+        pk_bytes = sk.public_key().public_bytes_raw()
+        did = f"did:key:z{encode_base58(bytes([0xed, 0x01]) + pk_bytes)}"
+
+        doc = DIDResolver.resolve(did)
+        self.assertEqual(doc["id"], did)
+        self.assertEqual(len(doc["verificationMethod"]), 1)
+        self.assertEqual(doc["verificationMethod"][0]["publicKeyHex"], pk_bytes.hex())
+
+        pkh_doc = DIDResolver.resolve("did:pkh:eip155:1:0x71C83638379321e0b51B8d6Ac7b6C81204d80916")
+        self.assertEqual(pkh_doc["id"], "did:pkh:eip155:1:0x71C83638379321e0b51B8d6Ac7b6C81204d80916")
+
 if __name__ == '__main__':
     unittest.main()
+
 
 
 

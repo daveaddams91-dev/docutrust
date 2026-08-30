@@ -16,6 +16,7 @@ import TrustRecoveryStudio from './components/TrustRecoveryStudio.jsx';
 import BBSOracleStudio from './components/BBSOracleStudio.jsx';
 import FederationDIDCommStudio from './components/FederationDIDCommStudio.jsx';
 import SovereignStudio from './components/SovereignStudio.jsx';
+import MeshStudio from './components/MeshStudio.jsx';
 import Footer from './components/Footer.jsx';
 
 export default function App() {
@@ -33,6 +34,7 @@ export default function App() {
 
       <main className="flex-1">
         {activeTab === 'hero' && <HeroSection setActiveTab={setActiveTab} />}
+        {activeTab === 'mesh' && <MeshStudio />}
         {activeTab === 'sovereign' && <SovereignStudio />}
         {activeTab === 'armor' && <FortressArmorStudio />}
         {activeTab === 'trustmesh' && <TrustRecoveryStudio />}

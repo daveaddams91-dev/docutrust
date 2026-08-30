@@ -109,4 +109,9 @@ export class DecentralizedTrustRegistry {
 
     return { authorized: true, accreditation: acc };
   }
+
+  public listAllIssuers(): TrustAuthorityAccreditation[] {
+    return Array.from(this.accreditations.values());
+  }
 }
+

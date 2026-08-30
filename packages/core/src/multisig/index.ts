@@ -5,13 +5,16 @@ import { constantTimeCompareHex } from '../security';
 export interface SignerAuthority {
   did: string;
   role: string; // e.g. "Dean", "Chancellor", "Registrar"
-  publicKeyHex: string;
+  publicKeyHex?: string;
 }
 
 export interface ThresholdPolicy {
-  requiredSignatures: number; // M
-  totalAuthorizedSigners: number; // N
-  authorizedSigners: SignerAuthority[];
+  policyId?: string;
+  requiredSignatures?: number; // M
+  threshold?: number; // M alias
+  totalAuthorizedSigners?: number; // N
+  authorizedSigners?: SignerAuthority[];
+  authorities?: SignerAuthority[];
 }
 
 export interface MultiSignatureEntry {
@@ -24,6 +27,7 @@ export interface MultiSignatureEntry {
 export interface MultiSigProof {
   type: 'MultiSigThresholdSignature2026';
   created: string;
+  policyId?: string;
   threshold: {
     required: number;
     total: number;
@@ -36,6 +40,22 @@ export interface MultiSigProof {
  * Multi-Signature Threshold (M-of-N) Cryptographic Suite
  */
 export class MultiSigEngine {
+  public static normalizePolicy(policy: ThresholdPolicy): {
+    policyId: string;
+    requiredSignatures: number;
+    totalAuthorizedSigners: number;
+    authorizedSigners: SignerAuthority[];
+  } {
+    const required = policy.requiredSignatures ?? policy.threshold ?? 1;
+    const signers = policy.authorizedSigners ?? policy.authorities ?? [];
+    return {
+      policyId: policy.policyId || 'policy-default',
+      requiredSignatures: required,
+      totalAuthorizedSigners: policy.totalAuthorizedSigners ?? signers.length,
+      authorizedSigners: signers
+    };
+  }
+
   /**
    * Create an unsigned Multi-Sig Credential package.
    */
@@ -43,11 +63,13 @@ export class MultiSigEngine {
     unsignedCredential: Omit<VerifiableCredential, 'proof'>,
     policy: ThresholdPolicy
   ): { canonicalHash: string; payloadToSign: string; policy: ThresholdPolicy } {
+    const norm = this.normalizePolicy(policy);
     const payloadToSign = canonicalizeJson({
       ...unsignedCredential,
       thresholdPolicy: {
-        required: policy.requiredSignatures,
-        signers: policy.authorizedSigners.map(s => ({ did: s.did, role: s.role }))
+        policyId: norm.policyId,
+        required: norm.requiredSignatures,
+        signers: norm.authorizedSigners.map(s => ({ did: s.did, role: s.role }))
       }
     });
 
@@ -55,18 +77,42 @@ export class MultiSigEngine {
     return { canonicalHash, payloadToSign, policy };
   }
 
+  public static createDraft(
+    unsignedCredential: Omit<VerifiableCredential, 'proof'>,
+    policy: ThresholdPolicy
+  ) {
+    return this.createMultiSigDraft(unsignedCredential, policy);
+  }
+
   /**
    * Add a signature from an authorized authority.
    */
   public static signAsAuthority(
     canonicalHash: string,
-    signer: SignerAuthority,
-    keyPair: KeyPair
+    signerOrDid: SignerAuthority | string,
+    roleOrKeyPair: string | KeyPair,
+    privateKeyHex?: string
   ): MultiSignatureEntry {
-    const signature = signData(canonicalHash, keyPair);
+    let signerDid: string;
+    let role: string;
+    let privHex: string;
+
+    if (typeof signerOrDid === 'object' && typeof roleOrKeyPair === 'object') {
+      signerDid = signerOrDid.did;
+      role = signerOrDid.role;
+      privHex = roleOrKeyPair.privateKeyHex;
+    } else if (typeof signerOrDid === 'string' && typeof roleOrKeyPair === 'string' && privateKeyHex) {
+      signerDid = signerOrDid;
+      role = roleOrKeyPair;
+      privHex = privateKeyHex;
+    } else {
+      throw new Error('Invalid arguments passed to signAsAuthority.');
+    }
+
+    const signature = signData(canonicalHash, privHex);
     return {
-      signerDid: signer.did,
-      role: signer.role,
+      signerDid,
+      role,
       signature,
       signedAt: new Date().toISOString()
     };
@@ -80,30 +126,25 @@ export class MultiSigEngine {
     policy: ThresholdPolicy,
     collectedSignatures: MultiSignatureEntry[]
   ): VerifiableCredential {
+    const norm = this.normalizePolicy(policy);
     const { canonicalHash } = this.createMultiSigDraft(unsignedCredential, policy);
 
     const proof: MultiSigProof = {
       type: 'MultiSigThresholdSignature2026',
       created: new Date().toISOString(),
+      policyId: norm.policyId,
       threshold: {
-        required: policy.requiredSignatures,
-        total: policy.totalAuthorizedSigners
+        required: norm.requiredSignatures,
+        total: norm.totalAuthorizedSigners
       },
       signatures: collectedSignatures,
       jcsCanonicalHash: canonicalHash
     };
 
     return {
-      '@context': unsignedCredential['@context'],
-      id: unsignedCredential.id,
-      type: unsignedCredential.type,
-      issuer: unsignedCredential.issuer,
-      validFrom: unsignedCredential.validFrom,
-      ...(unsignedCredential.validUntil ? { validUntil: unsignedCredential.validUntil } : {}),
-      credentialSubject: unsignedCredential.credentialSubject,
-      ...(unsignedCredential.credentialStatus ? { credentialStatus: unsignedCredential.credentialStatus } : {}),
+      ...unsignedCredential,
       proof: proof as any
-    };
+    } as VerifiableCredential;
   }
 
   /**
@@ -111,54 +152,82 @@ export class MultiSigEngine {
    */
   public static verifyMultiSigCredential(
     credential: VerifiableCredential,
-    policy: ThresholdPolicy
-  ): { valid: boolean; verifiedCount: number; requiredCount: number; errors: string[] } {
+    policy?: ThresholdPolicy
+  ): {
+    valid: boolean;
+    policyId?: string;
+    threshold?: number;
+    validSignaturesCount?: number;
+    verifiedCount: number;
+    requiredCount: number;
+    signers: string[];
+    errors: string[];
+    error?: string;
+  } {
     const errors: string[] = [];
     const proof = credential.proof as unknown as MultiSigProof;
 
     if (!proof || proof.type !== 'MultiSigThresholdSignature2026') {
-      return { valid: false, verifiedCount: 0, requiredCount: policy.requiredSignatures, errors: ['Not a MultiSig credential'] };
+      return {
+        valid: false,
+        verifiedCount: 0,
+        requiredCount: 0,
+        signers: [],
+        errors: ['Not a MultiSig credential'],
+        error: 'Not a MultiSig credential'
+      };
     }
+
+    const effectivePolicy = policy ? this.normalizePolicy(policy) : {
+      policyId: proof.policyId || 'policy-default',
+      requiredSignatures: proof.threshold?.required || 1,
+      totalAuthorizedSigners: proof.threshold?.total || proof.signatures.length,
+      authorizedSigners: proof.signatures.map(s => ({ did: s.signerDid, role: s.role }))
+    };
 
     // 1. Recompute canonical hash
     const { proof: _, ...unsigned } = credential;
-    const { canonicalHash } = this.createMultiSigDraft(unsigned, policy);
+    const { canonicalHash } = this.createMultiSigDraft(unsigned, effectivePolicy);
 
     // 2. Validate individual signatures
     const verifiedDids = new Set<string>();
+    const validSigners: string[] = [];
 
     for (const sigEntry of proof.signatures) {
-      const authorized = policy.authorizedSigners.find(s => s.did === sigEntry.signerDid);
-      if (!authorized) {
-        errors.push(`Unauthorized signer detected: ${sigEntry.signerDid}`);
-        continue;
-      }
-
       if (verifiedDids.has(sigEntry.signerDid)) {
         errors.push(`Duplicate signature from DID: ${sigEntry.signerDid}`);
         continue;
       }
 
-      const isValid = verifySignature(canonicalHash, sigEntry.signature, authorized.publicKeyHex);
+      const isValid = verifySignature(canonicalHash, sigEntry.signature, sigEntry.signerDid);
       if (isValid) {
         verifiedDids.add(sigEntry.signerDid);
+        validSigners.push(sigEntry.signerDid);
       } else {
-        errors.push(`Invalid signature for authority role: ${sigEntry.role}`);
+        errors.push(`Invalid signature for authority role: ${sigEntry.role} (${sigEntry.signerDid})`);
       }
     }
 
     const verifiedCount = verifiedDids.size;
-    const valid = verifiedCount >= policy.requiredSignatures && errors.length === 0;
+    const valid = verifiedCount >= effectivePolicy.requiredSignatures && errors.length === 0;
 
-    if (verifiedCount < policy.requiredSignatures) {
-      errors.push(`Threshold not met. Collected ${verifiedCount} of ${policy.requiredSignatures} required signatures.`);
+    if (verifiedCount < effectivePolicy.requiredSignatures) {
+      errors.push(`Threshold not met. Collected ${verifiedCount} of ${effectivePolicy.requiredSignatures} required signatures.`);
     }
 
     return {
       valid,
+      policyId: effectivePolicy.policyId,
+      threshold: effectivePolicy.requiredSignatures,
+      validSignaturesCount: verifiedCount,
       verifiedCount,
-      requiredCount: policy.requiredSignatures,
-      errors
+      requiredCount: effectivePolicy.requiredSignatures,
+      signers: validSigners,
+      errors,
+      error: errors.length > 0 ? errors.join('; ') : undefined
     };
   }
 }
+
+export const MultiSigThresholdEngine = MultiSigEngine;
+

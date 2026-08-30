@@ -132,6 +132,34 @@ describe('DocuTrust TypeScript SDK (@docutrust/sdk)', () => {
     // 20. ZK Set Intersection
     await client.proveSetIntersection('badge', 'B1', 'salt', ['B1', 'B2']);
     assert.strictEqual(mockCalls[19].url, 'https://test-api.docutrust.org/api/v1/zk/prove-intersection');
+
+    // 21. MultiSig Draft
+    await client.createMultiSigDraft({ id: 'vc1' }, { threshold: 2 });
+    assert.strictEqual(mockCalls[20].url, 'https://test-api.docutrust.org/api/v1/credentials/multisig/draft');
+
+    // 22. MultiSig Sign
+    await client.signMultiSigAsAuthority('0xhash', 'did:key:zDean', 'Dean', '0xpriv');
+    assert.strictEqual(mockCalls[21].url, 'https://test-api.docutrust.org/api/v1/credentials/multisig/sign');
+
+    // 23. MultiSig Assemble
+    await client.assembleMultiSigCredential({ id: 'vc1' }, { threshold: 2 }, []);
+    assert.strictEqual(mockCalls[22].url, 'https://test-api.docutrust.org/api/v1/credentials/multisig/assemble');
+
+    // 24. MultiSig Verify
+    await client.verifyMultiSigCredential({ id: 'vc1' }, { threshold: 2 });
+    assert.strictEqual(mockCalls[23].url, 'https://test-api.docutrust.org/api/v1/credentials/multisig/verify');
+
+    // 25. DID Resolve
+    await client.resolveDID('did:key:z123');
+    assert.strictEqual(mockCalls[24].url, 'https://test-api.docutrust.org/api/v1/did/resolve?did=did%3Akey%3Az123');
+
+    // 26. Trust Registry
+    await client.getTrustRegistryIssuers();
+    assert.strictEqual(mockCalls[25].url, 'https://test-api.docutrust.org/api/v1/trust/registry');
+
+    // 27. Vault Credentials
+    await client.getVaultCredentials({ search: 'Stanford', limit: 10 });
+    assert.strictEqual(mockCalls[26].url, 'https://test-api.docutrust.org/api/v1/vault/credentials?search=Stanford&limit=10');
   });
 
   test('DocuTrustClient handles HTTP error responses gracefully', async () => {

@@ -2,16 +2,18 @@
 
 # 🛡️ DocuTrust
 
-### The Open-Source Sovereign Trust Stack for Verifiable Credentials, Bitstring Status List 2024, DIF Presentation Exchange 2.0, RSA Non-Membership Accumulators, Recursive ZK Predicate Graphs & Sovereign Studio
+### The Open-Source Sovereign Trust Mesh for Verifiable Credentials, M-of-N MultiSig Senates, Universal DID Resolution, Post-Quantum Cryptography & Zero-Knowledge Proofs
 
-[![Version](https://img.shields.io/badge/Version-v2.5.0-blue.svg)]()
+[![Version](https://img.shields.io/badge/Version-v3.0.0-cyan.svg)]()
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CI Status](https://img.shields.io/badge/CI-100%25%20Passing-brightgreen.svg)]()
+[![MultiSig](https://img.shields.io/badge/Governance-M--of--N%20Threshold%20Senate-blue.svg)]()
+[![Universal DID](https://img.shields.io/badge/Resolver-Universal%20W3C%20DID-indigo.svg)]()
 [![Status List 2024](https://img.shields.io/badge/Revocation-W3C%20BitstringStatusList2024%20(Gzip%20Multibase)-blue.svg)]()
 [![Presentation Exchange](https://img.shields.io/badge/Query-DIF%20Presentation%20Exchange%202.0-indigo.svg)]()
 [![Accumulator](https://img.shields.io/badge/Accumulator-RSA%20Bezout%20Non--Membership%20O(1)-rose.svg)]()
 [![ZK Predicate Graphs](https://img.shields.io/badge/Zero--Knowledge-Recursive%20Predicate%20Graphs-purple.svg)]()
-[![JSON Schema](https://img.shields.io/badge/Schema-W3C%20VC%202.0%20(RFC%208785%20Hash)-teal.svg)]()
+[![JSON Schema](https://img.shields.io/badge/Schema-Hardened%20Depth%20%26%20Cycle%20Defense-teal.svg)]()
 [![JWE](https://img.shields.io/badge/Encryption-Multi--Recipient%20General%20JWE-amber.svg)]()
 [![EIP-712](https://img.shields.io/badge/Ethereum-EIP--712%20Typed%20Data-blue.svg)]()
 [![Multi-Chain](https://img.shields.io/badge/Ledger%20Anchor-EVM%20%7C%20Solana%20%7C%20Bitcoin-violet.svg)]()
@@ -25,10 +27,10 @@
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)]()
 
 <p align="center">
-  <b>DocuTrust</b> enables universities, enterprises, and governments to issue tamper-proof academic degrees, employment certificates, and licenses with <b>sub-50ms instant verification</b>, <b>W3C Bitstring Status List 2024</b> multi-state revocation/suspension, <b>DIF Presentation Exchange 2.0</b> claim evaluation, <b>RSA dynamic cryptographic accumulators with Bezout non-membership witnesses ($O(1)$ constant-size)</b>, <b>Recursive Zero-Knowledge Predicate Graphs (AND, OR, NOT, THRESHOLD)</b>, <b>W3C VC 2.0 JSON Schema validation & RFC 8785 hashing</b>, <b>multi-recipient General JWE encryption</b>, <b>EIP-712 Ethereum typed credential signing</b>, <b>cross-chain ledger anchoring (EVM, Solana, Bitcoin)</b>, <b>decentralized guardian social recovery & timelocked escrow</b>, <b>DIDComm v2 encrypted agent messaging</b>, <b>Merkle Mountain Range streaming logs</b>, <b>BBS+ unlinkable zero-knowledge proofs</b>, <b>RFC 3161 TSA attestation oracles</b>, <b>IETF SD-JWT mobile wallet interoperability</b>, and <b>NIST ML-KEM & ML-DSA quantum armor</b>.
+  <b>DocuTrust</b> enables universities, enterprises, and governments to issue tamper-proof academic degrees, employment certificates, and licenses with <b>sub-50ms instant verification</b>, <b>M-of-N MultiSig threshold signatures</b>, <b>Universal W3C DID resolution (did:key, did:pqc, did:kem, did:bbs, did:pkh, did:web)</b>, <b>W3C Bitstring Status List 2024</b> multi-state revocation/suspension, <b>DIF Presentation Exchange 2.0</b> claim evaluation, <b>RSA dynamic cryptographic accumulators with Bezout non-membership witnesses ($O(1)$ constant-size)</b>, <b>Recursive Zero-Knowledge Predicate Graphs (AND, OR, NOT, THRESHOLD)</b>, <b>W3C VC 2.0 JSON Schema validation & RFC 8785 hashing</b>, <b>multi-recipient General JWE encryption</b>, <b>EIP-712 Ethereum typed credential signing</b>, <b>cross-chain ledger anchoring (EVM, Solana, Bitcoin)</b>, <b>decentralized guardian social recovery & timelocked escrow</b>, <b>DIDComm v2 encrypted agent messaging</b>, <b>Merkle Mountain Range streaming logs</b>, <b>BBS+ unlinkable zero-knowledge proofs</b>, <b>RFC 3161 TSA attestation oracles</b>, <b>IETF SD-JWT mobile wallet interoperability</b>, and <b>NIST ML-KEM & ML-DSA quantum armor</b>.
 </p>
 
-[Quickstart Demo](#-10-second-quickstart-demo) • [Architecture](#-architecture) • [Security Hardening](#-defense-in-depth-security-hardening) • [CLI Toolkit](#-cli-toolkit) • [Python SDK](#-python-sdk) • [REST API](#-rest-api-endpoints)
+[Quickstart Demo](#-10-second-quickstart-demo) • [Architecture](#-system-architecture--workflow) • [Security Hardening](#-defense-in-depth-security-hardening-uncrackable-guarantee) • [CLI Toolkit](#-cli-toolkit) • [Python SDK](#-python-sdk-docutrust) • [REST API](#-rest-api-endpoints)
 
 </div>
 
@@ -205,7 +207,12 @@ with open("diploma.pdf", "rb") as f:
 | `POST` | `/api/v1/credentials/issue` | Issues signed W3C Verifiable Credential with optional PQC |
 | `POST` | `/api/v1/credentials/verify` | Sub-50ms verification of signature, Merkle proof, and anchor |
 | `POST` | `/api/v1/credentials/render-pdf` | Generates official PDF with embedded `/DocuTrustProof` |
-| `POST` | `/api/v1/credentials/verify-pdf` | Verifies uploaded PDF bytes directly against blockchain anchor |
+| `POST` | `/api/v1/credentials/multisig/draft` | Generates M-of-N MultiSig draft and canonical hash |
+| `POST` | `/api/v1/credentials/multisig/sign` | Signs draft as an authorized institutional authority |
+| `POST` | `/api/v1/credentials/multisig/assemble` | Assembles collected authority signatures into finalized VC |
+| `POST` | `/api/v1/credentials/multisig/verify` | Cryptographically verifies M-of-N threshold signatures |
+| `GET/POST` | `/api/v1/did/resolve` | Universal DID resolver (did:key, did:pqc, did:kem, did:bbs, did:pkh, did:web) |
+| `GET` | `/api/v1/trust/registry` | Queries accredited issuers and authorized schema policies |
 | `GET` | `/api/v1/vault/credentials` | Searchable persistent credential registry with status filters |
 | `GET` | `/api/v1/vault/metrics` | Real-time institutional telemetry (latency, gas savings, PQC) |
 | `POST` | `/api/v1/vault/auto-anchor` | Triggers background Merkle batch worker |

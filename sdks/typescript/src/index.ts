@@ -950,5 +950,88 @@ export class DocuTrustClient {
       context
     });
   }
+
+  /**
+   * Creates an unsigned Multi-Signature (M-of-N) Credential draft and canonical hash.
+   */
+  public async createMultiSigDraft(
+    credential: Record<string, any>,
+    policy: Record<string, any>
+  ): Promise<any> {
+    return this.request('/credentials/multisig/draft', 'POST', { credential, policy });
+  }
+
+  /**
+   * Signs a canonical hash as an authorized institutional authority.
+   */
+  public async signMultiSigAsAuthority(
+    canonicalHash: string,
+    signerDid: string,
+    signerRole: string,
+    privateKeyHex: string
+  ): Promise<any> {
+    return this.request('/credentials/multisig/sign', 'POST', {
+      canonicalHash,
+      signerDid,
+      signerRole,
+      privateKeyHex
+    });
+  }
+
+  /**
+   * Assembles a finalized M-of-N MultiSig Verifiable Credential from collected signatures.
+   */
+  public async assembleMultiSigCredential(
+    credential: Record<string, any>,
+    policy: Record<string, any>,
+    signatures: any[]
+  ): Promise<any> {
+    return this.request('/credentials/multisig/assemble', 'POST', {
+      credential,
+      policy,
+      signatures
+    });
+  }
+
+  /**
+   * Cryptographically verifies an M-of-N MultiSig Verifiable Credential against policy.
+   */
+  public async verifyMultiSigCredential(
+    credential: Record<string, any>,
+    policy?: Record<string, any>
+  ): Promise<any> {
+    return this.request('/credentials/multisig/verify', 'POST', {
+      credential,
+      policy
+    });
+  }
+
+  /**
+   * Resolves a DID string to its complete W3C DID Document.
+   */
+  public async resolveDID(did: string): Promise<any> {
+    return this.request(`/did/resolve?did=${encodeURIComponent(did)}`, 'GET');
+  }
+
+  /**
+   * Retrieves all accredited issuers in the Decentralized Trust Registry.
+   */
+  public async getTrustRegistryIssuers(): Promise<any> {
+    return this.request('/trust/registry', 'GET');
+  }
+
+  /**
+   * Queries stored credentials from the institutional vault.
+   */
+  public async getVaultCredentials(query?: { search?: string; type?: string; limit?: number; offset?: number }): Promise<any> {
+    const params = new URLSearchParams();
+    if (query?.search) params.set('search', query.search);
+    if (query?.type) params.set('type', query.type);
+    if (query?.limit) params.set('limit', String(query.limit));
+    if (query?.offset) params.set('offset', String(query.offset));
+    const qs = params.toString();
+    return this.request(`/vault/credentials${qs ? `?${qs}` : ''}`, 'GET');
+  }
 }
+
 

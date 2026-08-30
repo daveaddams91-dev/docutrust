@@ -44,7 +44,10 @@ from .zk_predicates import (
     verify_predicate_graph
 )
 
-__version__ = "2.4.0"
+from .multisig import MultiSigEngine
+from .did import DIDResolver
+
+__version__ = "3.0.0"
 __all__ = [
     "DocuTrustClient",
     "canonicalize_json",
@@ -93,6 +96,9 @@ __all__ = [
     "extended_gcd",
     "MultiRecipientJWE",
     "BitstringStatusList2024",
-    "PresentationExchangeEngine"
+    "PresentationExchangeEngine",
+    "MultiSigEngine",
+    "DIDResolver"
 ]
+
 

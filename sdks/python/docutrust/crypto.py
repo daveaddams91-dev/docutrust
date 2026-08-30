@@ -21,50 +21,38 @@ def encode_base58(buffer: bytes) -> str:
     """Base58 encoding helper."""
     if not buffer:
         return ""
-    digits = [0]
-    for byte in buffer:
-        for j in range(len(digits)):
-            digits[j] <<= 8
-        digits[0] += byte
-        carry = 0
-        for j in range(len(digits)):
-            digits[j] += carry
-            carry = digits[j] // 58
-            digits[j] %= 58
-        while carry > 0:
-            digits.append(carry % 58)
-            carry = carry // 58
+    leading_zeros = 0
     for byte in buffer:
         if byte == 0:
-            digits.append(0)
+            leading_zeros += 1
         else:
             break
-    return ''.join(BASE58_ALPHABET[d] for d in reversed(digits))
+    num = int.from_bytes(buffer, 'big')
+    encoded = []
+    while num > 0:
+        num, rem = divmod(num, 58)
+        encoded.append(BASE58_ALPHABET[rem])
+    return ('1' * leading_zeros) + ''.join(reversed(encoded))
 
 def decode_base58(s: str) -> bytes:
     """Base58 decoding helper."""
     if not s:
         return b""
-    bytes_arr = [0]
-    for char in s:
-        value = BASE58_ALPHABET.index(char)
-        for j in range(len(bytes_arr)):
-            bytes_arr[j] *= 58
-        bytes_arr[0] += value
-        carry = 0
-        for j in range(len(bytes_arr)):
-            bytes_arr[j] += carry
-            carry = bytes_arr[j] >> 8
-            bytes_arr[j] &= 0xFF
-        while carry > 0:
-            bytes_arr.append(carry & 0xFF)
-            carry >>= 8
+    leading_ones = 0
     for char in s:
         if char == '1':
-            bytes_arr.append(0)
+            leading_ones += 1
         else:
             break
-    return bytes(reversed(bytes_arr))
+    num = 0
+    for char in s:
+        num = num * 58 + BASE58_ALPHABET.index(char)
+    num_bytes = []
+    while num > 0:
+        num, rem = divmod(num, 256)
+        num_bytes.append(rem)
+    return (b'\x00' * leading_ones) + bytes(reversed(num_bytes))
+
 
 def sha256_hex(data: Union[str, bytes]) -> str:
     if isinstance(data, str):

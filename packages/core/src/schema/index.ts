@@ -134,12 +134,31 @@ export class SchemaValidator {
     return null;
   }
 
-  private static _validateNode(value: any, prop: JsonSchemaProperty, path: string, errors: string[], rootSchema: any): void {
+  private static _validateNode(
+    value: any,
+    prop: JsonSchemaProperty,
+    path: string,
+    errors: string[],
+    rootSchema: any,
+    depth: number = 0,
+    visitedRefs: Set<string> = new Set()
+  ): void {
+    if (depth > 64) {
+      errors.push(`${path}: maximum schema recursion depth exceeded`);
+      return;
+    }
+
     // 0. Handle $ref pointer
     if (prop.$ref) {
+      if (visitedRefs.has(prop.$ref)) {
+        // Circular reference detected; prevent infinite loop
+        return;
+      }
+      const nextVisited = new Set(visitedRefs);
+      nextVisited.add(prop.$ref);
       const resolved = this._resolveRef(prop.$ref, rootSchema);
       if (resolved) {
-        this._validateNode(value, resolved, path, errors, rootSchema);
+        this._validateNode(value, resolved, path, errors, rootSchema, depth + 1, nextVisited);
         return;
       } else {
         errors.push(`${path}: unable to resolve schema reference ${prop.$ref}`);
@@ -168,7 +187,7 @@ export class SchemaValidator {
     if (prop.allOf && Array.isArray(prop.allOf)) {
       for (let i = 0; i < prop.allOf.length; i++) {
         const subErrors: string[] = [];
-        this._validateNode(value, prop.allOf[i], `${path}.allOf[${i}]`, subErrors, rootSchema);
+        this._validateNode(value, prop.allOf[i], `${path}.allOf[${i}]`, subErrors, rootSchema, depth + 1, visitedRefs);
         if (subErrors.length > 0) {
           errors.push(...subErrors);
         }
@@ -178,7 +197,7 @@ export class SchemaValidator {
     if (prop.anyOf && Array.isArray(prop.anyOf)) {
       const matchFound = prop.anyOf.some(subSchema => {
         const subErrors: string[] = [];
-        this._validateNode(value, subSchema, path, subErrors, rootSchema);
+        this._validateNode(value, subSchema, path, subErrors, rootSchema, depth + 1, visitedRefs);
         return subErrors.length === 0;
       });
       if (!matchFound) {
@@ -189,7 +208,7 @@ export class SchemaValidator {
     if (prop.oneOf && Array.isArray(prop.oneOf)) {
       const matchCount = prop.oneOf.filter(subSchema => {
         const subErrors: string[] = [];
-        this._validateNode(value, subSchema, path, subErrors, rootSchema);
+        this._validateNode(value, subSchema, path, subErrors, rootSchema, depth + 1, visitedRefs);
         return subErrors.length === 0;
       }).length;
       if (matchCount !== 1) {
@@ -199,7 +218,7 @@ export class SchemaValidator {
 
     if (prop.not) {
       const subErrors: string[] = [];
-      this._validateNode(value, prop.not, path, subErrors, rootSchema);
+      this._validateNode(value, prop.not, path, subErrors, rootSchema, depth + 1, visitedRefs);
       if (subErrors.length === 0) {
         errors.push(`${path}: value matched disallowed 'not' schema condition`);
       }
@@ -263,7 +282,7 @@ export class SchemaValidator {
       }
       if (prop.items) {
         value.forEach((item, index) => {
-          this._validateNode(item, prop.items!, `${path}[${index}]`, errors, rootSchema);
+          this._validateNode(item, prop.items!, `${path}[${index}]`, errors, rootSchema, depth + 1, visitedRefs);
         });
       }
     }
@@ -283,7 +302,7 @@ export class SchemaValidator {
       if (prop.properties) {
         for (const [key, subProp] of Object.entries(prop.properties)) {
           if (value[key] !== undefined) {
-            this._validateNode(value[key], subProp, `${path}.${key}`, errors, rootSchema);
+            this._validateNode(value[key], subProp, `${path}.${key}`, errors, rootSchema, depth + 1, visitedRefs);
           }
         }
       }
@@ -300,7 +319,7 @@ export class SchemaValidator {
         const declaredKeys = new Set(prop.properties ? Object.keys(prop.properties) : []);
         for (const [key, val] of Object.entries(value)) {
           if (!declaredKeys.has(key)) {
-            this._validateNode(val, prop.additionalProperties as JsonSchemaProperty, `${path}.${key}`, errors, rootSchema);
+            this._validateNode(val, prop.additionalProperties as JsonSchemaProperty, `${path}.${key}`, errors, rootSchema, depth + 1, visitedRefs);
           }
         }
       }

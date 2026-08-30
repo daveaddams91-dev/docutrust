@@ -60,7 +60,7 @@ test('API Server Suite', async (t) => {
     const res = await makeRequest('GET', '/api/v1/health');
     assert.equal(res.status, 200);
     assert.equal(res.body.status, 'healthy');
-    assert.equal(res.body.version, '2.5.0');
+    assert.equal(res.body.version, '3.0.0');
     assert.ok(Array.isArray(res.body.features));
     assert.ok(res.body.systemDid.startsWith('did:key:z6M'));
   });
@@ -908,6 +908,81 @@ test('API Server Suite', async (t) => {
     assert.equal(res.status, 200);
     assert.equal(Object.prototype.injected, undefined);
     assert.equal(({}).injected, undefined);
+  });
+
+  await t.test('39. POST /api/v1/credentials/multisig (Draft, Sign, Assemble, Verify)', async () => {
+    const kp1 = (await makeRequest('POST', '/api/v1/keys/generate')).body.keyPair;
+    const kp2 = (await makeRequest('POST', '/api/v1/keys/generate')).body.keyPair;
+
+    const policy = {
+      policyId: 'policy_multisig_api_01',
+      threshold: 2,
+      authorities: [
+        { did: kp1.did, role: 'Dean' },
+        { did: kp2.did, role: 'Registrar' }
+      ]
+    };
+
+    const unsignedVc = {
+      id: 'urn:uuid:multisig-api-01',
+      type: ['VerifiableCredential', 'DegreeCredential'],
+      issuer: 'did:org:multisig',
+      credentialSubject: { student: 'Alice' }
+    };
+
+    const draftRes = await makeRequest('POST', '/api/v1/credentials/multisig/draft', {
+      credential: unsignedVc,
+      policy
+    });
+    assert.equal(draftRes.status, 200);
+    assert.ok(draftRes.body.draft.canonicalHash);
+
+    const sig1Res = await makeRequest('POST', '/api/v1/credentials/multisig/sign', {
+      canonicalHash: draftRes.body.draft.canonicalHash,
+      signerDid: kp1.did,
+      signerRole: 'Dean',
+      privateKeyHex: kp1.privateKeyHex
+    });
+    assert.equal(sig1Res.status, 200);
+
+    const sig2Res = await makeRequest('POST', '/api/v1/credentials/multisig/sign', {
+      canonicalHash: draftRes.body.draft.canonicalHash,
+      signerDid: kp2.did,
+      signerRole: 'Registrar',
+      privateKeyHex: kp2.privateKeyHex
+    });
+    assert.equal(sig2Res.status, 200);
+
+    const assembleRes = await makeRequest('POST', '/api/v1/credentials/multisig/assemble', {
+      credential: unsignedVc,
+      policy,
+      signatures: [sig1Res.body.signatureEntry, sig2Res.body.signatureEntry]
+    });
+    assert.equal(assembleRes.status, 200);
+    assert.ok(assembleRes.body.credential.proof);
+
+    const verifyRes = await makeRequest('POST', '/api/v1/credentials/multisig/verify', {
+      credential: assembleRes.body.credential,
+      policy
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.valid, true);
+    assert.equal(verifyRes.body.validSignaturesCount, 2);
+  });
+
+  await t.test('40. GET /api/v1/did/resolve resolves DID document', async () => {
+    const kp = (await makeRequest('POST', '/api/v1/keys/generate')).body.keyPair;
+    const res = await makeRequest('GET', `/api/v1/did/resolve?did=${encodeURIComponent(kp.did)}`);
+    assert.equal(res.status, 200);
+    assert.equal(res.body.id, kp.did);
+    assert.ok(Array.isArray(res.body.verificationMethod));
+  });
+
+  await t.test('41. GET /api/v1/trust/registry lists registered issuers', async () => {
+    const res = await makeRequest('GET', '/api/v1/trust/registry');
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
+    assert.ok(Array.isArray(res.body.issuers));
   });
 });
 

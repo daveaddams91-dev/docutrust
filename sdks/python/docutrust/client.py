@@ -748,6 +748,75 @@ class DocuTrustClient:
         from .zk_predicates import verify_predicate_graph
         return verify_predicate_graph(graph_proof, context)
 
+    def create_multisig_draft(
+        self,
+        credential: Dict[str, Any],
+        policy: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Creates an unsigned Multi-Signature (M-of-N) Credential draft and canonical hash."""
+        from .multisig import MultiSigEngine
+        return MultiSigEngine.create_multisig_draft(credential, policy)
+
+    def sign_multisig_as_authority(
+        self,
+        canonical_hash: str,
+        signer_did: str,
+        signer_role: str,
+        private_key_hex: str
+    ) -> Dict[str, Any]:
+        """Signs a canonical hash as an authorized institutional authority."""
+        from .multisig import MultiSigEngine
+        return MultiSigEngine.sign_as_authority(canonical_hash, signer_did, signer_role, private_key_hex)
+
+    def assemble_multisig_credential(
+        self,
+        credential: Dict[str, Any],
+        policy: Dict[str, Any],
+        signatures: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Assembles a finalized M-of-N MultiSig Verifiable Credential from collected signatures."""
+        from .multisig import MultiSigEngine
+        return MultiSigEngine.assemble_multisig_credential(credential, policy, signatures)
+
+    def verify_multisig_credential(
+        self,
+        credential: Dict[str, Any],
+        policy: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Cryptographically verifies an M-of-N MultiSig Verifiable Credential against policy."""
+        from .multisig import MultiSigEngine
+        return MultiSigEngine.verify_multisig_credential(credential, policy)
+
+    def resolve_did(self, did: str) -> Dict[str, Any]:
+        """Resolves a DID string to its complete W3C DID Document."""
+        from .did import DIDResolver
+        return DIDResolver.resolve(did)
+
+    def get_trust_registry_issuers(self) -> Dict[str, Any]:
+        """Retrieves all accredited issuers from the trust registry via API."""
+        return self._request("/trust/registry", "GET")
+
+    def get_vault_credentials(
+        self,
+        search: Optional[str] = None,
+        type_filter: Optional[str] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Queries stored credentials from the institutional vault."""
+        params = []
+        if search:
+            params.append(f"search={search}")
+        if type_filter:
+            params.append(f"type={type_filter}")
+        if limit is not None:
+            params.append(f"limit={limit}")
+        if offset is not None:
+            params.append(f"offset={offset}")
+        qs = f"?{'&'.join(params)}" if params else ""
+        return self._request(f"/vault/credentials{qs}", "GET")
+
+
 
 
 

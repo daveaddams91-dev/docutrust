@@ -1,5 +1,73 @@
 # 📝 DocuTrust Changelog & Release Notes
 
+## [v3.0.0] - Sovereign Trust Mesh: Multi-Sig Threshold Senate, Universal DID Resolver, Schema Hardening & Full-Stack Parity - 2026-08-30
+
+### 🌟 Release Overview (v3.0.0 - Major Milestone Release)
+DocuTrust 3.0.0 represents a major milestone leap to the **Sovereign Trust Mesh**. This release introduces institutional multi-authority governance via M-of-N MultiSig threshold signatures (`MultiSigThresholdSignature2026`), a Universal W3C DID Resolver supporting cross-method DID resolution (`did:key`, `did:pqc`, `did:kem`, `did:bbs`, `did:pkh`, and `did:web`), maximum recursion depth and cycle detection defense in the JSON Schema validator, end-to-end parity across TypeScript and Python SDKs, new REST API governance routes, complete CLI commands for PDF credential rendering/verification and MultiSig workflows, and an interactive Trust Mesh 3.0 Web Studio.
+
+---
+
+### 🛡️ Multi-Authority MultiSig & Governance Engine (`@docutrust/core`, `sdks/python`)
+- **M-of-N Threshold Signatures (`MultiSigThresholdSignature2026`)**:
+  - Implemented `MultiSigEngine` & `MultiSigThresholdEngine` enabling distributed institutional threshold signing across academic senates, boardrooms, and decentralized consortiums.
+  - Generates RFC 8785 canonical drafts (`createMultiSigDraft`), signs per-authority canonical hashes (`signAsAuthority`), and cryptographically assembles finalized multi-signed Verifiable Credentials (`assembleMultiSigCredential`).
+  - Strict verification pipeline (`verifyMultiSigCredential`) ensuring duplicate signature prevention, authority DID public key resolution, signature validity checks, and quorum threshold enforcement.
+- **Universal DID Resolution Engine**:
+  - Direct resolution of heterogeneous decentralized identifiers:
+    - `did:key`: W3C Ed25519 multibase keys (`Ed25519VerificationKey2020`).
+    - `did:pqc`: NIST ML-DSA-65 post-quantum hybrid keys (`MLDSA65HybridVerificationKey2026`).
+    - `did:kem`: NIST ML-KEM-768 post-quantum key encapsulation keys (`MLKEM768KeyAgreementKey2026`).
+    - `did:bbs`: BLS12-381 G2 keys for selective disclosure zero-knowledge credentials (`Bls12381G2Key2020`).
+    - `did:pkh`: Multi-chain Ethereum / EVM accounts via EIP-155 (`EcdsaSecp256k1RecoveryMethod2020`).
+    - `did:web`: Domain-based decentralized identifiers.
+- **JSON Schema Hardening**:
+  - Added recursion depth limits (maximum 64 stack depth) and cycle detection for `$defs` and `$ref` to eliminate ReDoS and stack overflow vectors.
+- **Decentralized Trust Registry**:
+  - Added `listAllIssuers()` method for accredited issuer queries across all registered authorities.
+
+---
+
+### 🌐 REST API Endpoints & Enterprise Hardening (`apps/api`)
+- Upgraded API server and health checks to `v3.0.0`.
+- **New Governance & Mesh Endpoints**:
+  - `POST /api/v1/credentials/multisig/draft`: Generate M-of-N unsigned drafts and canonical hashes.
+  - `POST /api/v1/credentials/multisig/sign`: Authority signing endpoint.
+  - `POST /api/v1/credentials/multisig/assemble`: Assembles collected authority signatures into a finalized MultiSig VC.
+  - `POST /api/v1/credentials/multisig/verify`: Cryptographically validates threshold policies and multi-signatures.
+  - `GET|POST /api/v1/did/resolve`: Universal DID resolver endpoint returning W3C DID Documents.
+  - `GET /api/v1/trust/registry`: Queries accredited issuers and authorized schemas from the trust registry.
+- All 42/42 API integration test suites passing.
+
+---
+
+### 📦 TypeScript & Python SDK Parity (`@docutrust/sdk`, `docutrust`)
+- **TypeScript SDK**: Added `createMultiSigDraft`, `signMultiSigAsAuthority`, `assembleMultiSigCredential`, `verifyMultiSigCredential`, `resolveDID`, `getTrustRegistryIssuers`, and `getVaultCredentials`.
+- **Python SDK**: Added `MultiSigEngine`, `DIDResolver`, full `DocuTrustClient` parity methods, standalone standard Base58 arithmetic codecs, and 44/44 unit test coverage with pure Python standard cryptography.
+
+---
+
+### 💻 Command-Line Interface (`@docutrust/cli`)
+- Updated version banner to `v3.0.0`.
+- Added interactive CLI commands:
+  - `multisig-draft <credential.json> <policy.json>`
+  - `multisig-sign <hash> <did> <role> <privateKey>`
+  - `multisig-assemble <credential.json> <policy.json> <signatures.json>`
+  - `multisig-verify <credential.json> [policy.json]`
+  - `render-pdf <credential.json> [output.pdf]`
+  - `verify-pdf <input.pdf>`
+  - `did-resolve <did>`
+
+---
+
+### 🖥️ Web Platform & Trust Mesh 3.0 Studio (`apps/web`)
+- Added `MeshStudio.jsx` featuring:
+  - Universal DID Resolver Inspector with live sample DIDs across Ed25519, Post-Quantum ML-DSA, Ethereum EVM, and Web domains.
+  - Interactive 2-of-3 MultiSig Senate Signing Workflow with live quorum status indicators.
+  - Decentralized Trust Registry Explorer with search filtering across accredited issuers and authorized credential schemas.
+- Updated Navbar and application banners to `v3.0.0`.
+
+---
+
 ## [v2.5.0] - Unified Cryptographic Verification Engine, Prototype Pollution Defense & Full-Stack Polish - 2026-08-30
 
 ### 🌟 Release Overview (v2.5.0)

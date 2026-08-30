@@ -69,7 +69,9 @@ const {
   provePredicateGraph,
   verifyPredicateGraph,
   sanitizeJsonPayload,
-  VerifiableCredentialsEngine
+  VerifiableCredentialsEngine,
+  MultiSigThresholdEngine,
+  DIDResolver
 } = require('@docutrust/core');
 
 const PORT = process.env.PORT || 4000;
@@ -166,7 +168,7 @@ const server = http.createServer(async (req, res) => {
       return jsonResponse(200, {
         status: 'healthy',
         service: 'DocuTrust Sovereign Verifiable Credentials Engine',
-        version: '2.5.0',
+        version: '3.0.0',
         features: [
           'W3C VC 2.0',
           'DID Key Ed25519',
@@ -178,7 +180,9 @@ const server = http.createServer(async (req, res) => {
           'W3C Bitstring StatusList2024',
           'DIF Presentation Exchange 2.0',
           'RSA Accumulator Non-Membership Witnesses',
-          'Recursive Zero-Knowledge Predicate Graphs'
+          'Recursive Zero-Knowledge Predicate Graphs',
+          'M-of-N MultiSig Threshold Credentials',
+          'Universal DID Resolution'
         ],
         systemDid: systemKeyPair.did,
         uptime: process.uptime()
@@ -1381,6 +1385,90 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // 43. Multi-Signature Threshold Endpoints
+    if (pathname === '/api/v1/credentials/multisig/draft' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { credential, policy } = body;
+      if (!credential || !policy) {
+        return jsonResponse(400, { error: 'Missing credential or policy in request.' });
+      }
+      try {
+        const draft = MultiSigThresholdEngine.createDraft(credential, policy);
+        return jsonResponse(200, { success: true, draft });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/credentials/multisig/sign' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { canonicalHash, signerDid, signerRole, privateKeyHex } = body;
+      if (!canonicalHash || !signerDid || !privateKeyHex) {
+        return jsonResponse(400, { error: 'Missing canonicalHash, signerDid, or privateKeyHex.' });
+      }
+      try {
+        const sigEntry = MultiSigThresholdEngine.signAsAuthority(canonicalHash, signerDid, signerRole || 'Trustee', privateKeyHex);
+        return jsonResponse(200, { success: true, signatureEntry: sigEntry });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/credentials/multisig/assemble' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { credential, policy, signatures } = body;
+      if (!credential || !policy || !signatures) {
+        return jsonResponse(400, { error: 'Missing credential, policy, or signatures.' });
+      }
+      try {
+        const assembled = MultiSigThresholdEngine.assembleMultiSigCredential(credential, policy, signatures);
+        return jsonResponse(200, { success: true, credential: assembled });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/credentials/multisig/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { credential, policy } = body;
+      if (!credential) {
+        return jsonResponse(400, { error: 'Missing credential payload.' });
+      }
+      try {
+        const result = MultiSigThresholdEngine.verifyMultiSigCredential(credential, policy);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // 44. Universal DID Resolution
+    if ((pathname === '/api/v1/did/resolve' || pathname.startsWith('/api/v1/did/resolve/')) && (req.method === 'GET' || req.method === 'POST')) {
+      let targetDid = url.searchParams.get('did');
+      if (!targetDid && pathname.startsWith('/api/v1/did/resolve/')) {
+        targetDid = decodeURIComponent(pathname.replace('/api/v1/did/resolve/', ''));
+      }
+      if (!targetDid && req.method === 'POST') {
+        const body = await readJsonBody();
+        targetDid = body.did;
+      }
+      if (!targetDid) {
+        return jsonResponse(400, { error: 'Missing target DID parameter.' });
+      }
+      try {
+        const didDoc = await DIDResolver.resolve(targetDid);
+        return jsonResponse(200, didDoc);
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // 45. Trust Registry Lookup
+    if (pathname === '/api/v1/trust/registry' && req.method === 'GET') {
+      const all = trustRegistry.listAllIssuers();
+      return jsonResponse(200, { success: true, count: all.length, issuers: all });
+    }
+
     // Default 404
     jsonResponse(404, { error: 'Route not found' });
   } catch (err) {
@@ -1390,7 +1478,7 @@ const server = http.createServer(async (req, res) => {
 
 if (require.main === module) {
   server.listen(PORT, () => {
-    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v2.3.0 running on http://localhost:${PORT}`);
+    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v3.0.0 running on http://localhost:${PORT}`);
   });
 }
 
