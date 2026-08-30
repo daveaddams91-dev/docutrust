@@ -18,12 +18,14 @@ import {
   Code2, 
   Package, 
   FileCode,
-  Binary
+  Binary,
+  Award
 } from 'lucide-react';
 
 export default function Navbar({ activeTab, setActiveTab }) {
   const navItems = [
     { id: 'hero', label: 'Overview', icon: ShieldCheck },
+    { id: 'badge', label: 'Badges', icon: Award },
     { id: 'confidential', label: 'Confidential ZK', icon: Binary },
     { id: 'jsonld', label: 'JSON-LD 2.0', icon: FileCode },
     { id: 'trustchain', label: 'Trust Chains', icon: GitMerge },

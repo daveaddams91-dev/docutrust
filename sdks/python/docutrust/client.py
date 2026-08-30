@@ -1191,3 +1191,21 @@ class DocuTrustClient:
         """Unseals a quantum-armored envelope."""
         from .quantum_armor import DualHybridKEMEngine
         return DualHybridKEMEngine.unseal_credential(envelope, recipient_hybrid_priv)
+
+    # ==========================================
+    # Verifiable SVG Digital Badge Methods
+    # ==========================================
+
+    def render_badge_svg(
+        self,
+        credential: Dict[str, Any],
+        options: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """Renders a tamper-evident SVG digital badge containing embedded credential metadata."""
+        from .badge import BadgeEngine
+        return BadgeEngine.render_badge_svg(credential, options)
+
+    def verify_badge_svg(self, svg_content: str) -> Dict[str, Any]:
+        """Verifies the integrity and authenticity of an SVG badge."""
+        from .badge import BadgeEngine
+        return BadgeEngine.verify_badge_svg(svg_content)

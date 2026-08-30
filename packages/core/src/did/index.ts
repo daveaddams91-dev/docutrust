@@ -6,6 +6,7 @@ export interface VerificationMethod {
   controller: string;
   publicKeyMultibase?: string;
   publicKeyHex?: string;
+  publicKeyJwk?: Record<string, any>;
   blockchainAccountId?: string;
   ethereumAddress?: string;
 }
@@ -36,6 +37,10 @@ export class DIDResolver {
   public static async resolve(did: string): Promise<DIDDocument> {
     if (this.registry.has(did)) {
       return this.registry.get(did)!;
+    }
+
+    if (did.startsWith('did:jwk:')) {
+      return this.resolveDidJwk(did);
     }
 
     if (did.startsWith('did:key:')) {
@@ -304,4 +309,81 @@ export class DIDResolver {
       assertionMethod: [`${did}#owner`]
     };
   }
+
+  /**
+   * Deterministically resolves a did:jwk (RFC 7517 JSON Web Key) without network access.
+   */
+  public static resolveDidJwk(did: string): DIDDocument {
+    const rawEncoded = did.replace('did:jwk:', '');
+    let jwk: Record<string, any>;
+    try {
+      const decodedJson = Buffer.from(rawEncoded, 'base64url').toString('utf8');
+      jwk = JSON.parse(decodedJson);
+    } catch {
+      throw new Error(`Invalid did:jwk: unable to decode base64url payload.`);
+    }
+
+    if (!jwk.kty) {
+      throw new Error(`Invalid did:jwk: missing 'kty' parameter in JWK.`);
+    }
+
+    let vmType = 'JsonWebKey2020';
+    if (jwk.kty === 'OKP' && jwk.crv === 'Ed25519') {
+      vmType = 'Ed25519VerificationKey2020';
+    } else if (jwk.kty === 'EC' && jwk.crv === 'secp256k1') {
+      vmType = 'EcdsaSecp256k1VerificationKey2019';
+    } else if (jwk.kty === 'RSA') {
+      vmType = 'RsaVerificationKey2018';
+    }
+
+    const keyId = `${did}#0`;
+
+    return {
+      '@context': [
+        'https://www.w3.org/ns/did/v1',
+        'https://w3id.org/security/suites/jws-2020/v1'
+      ],
+      id: did,
+      verificationMethod: [
+        {
+          id: keyId,
+          type: vmType,
+          controller: did,
+          publicKeyJwk: jwk
+        }
+      ],
+      authentication: [keyId],
+      assertionMethod: [keyId],
+      capabilityInvocation: [keyId],
+      capabilityDelegation: [keyId]
+    };
+  }
+
+  /**
+   * Encodes a JSON Web Key (JWK) into a canonical did:jwk identifier.
+   */
+  public static encodeDidJwk(jwk: Record<string, any>): string {
+    const sanitizedJwk: Record<string, any> = { ...jwk };
+    delete sanitizedJwk.d; // Ensure private key material is never encoded
+    delete sanitizedJwk.p;
+    delete sanitizedJwk.q;
+    delete sanitizedJwk.dp;
+    delete sanitizedJwk.dq;
+    delete sanitizedJwk.qi;
+
+    const base64url = Buffer.from(JSON.stringify(sanitizedJwk)).toString('base64url');
+    return `did:jwk:${base64url}`;
+  }
+
+  /**
+   * Decodes a did:jwk identifier into its original JSON Web Key (JWK) representation.
+   */
+  public static decodeDidJwk(did: string): Record<string, any> {
+    const rawEncoded = did.replace('did:jwk:', '');
+    return JSON.parse(Buffer.from(rawEncoded, 'base64url').toString('utf8'));
+  }
+}
+
+export function createDidJwk(jwk: Record<string, any>): string {
+  return DIDResolver.encodeDidJwk(jwk);
 }

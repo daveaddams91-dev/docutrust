@@ -45,6 +45,8 @@ from docutrust.jsonld import JsonLdCanonicalizationEngine
 from docutrust.accumulator import CryptographicAccumulator
 from docutrust.trustchain import TrustChainEngine
 from docutrust.quantum_armor import DualHybridKEMEngine
+from docutrust.badge import BadgeEngine
+from docutrust.did import DIDResolver
 
 class TestDocuTrustPython(unittest.TestCase):
     def test_didcomm_messaging(self):
@@ -1072,6 +1074,72 @@ class TestDocuTrustPython(unittest.TestCase):
         c_sub = PaillierCryptosystem.subtract(c1, c2, pub)
         dec_sub = PaillierCryptosystem.decrypt(c_sub, priv, pub)
         self.assertEqual(dec_sub, 5)
+
+    def test_did_jwk(self):
+        jwk = {
+            "kty": "OKP",
+            "crv": "Ed25519",
+            "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
+        }
+        did = DIDResolver.encode_did_jwk(jwk)
+        self.assertTrue(did.startswith("did:jwk:"))
+
+        decoded = DIDResolver.decode_did_jwk(did)
+        self.assertEqual(decoded["x"], jwk["x"])
+
+        doc = DIDResolver.resolve(did)
+        self.assertEqual(doc["id"], did)
+        self.assertEqual(doc["verificationMethod"][0]["type"], "Ed25519VerificationKey2020")
+        self.assertEqual(doc["verificationMethod"][0]["publicKeyJwk"]["x"], jwk["x"])
+
+    def test_badge_engine(self):
+        from docutrust.crypto import generate_key_pair, sign_data
+        issuer_kp = generate_key_pair()
+        subject_kp = generate_key_pair()
+
+        unsigned = {
+            "@context": ["https://www.w3.org/ns/credentials/v2"],
+            "id": "urn:uuid:py-badge-vc-01",
+            "type": ["VerifiableCredential", "MasterDegreeCredential"],
+            "issuer": {"id": issuer_kp["did"], "name": "Stanford Online"},
+            "validFrom": "2026-08-30T10:00:00Z",
+            "credentialSubject": {
+                "id": subject_kp["did"],
+                "degree": "MSc in Quantum Engineering",
+                "recipient": "Katherine Johnson"
+            }
+        }
+        sig = sign_data(canonicalize_json(unsigned), issuer_kp)
+        credential = {
+            **unsigned,
+            "proof": {
+                "type": "Ed25519Signature2020",
+                "created": "2026-08-30T10:00:00Z",
+                "verificationMethod": f"{issuer_kp['did']}#keys-1",
+                "proofPurpose": "assertionMethod",
+                "proofValue": sig
+            }
+        }
+
+        # 1. Render badge
+        svg = BadgeEngine.render_badge_svg(credential, {
+            "theme": "cyber-neon",
+            "badgeTitle": "MSc in Quantum Engineering",
+            "recipientName": "Katherine Johnson"
+        })
+        self.assertIn("<svg", svg)
+        self.assertIn("Katherine Johnson", svg)
+        self.assertIn("<metadata>", svg)
+
+        # 2. Extract credential
+        extracted = BadgeEngine.extract_credential_from_svg(svg)
+        self.assertEqual(extracted["id"], credential["id"])
+        self.assertEqual(extracted["credentialSubject"]["degree"], "MSc in Quantum Engineering")
+
+        # 3. Verify badge
+        verify_res = BadgeEngine.verify_badge_svg(svg)
+        self.assertTrue(verify_res["valid"])
+        self.assertEqual(verify_res["issuer"], issuer_kp["did"])
 
 if __name__ == '__main__':
     unittest.main()

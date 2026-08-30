@@ -121,3 +121,6 @@ export * from './trustchain';
 // Export Post-Quantum Dual Hybrid KEM Armor (X25519 + NIST ML-KEM-768)
 export * from './quantum-armor';
 
+// Export Verifiable SVG Digital Badge & Open Badges 3.0 Engine
+export * from './badge';
+

@@ -1301,5 +1301,40 @@ test('API Server Suite', async (t) => {
     assert.equal(linRes.body.success, true);
     assert.equal(linRes.body.result.operandsCount, 2);
   });
+
+  await t.test('53. POST /api/v1/badge (Render & Verify Verifiable SVG Badges)', async () => {
+    const keyRes = await makeRequest('POST', '/api/v1/keys/generate');
+    const issueRes = await makeRequest('POST', '/api/v1/credentials/issue', {
+      type: ['VerifiableCredential', 'BadgeCredential'],
+      credentialSubject: {
+        id: 'did:key:z6MkuSubjectHolder',
+        title: 'Senior Blockchain Architect',
+        name: 'Grace Hopper'
+      },
+      keyPair: keyRes.body.keyPair
+    });
+    assert.equal(issueRes.status, 200);
+
+    // Render badge
+    const renderRes = await makeRequest('POST', '/api/v1/badge/render', {
+      credential: issueRes.body.credential,
+      options: {
+        theme: 'cyber-neon',
+        badgeTitle: 'Senior Blockchain Architect',
+        recipientName: 'Grace Hopper'
+      }
+    });
+    assert.equal(renderRes.status, 200);
+    assert.ok(renderRes.body.svg.includes('<svg'));
+    assert.ok(renderRes.body.svg.includes('Grace Hopper'));
+
+    // Verify badge
+    const verifyBadgeRes = await makeRequest('POST', '/api/v1/badge/verify', {
+      svg: renderRes.body.svg
+    });
+    assert.equal(verifyBadgeRes.status, 200);
+    assert.equal(verifyBadgeRes.body.valid, true);
+    assert.equal(verifyBadgeRes.body.issuer, keyRes.body.keyPair.did);
+  });
 });
 

@@ -1345,6 +1345,24 @@ export class DocuTrustClient {
   public async unsealCredentialWithQuantumArmor(envelope: any, recipientHybridPriv: any): Promise<any> {
     return this.request('/quantum-armor/unseal', 'POST', { envelope, recipientHybridPriv });
   }
+
+  // ==========================================
+  // Verifiable SVG Digital Badge Methods
+  // ==========================================
+
+  /**
+   * Renders a tamper-evident Verifiable SVG digital badge for a credential.
+   */
+  public async renderBadgeSvg(credential: any, options?: { theme?: string; badgeTitle?: string; recipientName?: string; width?: number; height?: number }): Promise<{ success: boolean; svg: string }> {
+    return this.request('/badge/render', 'POST', { credential, options });
+  }
+
+  /**
+   * Verifies the cryptographic integrity and authenticity of an SVG badge.
+   */
+  public async verifyBadgeSvg(svg: string): Promise<{ success: boolean; valid: boolean; canonicalHash?: string; issuer?: string; error?: string }> {
+    return this.request('/badge/verify', 'POST', { svg });
+  }
 }
 
 

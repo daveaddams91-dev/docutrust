@@ -692,6 +692,41 @@ test('CLI Suite', async (t) => {
     assert.ok(linOut.includes('Homomorphic linear combination computed'));
     assert.ok(fs.existsSync(lincombFile));
   });
+
+  const jwkKeyFile = path.join(tempDir, 'jwk-key.json');
+  const badgeCredFile = path.join(tempDir, 'badge-cred.json');
+  const badgeSvgFile = path.join(tempDir, 'badge.svg');
+  await t.test('42. docutrust did-jwk and badge commands (badge-render, badge-verify)', () => {
+    // 1. did-jwk
+    fs.writeFileSync(jwkKeyFile, JSON.stringify({
+      kty: 'OKP',
+      crv: 'Ed25519',
+      x: '11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo'
+    }), 'utf-8');
+    const jwkOut = execSync(`node "${cliPath}" did-jwk --jwk "${jwkKeyFile}"`).toString();
+    assert.ok(jwkOut.includes('did:jwk:'));
+
+    // 2. Issue credential for badge
+    const badgeSubjectFile = path.join(tempDir, 'badge-subject.json');
+    fs.writeFileSync(badgeSubjectFile, JSON.stringify({
+      credentialType: 'DegreeCredential',
+      subject: {
+        id: 'did:key:z6MkuStudent',
+        degree: 'MSc Cryptography',
+        recipient: 'Alice'
+      }
+    }), 'utf-8');
+    execSync(`node "${cliPath}" issue --subject "${badgeSubjectFile}" --key "${keysFile}" --out "${badgeCredFile}"`);
+
+    // 3. badge-render
+    const renderOut = execSync(`node "${cliPath}" badge-render --credential "${badgeCredFile}" --theme emerald-cert --title "MSc Cryptography" --recipient "Alice" --out "${badgeSvgFile}"`).toString();
+    assert.ok(renderOut.includes('Verifiable SVG Badge generated'));
+    assert.ok(fs.existsSync(badgeSvgFile));
+
+    // 4. badge-verify
+    const verifyOut = execSync(`node "${cliPath}" badge-verify --svg "${badgeSvgFile}"`).toString();
+    assert.ok(verifyOut.includes('AUTHENTIC & VALID'));
+  });
 });
 
 

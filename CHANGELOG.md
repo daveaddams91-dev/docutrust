@@ -1,5 +1,30 @@
 # 📝 DocuTrust Changelog & Release Notes
 
+## [v8.1.0] - Open Badges 3.0 & Verifiable SVG Engine, Sovereign W3C did:jwk DID Method & Interactive Badge Studio - 2026-08-30
+
+### 🌟 Release Overview (v8.1.0)
+DocuTrust 8.1.0 introduces native Open Badges 3.0 and Verifiable SVG credential rendering, W3C `did:jwk` decentralized identifier support, and real-time visual badge design and verification:
+1. **Verifiable SVG Digital Badge & Open Badges 3.0 Engine (`@docutrust/core/badge`, `docutrust.badge`)**:
+   - Implemented `BadgeEngine` supporting tamper-evident SVG rendering with steganographic XML credential metadata embedding (`<metadata><docutrust:credential ...>`).
+   - Four distinct vector theme palettes: `sovereign`, `academic-gold`, `cyber-neon`, and `emerald-cert`.
+   - Full extraction and cryptographic verification of embedded W3C Verifiable Credentials directly from raw SVG vector graphics.
+2. **W3C `did:jwk` Sovereign DID Method Resolution & Encoding (`@docutrust/core/did`, `docutrust.did`)**:
+   - Added `resolveDidJwk`, `encodeDidJwk`, `decodeDidJwk`, and `createDidJwk` with base64url-encoded RFC-7517 JSON Web Keys.
+   - Enables instant, 100% offline, zero-registry decentralized identifier resolution across Ed25519 and Secp256k1 keys.
+3. **Interactive Web Studio (`BadgeStudio.jsx`)**:
+   - Built a sleek, real-time SVG badge designer with live vector preview, theme selector, credential JSON inspector, cryptographic verification status badge, and one-click `.svg` vector export.
+4. **Full-Stack CLI & REST API Parity**:
+   - CLI: Added `did-jwk`, `badge-render`, and `badge-verify` commands.
+   - REST API: Added `POST /api/v1/badge/render` and `POST /api/v1/badge/verify`.
+   - SDKs: Added `renderBadgeSvg` and `verifyBadgeSvg` to TypeScript (`@docutrust/sdk`) and Python (`docutrust`) client libraries.
+5. **100% Test Pass Rate across Monorepo (225 Automated Tests)**:
+   - Core: 66 tests passing.
+   - API: 54 tests passing.
+   - CLI: 43 tests passing.
+   - SDKs: 4 TypeScript tests + 58 Python tests passing.
+
+---
+
 ## [v8.0.0] - Dynamic Accumulator Batch Witnesses, Confidential Linear Combinations, DID Fragment Normalization & Sovereign Trust Mesh Hardening - 2026-08-30
 
 ### 🌟 Release Overview (v8.0.0 - Major Milestone Release)

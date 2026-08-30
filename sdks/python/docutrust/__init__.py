@@ -52,6 +52,7 @@ from .confidential import PaillierCryptosystem, ConfidentialClaimsEngine
 from .jsonld import JsonLdCanonicalizationEngine
 from .trustchain import TrustChainEngine
 from .quantum_armor import DualHybridKEMEngine
+from .badge import BadgeEngine
 
 __version__ = "8.0.0"
 __all__ = [
@@ -116,5 +117,6 @@ __all__ = [
     "ConfidentialClaimsEngine",
     "JsonLdCanonicalizationEngine",
     "TrustChainEngine",
-    "DualHybridKEMEngine"
+    "DualHybridKEMEngine",
+    "BadgeEngine"
 ]

@@ -2415,6 +2415,89 @@ async function main() {
     return;
   }
 
+  // ==========================================
+  // did:jwk Decentralized Identifier Commands
+  // ==========================================
+  if (command === 'did-jwk') {
+    const jwkFile = getArgValue('--jwk') || getArgValue('-j');
+    const didStr = getArgValue('--did') || getArgValue('-d');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (jwkFile) {
+      const jwk = JSON.parse(fs.readFileSync(jwkFile, 'utf-8'));
+      const did = core.DIDResolver.encodeDidJwk(jwk);
+      const doc = core.DIDResolver.resolveDidJwk(did);
+      const output = { did, didDocument: doc };
+      if (outFile) {
+        safeWriteFileSync(outFile, JSON.stringify(output, null, 2));
+        console.log(`\x1b[32m✔\x1b[0m did:jwk encoded and saved to \x1b[1m${outFile}\x1b[0m: ${did}`);
+      } else {
+        console.log(JSON.stringify(output, null, 2));
+      }
+      return;
+    } else if (didStr) {
+      const doc = core.DIDResolver.resolveDidJwk(didStr);
+      if (outFile) {
+        safeWriteFileSync(outFile, JSON.stringify(doc, null, 2));
+        console.log(`\x1b[32m✔\x1b[0m DID Document resolved and saved to \x1b[1m${outFile}\x1b[0m`);
+      } else {
+        console.log(JSON.stringify(doc, null, 2));
+      }
+      return;
+    } else {
+      console.error('\x1b[31mError:\x1b[0m Missing --jwk <key.json> or --did <did:jwk:...>');
+      process.exit(1);
+    }
+  }
+
+  // ==========================================
+  // Verifiable SVG Digital Badge Commands
+  // ==========================================
+  if (command === 'badge-render') {
+    const credFile = getArgValue('--credential') || getArgValue('--in') || getArgValue('-c') || getArgValue('-i');
+    const outFile = getArgValue('--out') || getArgValue('-o') || 'credential-badge.svg';
+    const theme = getArgValue('--theme') || getArgValue('-t') || 'sovereign';
+    const title = getArgValue('--title');
+    const recipient = getArgValue('--recipient');
+
+    if (!credFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --credential/--in <vc.json>');
+      process.exit(1);
+    }
+
+    const credential = JSON.parse(fs.readFileSync(credFile, 'utf-8'));
+    const svg = core.BadgeEngine.renderBadgeSvg(credential, {
+      theme,
+      badgeTitle: title || undefined,
+      recipientName: recipient || undefined
+    });
+
+    safeWriteFileSync(outFile, svg);
+    console.log(`\x1b[32m✔\x1b[0m Verifiable SVG Badge generated and saved to \x1b[1m${outFile}\x1b[0m (Theme: ${theme})`);
+    return;
+  }
+
+  if (command === 'badge-verify') {
+    const svgFile = getArgValue('--svg') || getArgValue('--in') || getArgValue('-s') || getArgValue('-i');
+    if (!svgFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --svg/--in <badge.svg>');
+      process.exit(1);
+    }
+
+    const svgContent = fs.readFileSync(svgFile, 'utf-8');
+    const result = await core.BadgeEngine.verifyBadgeSvg(svgContent);
+
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m Verifiable SVG Badge is \x1b[1m\x1b[32mAUTHENTIC & VALID\x1b[0m`);
+      console.log(`  Issuer: ${result.issuer || 'Unknown'}`);
+      console.log(`  Canonical JCS Hash: ${result.canonicalHash}`);
+    } else {
+      console.log(`\x1b[31m✖\x1b[0m Verifiable SVG Badge is \x1b[1m\x1b[31mINVALID\x1b[0m: ${result.error || 'Verification failed.'}`);
+      process.exit(1);
+    }
+    return;
+  }
+
   console.log(`Unknown command: ${command}. Run 'docutrust help' for usage.`);
 }
 

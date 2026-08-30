@@ -136,9 +136,10 @@ const {
   PaillierCryptosystem,
   ConfidentialClaimsEngine,
   JsonLdCanonicalizationEngine,
-  JsonLdSignaturesEngine,
   TrustChainEngine,
-  DualHybridKEMEngine
+  DualHybridKEMEngine,
+  BadgeEngine,
+  createDidJwk
 } = require('../dist/index.js');
 
 // 1. Cryptography Tests
@@ -2257,5 +2258,86 @@ test('59. TrustChain: Delegation token revocation checking and normalized DID re
   });
   assert.equal(revokedCheck.valid, false);
   assert.ok(revokedCheck.errors.some(e => e.includes('has been revoked')));
+});
+
+// 60. did:jwk Encoding, Decoding & Resolution
+test('60. DID: did:jwk encoding, decoding, and deterministic W3C DID document resolution', async () => {
+  const ed25519Jwk = {
+    kty: 'OKP',
+    crv: 'Ed25519',
+    x: '11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo'
+  };
+
+  // Encode JWK into did:jwk
+  const did = DIDResolver.encodeDidJwk(ed25519Jwk);
+  assert.ok(did.startsWith('did:jwk:'));
+
+  // Decode back to JWK
+  const decodedJwk = DIDResolver.decodeDidJwk(did);
+  assert.equal(decodedJwk.kty, 'OKP');
+  assert.equal(decodedJwk.crv, 'Ed25519');
+  assert.equal(decodedJwk.x, ed25519Jwk.x);
+
+  // Resolve into W3C DID Document
+  const doc = await DIDResolver.resolve(did);
+  assert.equal(doc.id, did);
+  assert.equal(doc.verificationMethod.length, 1);
+  assert.equal(doc.verificationMethod[0].type, 'Ed25519VerificationKey2020');
+  assert.deepEqual(doc.verificationMethod[0].publicKeyJwk, ed25519Jwk);
+  assert.ok(doc.assertionMethod.includes(`${did}#0`));
+});
+
+// 61. Verifiable SVG Digital Badge Engine
+test('61. Badge: Verifiable SVG digital badge rendering, embedded metadata extraction, and tamper-evident verification', async () => {
+  const issuerKp = generateKeyPair();
+  const subjectKp = generateKeyPair();
+
+  const { credential } = VerifiableCredentialsEngine.issue({
+    issuer: { id: issuerKp.did },
+    type: ['VerifiableCredential'],
+    credentialSubject: {
+      id: subjectKp.did,
+      degree: 'Master of Quantum Cryptography',
+      name: 'Alice Turing',
+      honors: 'Summa Cum Laude'
+    },
+    keyPair: issuerKp
+  });
+
+  // Render SVG badge with academic-gold theme
+  const svg = BadgeEngine.renderBadgeSvg(credential, {
+    theme: 'academic-gold',
+    badgeTitle: 'Master of Quantum Cryptography',
+    recipientName: 'Alice Turing'
+  });
+
+  assert.ok(svg.includes('<svg'));
+  assert.ok(svg.includes('<metadata>'));
+  assert.ok(svg.includes('DOCUTRUST SOVEREIGN VERIFIABLE BADGE'));
+  assert.ok(svg.includes('Master of Quantum Cryptography'));
+  assert.ok(svg.includes('Alice Turing'));
+
+  // Extract embedded credential
+  const extractedCred = BadgeEngine.extractCredentialFromSvg(svg);
+  assert.equal(extractedCred.id, credential.id);
+  assert.equal(extractedCred.credentialSubject.degree, 'Master of Quantum Cryptography');
+
+  // Verify badge authenticity
+  const verifyResult = await BadgeEngine.verifyBadgeSvg(svg);
+  assert.equal(verifyResult.valid, true);
+  assert.equal(verifyResult.issuer, issuerKp.did);
+  assert.ok(verifyResult.canonicalHash.length === 64);
+
+  // Tamper detection: modifying SVG metadata breaks verification
+  const tamperedSvg = svg.replace('Master of Quantum Cryptography', 'Ph.D. in Hacking');
+  // If we tamper the embedded credential payload base64:
+  const tamperedPayloadSvg = svg.replace(/<docutrust:credential[^>]*>([A-Za-z0-9+/=]+)<\/docutrust:credential>/, (match, b64) => {
+    const raw = Buffer.from(b64, 'base64').toString('utf8');
+    const tampered = raw.replace('Master of Quantum Cryptography', 'Fake Degree');
+    return `<docutrust:credential xmlns:docutrust="https://docutrust.org/schema/badge/v1" format="w3c-vc-2.0" encoding="base64">${Buffer.from(tampered).toString('base64')}</docutrust:credential>`;
+  });
+
+  const tamperedResult = await BadgeEngine.verifyBadgeSvg(tamperedPayloadSvg);
+  assert.equal(tamperedResult.valid, false);
 });
 

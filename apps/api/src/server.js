@@ -80,7 +80,8 @@ const {
   ConfidentialClaimsEngine,
   JsonLdCanonicalizationEngine,
   TrustChainEngine,
-  DualHybridKEMEngine
+  DualHybridKEMEngine,
+  BadgeEngine
 } = require('@docutrust/core');
 
 const PORT = process.env.PORT || 4000;
@@ -1969,6 +1970,35 @@ const server = http.createServer(async (req, res) => {
       try {
         const payload = DualHybridKEMEngine.unsealCredential(envelope, priv);
         return jsonResponse(200, { success: true, payload });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // 55. Verifiable SVG Digital Badge Endpoints
+    if (pathname === '/api/v1/badge/render' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { credential, options } = body;
+      if (!credential) {
+        return jsonResponse(400, { error: 'Missing credential parameter.' });
+      }
+      try {
+        const svg = BadgeEngine.renderBadgeSvg(credential, options);
+        return jsonResponse(200, { success: true, svg });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/badge/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { svg } = body;
+      if (!svg) {
+        return jsonResponse(400, { error: 'Missing svg parameter.' });
+      }
+      try {
+        const result = await BadgeEngine.verifyBadgeSvg(svg);
+        return jsonResponse(200, { success: true, ...result });
       } catch (e) {
         return jsonResponse(400, { error: e.message });
       }

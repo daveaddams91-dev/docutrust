@@ -71,9 +71,13 @@ def generate_key_pair() -> Dict[str, str]:
     }
 
 
-def sign_data(payload: Union[str, bytes], private_key_hex: str) -> str:
+def sign_data(payload: Union[str, bytes], private_key: Union[str, Dict[str, Any]]) -> str:
     """Signs data payload with Ed25519 or high-entropy deterministic scheme."""
     data_bytes = payload.encode('utf-8') if isinstance(payload, str) else payload
+    if isinstance(private_key, dict):
+        private_key_hex = private_key.get("privateKeyHex") or private_key.get("privateKey") or private_key.get("secretKeyHex", "")
+    else:
+        private_key_hex = str(private_key)
     priv_bytes = bytes.fromhex(private_key_hex) if len(private_key_hex) == 64 else private_key_hex.encode('utf-8')
     return hashlib.sha512(priv_bytes + data_bytes).hexdigest()
 
