@@ -204,66 +204,66 @@ export default function HeroSection({ setActiveTab }) {
         {/* Feature Grid Highlights */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 max-w-6xl mx-auto mt-20 text-left">
           <div 
-            onClick={() => setActiveTab('anoncreds')}
-            className="glass-card p-5 rounded-2xl border border-gray-800/80 hover:border-indigo-500/50 hover:bg-gray-900/60 transition-all cursor-pointer group"
+            onClick={() => setActiveTab('confidential')}
+            className="glass-card p-5 rounded-2xl border border-gray-800/80 hover:border-purple-500/50 hover:bg-gray-900/60 transition-all cursor-pointer group"
           >
-            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-3 group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 mb-3 group-hover:scale-105 transition-transform">
               <Lock className="w-5 h-5" />
             </div>
             <h3 className="text-sm font-bold text-white mb-1.5 flex items-center gap-1">
-              AnonCreds 2.0 & Blind BBS+
-              <Sparkles className="w-3 h-3 text-indigo-400" />
+              Confidential ZK & Paillier
+              <Sparkles className="w-3 h-3 text-purple-400" />
             </h3>
             <p className="text-xs text-gray-400 leading-relaxed">
-              Holder secret blind commitments and unlinkable selective disclosure presentations.
+              Additive homomorphic encryption and zero-knowledge threshold proofs without revealing raw values.
             </p>
           </div>
 
           <div 
-            onClick={() => setActiveTab('dkg')}
+            onClick={() => setActiveTab('jsonld')}
             className="glass-card p-5 rounded-2xl border border-gray-800/80 hover:border-cyan-500/50 hover:bg-gray-900/60 transition-all cursor-pointer group"
           >
             <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 mb-3 group-hover:scale-105 transition-transform">
-              <Zap className="w-5 h-5" />
-            </div>
-            <h3 className="text-sm font-bold text-white mb-1.5 flex items-center gap-1">
-              FROST Threshold DKG
-              <Sparkles className="w-3 h-3 text-cyan-400" />
-            </h3>
-            <p className="text-xs text-gray-400 leading-relaxed">
-              K-of-N distributed key generation without reconstructing master private keys.
-            </p>
-          </div>
-
-          <div 
-            onClick={() => setActiveTab('solidity')}
-            className="glass-card p-5 rounded-2xl border border-gray-800/80 hover:border-blue-500/50 hover:bg-gray-900/60 transition-all cursor-pointer group"
-          >
-            <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 mb-3 group-hover:scale-105 transition-transform">
               <FileCode className="w-5 h-5" />
             </div>
             <h3 className="text-sm font-bold text-white mb-1.5 flex items-center gap-1">
-              Solidity On-Chain Verifier
-              <Sparkles className="w-3 h-3 text-blue-400" />
+              JSON-LD URDNA2015
+              <Sparkles className="w-3 h-3 text-cyan-400" />
             </h3>
             <p className="text-xs text-gray-400 leading-relaxed">
-              Exportable `DocuTrustVerifier.sol` smart contracts and Web3 ABI calldata generator.
+              W3C RDFC-1.0 deterministic dataset canonicalization and Linked Data Signatures 2020.
             </p>
           </div>
 
           <div 
-            onClick={() => setActiveTab('bundle')}
-            className="glass-card p-5 rounded-2xl border border-gray-800/80 hover:border-emerald-500/50 hover:bg-gray-900/60 transition-all cursor-pointer group"
+            onClick={() => setActiveTab('trustchain')}
+            className="glass-card p-5 rounded-2xl border border-gray-800/80 hover:border-blue-500/50 hover:bg-gray-900/60 transition-all cursor-pointer group"
           >
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-3 group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 mb-3 group-hover:scale-105 transition-transform">
               <Layers className="w-5 h-5" />
             </div>
             <h3 className="text-sm font-bold text-white mb-1.5 flex items-center gap-1">
-              Audit Bundles (.dtbundle)
-              <Sparkles className="w-3 h-3 text-emerald-400" />
+              Verifiable Trust Chains
+              <Sparkles className="w-3 h-3 text-blue-400" />
             </h3>
             <p className="text-xs text-gray-400 leading-relaxed">
-              HashChain, MMR peaks, TSA tokens, and automated SOC2 / ISO 27001 compliance certificates.
+              Hierarchical delegation tokens (Root → Accreditation Board → Department) with depth constraints.
+            </p>
+          </div>
+
+          <div 
+            onClick={() => setActiveTab('quantum-armor')}
+            className="glass-card p-5 rounded-2xl border border-gray-800/80 hover:border-rose-500/50 hover:bg-gray-900/60 transition-all cursor-pointer group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 mb-3 group-hover:scale-105 transition-transform">
+              <Zap className="w-5 h-5" />
+            </div>
+            <h3 className="text-sm font-bold text-white mb-1.5 flex items-center gap-1">
+              Quantum Armor KEM
+              <Sparkles className="w-3 h-3 text-rose-400" />
+            </h3>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              Dual Hybrid NIST FIPS 203 ML-KEM-768 lattice encapsulation with AES-256-GCM sealed envelopes.
             </p>
           </div>
         </div>

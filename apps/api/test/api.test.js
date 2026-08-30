@@ -1134,5 +1134,125 @@ test('API Server Suite', async (t) => {
     assert.equal(verifyRes.status, 200);
     assert.equal(verifyRes.body.valid, true);
   });
+
+  await t.test('47. POST /api/v1/confidential endpoints (Keygen, Encrypt, Sum, Threshold Prove & Verify)', async () => {
+    const keygenRes = await makeRequest('POST', '/api/v1/confidential/keygen', { bitLength: 128 });
+    assert.equal(keygenRes.status, 200);
+    assert.ok(keygenRes.body.keys.publicKey.n);
+
+    const enc1 = await makeRequest('POST', '/api/v1/confidential/encrypt', {
+      claimKey: 'balance',
+      value: 75000,
+      publicKey: keygenRes.body.keys.publicKey
+    });
+    assert.equal(enc1.status, 200);
+    assert.equal(enc1.body.encryptedClaim.claimKey, 'balance');
+
+    const enc2 = await makeRequest('POST', '/api/v1/confidential/encrypt', {
+      claimKey: 'bonus',
+      value: 25000,
+      publicKey: keygenRes.body.keys.publicKey
+    });
+    assert.equal(enc2.status, 200);
+
+    const sumRes = await makeRequest('POST', '/api/v1/confidential/sum', {
+      ciphertexts: [enc1.body.encryptedClaim.ciphertextHex, enc2.body.encryptedClaim.ciphertextHex],
+      publicKey: keygenRes.body.keys.publicKey
+    });
+    assert.equal(sumRes.status, 200);
+    assert.equal(sumRes.body.result.operandsCount, 2);
+
+    const proveRes = await makeRequest('POST', '/api/v1/confidential/threshold-prove', {
+      claimKey: 'balance',
+      actualValue: 75000,
+      threshold: 50000,
+      operator: 'gte',
+      publicKey: keygenRes.body.keys.publicKey
+    });
+    assert.equal(proveRes.status, 200);
+    assert.equal(proveRes.body.proof.isSatisfied, true);
+
+    const verifyRes = await makeRequest('POST', '/api/v1/confidential/threshold-verify', {
+      proof: proveRes.body.proof
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.valid, true);
+  });
+
+  await t.test('48. POST /api/v1/jsonld endpoints (Canonicalize, Sign, Verify)', async () => {
+    const kp = (await makeRequest('POST', '/api/v1/keys/generate')).body.keyPair;
+    const doc = {
+      "@context": ["https://www.w3.org/2018/credentials/v1"],
+      "id": "urn:uuid:jsonld-test-01",
+      "type": ["VerifiableCredential", "IdentityCredential"],
+      "issuer": kp.did,
+      "credentialSubject": { "name": "Jane Doe", "country": "Canada" }
+    };
+
+    const canonRes = await makeRequest('POST', '/api/v1/jsonld/canonicalize', { doc });
+    assert.equal(canonRes.status, 200);
+    assert.equal(canonRes.body.datasetDigestHex.length, 64);
+
+    const signRes = await makeRequest('POST', '/api/v1/jsonld/sign', { doc, keyPair: kp });
+    assert.equal(signRes.status, 200);
+    assert.ok(signRes.body.signedDoc.proof);
+
+    const verifyRes = await makeRequest('POST', '/api/v1/jsonld/verify', {
+      signedDoc: signRes.body.signedDoc,
+      expectedPublicKeyHex: kp.publicKeyHex
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.valid, true);
+  });
+
+  await t.test('49. POST /api/v1/trustchain endpoints (Create Token, Verify Token, Verify Path)', async () => {
+    const rootKp = (await makeRequest('POST', '/api/v1/keys/generate')).body.keyPair;
+    const registrarKp = (await makeRequest('POST', '/api/v1/keys/generate')).body.keyPair;
+
+    const tokenRes = await makeRequest('POST', '/api/v1/trustchain/token/create', {
+      delegatorKeyPair: rootKp,
+      delegateDid: registrarKp.did,
+      maxDepth: 2,
+      allowedCredentialTypes: ['*']
+    });
+    assert.equal(tokenRes.status, 200);
+    assert.equal(tokenRes.body.delegationToken.delegatorDid, rootKp.did);
+
+    const verifyTokenRes = await makeRequest('POST', '/api/v1/trustchain/token/verify', {
+      token: tokenRes.body.delegationToken,
+      expectedDelegatorPublicKeyHex: rootKp.publicKeyHex
+    });
+    assert.equal(verifyTokenRes.status, 200);
+    assert.equal(verifyTokenRes.body.valid, true);
+
+    const verifyPathRes = await makeRequest('POST', '/api/v1/trustchain/verify-path', {
+      delegationTokens: [tokenRes.body.delegationToken],
+      rootAuthorityDid: rootKp.did,
+      leafIssuerDid: registrarKp.did
+    });
+    assert.equal(verifyPathRes.status, 200);
+    assert.equal(verifyPathRes.body.valid, true);
+  });
+
+  await t.test('50. POST /api/v1/quantum-armor endpoints (Keygen, Seal, Unseal)', async () => {
+    const keygenRes = await makeRequest('POST', '/api/v1/quantum-armor/keygen', {});
+    assert.equal(keygenRes.status, 200);
+    assert.ok(keygenRes.body.keys.hybridPublicKey.pqcPub);
+
+    const payload = { securityClearing: 'TOP_SECRET_ORBITAL', accessLevel: 9 };
+    const sealRes = await makeRequest('POST', '/api/v1/quantum-armor/seal', {
+      payload,
+      recipientHybridPub: keygenRes.body.keys.hybridPublicKey
+    });
+    assert.equal(sealRes.status, 200);
+    assert.equal(sealRes.body.envelope.type, 'DocuTrustQuantumSealedEnvelope2026');
+
+    const unsealRes = await makeRequest('POST', '/api/v1/quantum-armor/unseal', {
+      envelope: sealRes.body.envelope,
+      recipientHybridKeys: keygenRes.body.keys.hybridSecretKey
+    });
+    assert.equal(unsealRes.status, 200);
+    assert.deepEqual(unsealRes.body.payload, payload);
+  });
 });
 

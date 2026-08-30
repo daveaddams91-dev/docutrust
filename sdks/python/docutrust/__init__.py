@@ -48,8 +48,12 @@ from .dkg import DKGEngine
 from .solidity import SolidityEngine
 from .bundle import AuditBundleEngine
 from .dataintegrity import DataIntegrityEngine
+from .confidential import PaillierCryptosystem, ConfidentialClaimsEngine
+from .jsonld import JsonLdCanonicalizationEngine
+from .trustchain import TrustChainEngine
+from .quantum_armor import DualHybridKEMEngine
 
-__version__ = "5.0.0"
+__version__ = "6.0.0"
 __all__ = [
     "DocuTrustClient",
     "canonicalize_json",
@@ -107,5 +111,10 @@ __all__ = [
     "DKGEngine",
     "SolidityEngine",
     "AuditBundleEngine",
-    "DataIntegrityEngine"
+    "DataIntegrityEngine",
+    "PaillierCryptosystem",
+    "ConfidentialClaimsEngine",
+    "JsonLdCanonicalizationEngine",
+    "TrustChainEngine",
+    "DualHybridKEMEngine"
 ]

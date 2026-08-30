@@ -1186,6 +1186,130 @@ export class DocuTrustClient {
   public async verifyDataIntegrityCredential(credential: any): Promise<any> {
     return this.request('/credentials/dataintegrity/verify', 'POST', { credential });
   }
+
+  // ==========================================
+  // v6.0.0 Confidential Homomorphic Computing
+  // ==========================================
+
+  /**
+   * Generates a Paillier KeyPair for confidential additive arithmetic.
+   */
+  public async generatePaillierKeyPair(bitLength: number = 512): Promise<any> {
+    return this.request('/confidential/keys/generate', 'POST', { bitLength });
+  }
+
+  /**
+   * Encrypts a numeric credential claim into a Paillier confidential payload.
+   */
+  public async encryptConfidentialClaim(claimKey: string, value: number, publicKey: any): Promise<any> {
+    return this.request('/confidential/encrypt', 'POST', { claimKey, value, publicKey });
+  }
+
+  /**
+   * Computes homomorphic addition over multiple encrypted claim ciphertexts.
+   */
+  public async homomorphicSum(ciphertexts: string[], publicKey: any): Promise<any> {
+    return this.request('/confidential/compute/sum', 'POST', { ciphertexts, publicKey });
+  }
+
+  /**
+   * Proves that a confidential claim satisfies a threshold condition without revealing the value.
+   */
+  public async proveConfidentialThreshold(
+    claimKey: string,
+    actualValue: number,
+    threshold: number,
+    operator: 'gte' | 'lte' | 'eq',
+    publicKey: any
+  ): Promise<any> {
+    return this.request('/confidential/proof/threshold', 'POST', { claimKey, actualValue, threshold, operator, publicKey });
+  }
+
+  /**
+   * Verifies a confidential zero-knowledge threshold proof.
+   */
+  public async verifyConfidentialThreshold(proof: any): Promise<any> {
+    return this.request('/confidential/verify/threshold', 'POST', { proof });
+  }
+
+  // ==========================================
+  // v6.0.0 W3C URDNA2015 JSON-LD Linked Data
+  // ==========================================
+
+  /**
+   * Canonicalizes a JSON-LD document into deterministic URDNA2015 / RDFC-1.0 N-Quads.
+   */
+  public async canonicalizeJsonLd(document: any): Promise<any> {
+    return this.request('/jsonld/canonicalize', 'POST', { document });
+  }
+
+  /**
+   * Signs a JSON-LD document with Linked Data Signatures.
+   */
+  public async signJsonLd(document: any, keyPair: any, options?: any): Promise<any> {
+    return this.request('/jsonld/sign', 'POST', { document, keyPair, options });
+  }
+
+  /**
+   * Verifies a W3C Linked Data Signed JSON-LD document.
+   */
+  public async verifyJsonLd(document: any, expectedPublicKeyHex?: string): Promise<any> {
+    return this.request('/jsonld/verify', 'POST', { document, expectedPublicKeyHex });
+  }
+
+  // ==========================================
+  // v6.0.0 Hierarchical Verifiable Trust Chains
+  // ==========================================
+
+  /**
+   * Issues a signed delegation token to a subordinate authority or department.
+   */
+  public async createDelegationToken(options: {
+    delegatorKeyPair: any;
+    delegateDid: string;
+    allowedCredentialTypes?: string[];
+    maxDepth?: number;
+    validFrom?: string;
+    validUntil?: string;
+  }): Promise<any> {
+    return this.request('/trustchain/token/create', 'POST', options);
+  }
+
+  /**
+   * Recursively verifies an end-to-end delegation trust chain against an issued credential.
+   */
+  public async verifyTrustChain(options: {
+    chain: any[];
+    credential: any;
+    accreditedRootDids: string[];
+  }): Promise<any> {
+    return this.request('/trustchain/verify', 'POST', options);
+  }
+
+  // ==========================================
+  // v6.0.0 Post-Quantum Dual Hybrid KEM Armor
+  // ==========================================
+
+  /**
+   * Generates a Dual-KEM Hybrid KeyPair (X25519 + NIST ML-KEM-768).
+   */
+  public async generateDualKEMKeys(): Promise<any> {
+    return this.request('/quantum-armor/keys/generate', 'GET');
+  }
+
+  /**
+   * Encrypts and seals any credential payload inside a Quantum-Sealed Envelope.
+   */
+  public async sealCredentialWithQuantumArmor(payload: any, recipientHybridPub: any): Promise<any> {
+    return this.request('/quantum-armor/seal', 'POST', { payload, recipientHybridPub });
+  }
+
+  /**
+   * Unseals and decrypts a Quantum-Sealed Envelope.
+   */
+  public async unsealCredentialWithQuantumArmor(envelope: any, recipientHybridPriv: any): Promise<any> {
+    return this.request('/quantum-armor/unseal', 'POST', { envelope, recipientHybridPriv });
+  }
 }
 
 

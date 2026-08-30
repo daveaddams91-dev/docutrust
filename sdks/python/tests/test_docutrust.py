@@ -40,6 +40,10 @@ from docutrust.dkg import DKGEngine
 from docutrust.solidity import SolidityEngine
 from docutrust.bundle import AuditBundleEngine
 from docutrust.dataintegrity import DataIntegrityEngine
+from docutrust.confidential import PaillierCryptosystem, ConfidentialClaimsEngine
+from docutrust.jsonld import JsonLdCanonicalizationEngine
+from docutrust.trustchain import TrustChainEngine
+from docutrust.quantum_armor import DualHybridKEMEngine
 
 class TestDocuTrustPython(unittest.TestCase):
     def test_didcomm_messaging(self):
@@ -922,6 +926,113 @@ class TestDocuTrustPython(unittest.TestCase):
 
         vault_creds = client.get_vault_credentials(search="Elena", limit=10)
         self.assertTrue(vault_creds["success"])
+
+    # ==========================================
+    # v6.0.0 Engine Unit Tests
+    # ==========================================
+
+    def test_paillier_and_confidential_claims(self):
+        keys = PaillierCryptosystem.generate_key_pair(128)
+        self.assertIn("publicKey", keys)
+        self.assertIn("privateKey", keys)
+
+        # Encrypt two claims
+        c1 = ConfidentialClaimsEngine.encrypt_claim("salary", 75000, keys["publicKey"])
+        c2 = ConfidentialClaimsEngine.encrypt_claim("bonus", 25000, keys["publicKey"])
+
+        # Homomorphic addition
+        sum_res = ConfidentialClaimsEngine.homomorphic_sum([c1["ciphertextHex"], c2["ciphertextHex"]], keys["publicKey"])
+        decrypted_sum = PaillierCryptosystem.decrypt(sum_res["sumCiphertextHex"], keys["privateKey"], keys["publicKey"])
+        self.assertEqual(decrypted_sum, 100000)
+
+        # Zero-Knowledge Threshold Proof
+        proof = ConfidentialClaimsEngine.prove_threshold("salary", 75000, 50000, "gte", keys["publicKey"])
+        verify_res = ConfidentialClaimsEngine.verify_threshold_proof(proof)
+        self.assertTrue(verify_res)
+
+    def test_jsonld_canonicalization_and_signing(self):
+        doc = {
+            "@context": ["https://www.w3.org/2018/credentials/v1"],
+            "id": "urn:uuid:py-jsonld-test",
+            "type": ["VerifiableCredential"],
+            "issuer": "did:key:z6MkuTestIssuer",
+            "credentialSubject": {"degree": "Ph.D. Cryptography", "year": 2026}
+        }
+        canonical = JsonLdCanonicalizationEngine.canonicalize(doc)
+        digest = JsonLdCanonicalizationEngine.digest(doc)
+        self.assertTrue(isinstance(canonical, str))
+        self.assertEqual(len(digest), 64)
+
+        key_pair = {
+            "privateKeyHex": os.urandom(32).hex(),
+            "publicKeyHex": os.urandom(32).hex(),
+            "did": "did:key:z6MkuTestIssuer"
+        }
+        signed = JsonLdCanonicalizationEngine.sign_json_ld(doc, key_pair)
+        self.assertIn("proof", signed)
+        verify_res = JsonLdCanonicalizationEngine.verify_json_ld(signed, key_pair["publicKeyHex"])
+        self.assertTrue(verify_res["valid"])
+
+    def test_trust_chain_engine(self):
+        root_priv = os.urandom(32).hex()
+        root_pub = os.urandom(32).hex()
+        root_did = f"did:key:z{encode_base58(bytes([0xed, 0x01]) + bytes.fromhex(root_pub))}"
+        root_keys = {"privateKeyHex": root_priv, "publicKeyHex": root_pub, "did": root_did}
+
+        inter_priv = os.urandom(32).hex()
+        inter_pub = os.urandom(32).hex()
+        inter_did = f"did:key:z{encode_base58(bytes([0xed, 0x01]) + bytes.fromhex(inter_pub))}"
+        inter_keys = {"privateKeyHex": inter_priv, "publicKeyHex": inter_pub, "did": inter_did}
+
+        leaf_priv = os.urandom(32).hex()
+        leaf_pub = os.urandom(32).hex()
+        leaf_did = f"did:key:z{encode_base58(bytes([0xed, 0x01]) + bytes.fromhex(leaf_pub))}"
+        leaf_keys = {"privateKeyHex": leaf_priv, "publicKeyHex": leaf_pub, "did": leaf_did}
+
+        # Step 1: Root delegates to Regulator
+        token1 = TrustChainEngine.create_delegation_token(
+            delegator_key_pair=root_keys,
+            delegate_did=inter_keys["did"],
+            allowed_credential_types=["UniversityDegreeCredential", "*"],
+            max_depth=3
+        )
+        self.assertTrue(TrustChainEngine.verify_delegation_token(token1, root_keys["publicKeyHex"]))
+
+        # Step 2: Regulator delegates to University
+        token2 = TrustChainEngine.create_delegation_token(
+            delegator_key_pair=inter_keys,
+            delegate_did=leaf_keys["did"],
+            allowed_credential_types=["UniversityDegreeCredential"],
+            max_depth=2
+        )
+        self.assertTrue(TrustChainEngine.verify_delegation_token(token2, inter_keys["publicKeyHex"]))
+
+        # Step 3: Verify 2-hop Trust Chain
+        leaf_vc = {
+            "id": "urn:uuid:degree-01",
+            "type": ["VerifiableCredential", "UniversityDegreeCredential"],
+            "issuer": leaf_keys["did"]
+        }
+        chain_res = TrustChainEngine.verify_trust_chain(
+            chain=[token1, token2],
+            credential=leaf_vc,
+            accredited_root_dids=[root_keys["did"]]
+        )
+        self.assertTrue(chain_res["valid"])
+        self.assertEqual(chain_res["chainDepth"], 2)
+
+    def test_dual_hybrid_kem_engine(self):
+        recipient_keys = DualHybridKEMEngine.generate_dual_key_pair()
+        self.assertIn("hybridPublicKey", recipient_keys)
+        self.assertIn("hybridSecretKey", recipient_keys)
+
+        payload = {"secretClearance": "Omega-7", "authCode": 987654}
+        envelope = DualHybridKEMEngine.seal_credential(payload, recipient_keys["hybridPublicKey"])
+        self.assertEqual(envelope["type"], "DocuTrustQuantumSealedEnvelope2026")
+
+        unsealed = DualHybridKEMEngine.unseal_credential(envelope, recipient_keys["hybridSecretKey"])
+        self.assertEqual(unsealed["secretClearance"], "Omega-7")
+        self.assertEqual(unsealed["authCode"], 987654)
 
 if __name__ == '__main__':
     unittest.main()

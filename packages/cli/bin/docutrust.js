@@ -62,6 +62,14 @@ function canonicalizeJson(obj) {
   return '{' + keys.map(k => `${JSON.stringify(k)}:${canonicalizeJson(obj[k])}`).join(',') + '}';
 }
 
+function safeWriteFileSync(filePath, data) {
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.writeFileSync(filePath, data, 'utf-8');
+}
+
 function sha256Hex(data) {
   return crypto.createHash('sha256').update(data).digest('hex');
 }
@@ -2005,6 +2013,291 @@ async function main() {
       console.log(`\x1b[31m✖\x1b[0m DataIntegrity Verification \x1b[1m\x1b[31mFAILED\x1b[0m: ${result.error}`);
       process.exit(1);
     }
+    return;
+  }
+
+  // ==========================================
+  // v6.0.0 Confidential Computing CLI Handlers
+  // ==========================================
+  if (command === 'confidential-keygen') {
+    const bits = parseInt(getArgValue('--bits') || '512', 10);
+    const outFile = getArgValue('--out') || getArgValue('-o') || 'paillier-keys.json';
+    const keys = core.PaillierCryptosystem.generateKeyPair(bits);
+    safeWriteFileSync(outFile, JSON.stringify(keys, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m Paillier ${bits}-bit Homomorphic KeyPair generated and saved to \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'confidential-encrypt') {
+    const claimKey = getArgValue('--claim') || getArgValue('--key') || getArgValue('-c');
+    const value = parseInt(getArgValue('--value') || getArgValue('--val') || getArgValue('-v'), 10);
+    const keyFile = getArgValue('--pub') || getArgValue('--key') || getArgValue('-k');
+    const outFile = getArgValue('--out') || getArgValue('-o') || 'encrypted-claim.json';
+
+    if (!claimKey || isNaN(value) || !keyFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --claim/--key <key>, --value/--val <num>, or --pub/--key <file.json>');
+      process.exit(1);
+    }
+
+    const keyData = JSON.parse(fs.readFileSync(keyFile, 'utf-8'));
+    const pubKey = keyData.publicKey || keyData;
+    const encrypted = core.ConfidentialClaimsEngine.encryptClaim(claimKey, value, pubKey);
+    safeWriteFileSync(outFile, JSON.stringify(encrypted, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m Homomorphic claim "${claimKey}" encrypted to \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'confidential-sum') {
+    const inputsStr = getArgValue('--inputs') || getArgValue('-i');
+    const keyFile = getArgValue('--pub') || getArgValue('--key') || getArgValue('-k');
+    const outFile = getArgValue('--out') || getArgValue('-o') || 'sum-result.json';
+
+    if (!inputsStr || !keyFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --inputs <c1.json,c2.json> or --pub/--key <key.json>');
+      process.exit(1);
+    }
+
+    const files = inputsStr.split(',').map(f => f.trim());
+    const ciphertexts = files.map(f => {
+      const parsed = JSON.parse(fs.readFileSync(f, 'utf-8'));
+      return parsed.ciphertextHex || parsed;
+    });
+
+    const keyData = JSON.parse(fs.readFileSync(keyFile, 'utf-8'));
+    const pubKey = keyData.publicKey || keyData;
+    const result = core.ConfidentialClaimsEngine.homomorphicSum(ciphertexts, pubKey);
+    safeWriteFileSync(outFile, JSON.stringify(result, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m Homomorphic addition computed over ${files.length} claims -> \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'confidential-threshold' || command === 'confidential-threshold-prove') {
+    const claimKey = getArgValue('--claim') || getArgValue('--key') || getArgValue('-c');
+    const val = parseInt(getArgValue('--value') || getArgValue('--val') || getArgValue('-v'), 10);
+    const threshold = parseInt(getArgValue('--threshold') || getArgValue('-t'), 10);
+    const op = getArgValue('--op') || 'gte';
+    const keyFile = getArgValue('--pub') || getArgValue('--key') || getArgValue('-k');
+    const outFile = getArgValue('--out') || getArgValue('-o') || 'threshold-proof.json';
+
+    if (!claimKey || isNaN(val) || isNaN(threshold) || !keyFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --claim <name>, --value <num>, --threshold <num>, or --pub/--key <keyfile>');
+      process.exit(1);
+    }
+
+    const keyData = JSON.parse(fs.readFileSync(keyFile, 'utf-8'));
+    const pubKey = keyData.publicKey || keyData;
+    const proof = core.ConfidentialClaimsEngine.proveThreshold(claimKey, val, threshold, op, pubKey);
+    safeWriteFileSync(outFile, JSON.stringify(proof, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m Confidential Threshold Proof generated -> \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'confidential-verify-threshold' || command === 'confidential-threshold-verify') {
+    const proofFile = getArgValue('--proof') || getArgValue('-p');
+    if (!proofFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --proof <proof.json>');
+      process.exit(1);
+    }
+    const proof = JSON.parse(fs.readFileSync(proofFile, 'utf-8'));
+    const valid = core.ConfidentialClaimsEngine.verifyThresholdProof(proof);
+    if (valid) {
+      console.log(`\x1b[32m✔\x1b[0m Confidential Threshold Proof is \x1b[1m\x1b[32mVALID\x1b[0m (Claim: ${proof.claimKey} ${proof.operator} ${proof.threshold})`);
+    } else {
+      console.log(`\x1b[31m✖\x1b[0m Confidential Threshold Proof \x1b[1m\x1b[31mFAILED\x1b[0m`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // ==========================================
+  // v6.0.0 W3C URDNA2015 JSON-LD CLI Handlers
+  // ==========================================
+  if (command === 'jsonld-canonicalize') {
+    const docFile = getArgValue('--doc') || getArgValue('--in') || getArgValue('-d') || getArgValue('-i');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+    if (!docFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --doc or --in <doc.json>');
+      process.exit(1);
+    }
+    const doc = JSON.parse(fs.readFileSync(docFile, 'utf-8'));
+    const canonical = core.JsonLdCanonicalizationEngine.canonicalize(doc);
+    const digest = core.JsonLdCanonicalizationEngine.digest(doc);
+    if (outFile) {
+      safeWriteFileSync(outFile, canonical);
+      console.log(`\x1b[32m✔\x1b[0m Canonical N-Quads saved to \x1b[1m${outFile}\x1b[0m (Digest: ${digest})`);
+    } else {
+      console.log(`\x1b[32m✔\x1b[0m Dataset Digest (SHA-256): \x1b[1m${digest}\x1b[0m\n${canonical}`);
+    }
+    return;
+  }
+
+  if (command === 'jsonld-sign') {
+    const docFile = getArgValue('--doc') || getArgValue('--in') || getArgValue('-d') || getArgValue('-i');
+    const keyFile = getArgValue('--key') || getArgValue('-k');
+    const outFile = getArgValue('--out') || getArgValue('-o') || 'signed-jsonld.json';
+    if (!docFile || !keyFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --doc/--in <doc.json> or --key <key.json>');
+      process.exit(1);
+    }
+    const doc = JSON.parse(fs.readFileSync(docFile, 'utf-8'));
+    const keyPair = JSON.parse(fs.readFileSync(keyFile, 'utf-8'));
+    const signed = core.JsonLdCanonicalizationEngine.signJsonLd(doc, keyPair);
+    safeWriteFileSync(outFile, JSON.stringify(signed, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m Linked Data Document signed and saved to \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'jsonld-verify') {
+    const docFile = getArgValue('--doc') || getArgValue('--in') || getArgValue('-d') || getArgValue('-i');
+    const pubKeyHex = getArgValue('--pub') || getArgValue('-p');
+    if (!docFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --doc/--in <signed-doc.json>');
+      process.exit(1);
+    }
+    const doc = JSON.parse(fs.readFileSync(docFile, 'utf-8'));
+    const result = core.JsonLdCanonicalizationEngine.verifyJsonLd(doc, pubKeyHex);
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m JSON-LD Linked Data Signature is \x1b[1m\x1b[32mVALID\x1b[0m`);
+      console.log(`  Canonical Digest: ${result.canonicalRdfDigest}`);
+      console.log(`  Quad Count: ${result.quadCount}`);
+      console.log(`  Verification Method: ${result.verificationMethod}`);
+    } else {
+      console.log(`\x1b[31m✖\x1b[0m JSON-LD Signature \x1b[1m\x1b[31mFAILED\x1b[0m: ${result.errors.join(', ')}`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // ==========================================
+  // v6.0.0 Hierarchical Verifiable Trust Chains
+  // ==========================================
+  if (command === 'trustchain-issue' || command === 'trustchain-create-token') {
+    const keyFile = getArgValue('--delegator-key') || getArgValue('--key') || getArgValue('-k');
+    const delegateDid = getArgValue('--delegate') || getArgValue('-d');
+    const typesStr = getArgValue('--types') || getArgValue('-t') || '*';
+    const depth = parseInt(getArgValue('--depth') || '2', 10);
+    const outFile = getArgValue('--out') || getArgValue('-o') || 'delegation-token.json';
+
+    if (!keyFile || !delegateDid) {
+      console.error('\x1b[31mError:\x1b[0m Missing --delegator-key/--key <key.json> or --delegate <did>');
+      process.exit(1);
+    }
+
+    const delegatorKeyPair = JSON.parse(fs.readFileSync(keyFile, 'utf-8'));
+    const allowedCredentialTypes = typesStr.split(',').map(t => t.trim());
+    const token = core.TrustChainEngine.createDelegationToken({
+      delegatorKeyPair,
+      delegateDid,
+      allowedCredentialTypes,
+      maxDepth: depth
+    });
+    safeWriteFileSync(outFile, JSON.stringify(token, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m Delegation Token created and saved to \x1b[1m${outFile}\x1b[0m (Delegate: ${delegateDid})`);
+    return;
+  }
+
+  if (command === 'trustchain-verify-token') {
+    const tokenFile = getArgValue('--token') || getArgValue('-t');
+    const pubHex = getArgValue('--pub') || getArgValue('-p');
+    if (!tokenFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --token <token.json>');
+      process.exit(1);
+    }
+    const token = JSON.parse(fs.readFileSync(tokenFile, 'utf-8'));
+    const valid = core.TrustChainEngine.verifyDelegationToken(token, pubHex);
+    if (valid) {
+      console.log(`\x1b[32m✔\x1b[0m Delegation Token is \x1b[1m\x1b[32mVALID\x1b[0m`);
+    } else {
+      console.log(`\x1b[31m✖\x1b[0m Delegation Token is \x1b[1m\x1b[31mINVALID\x1b[0m`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  if (command === 'trustchain-verify' || command === 'trustchain-verify-chain') {
+    const chainStr = getArgValue('--chain') || getArgValue('--tokens');
+    const vcFile = getArgValue('--vc');
+    const rootsStr = getArgValue('--root-dids') || getArgValue('--root');
+    const leafIssuer = getArgValue('--issuer');
+
+    if (!chainStr) {
+      console.error('\x1b[31mError:\x1b[0m Missing --chain/--tokens <t1.json,t2.json>');
+      process.exit(1);
+    }
+
+    const tokenFiles = chainStr.split(',').map(f => f.trim());
+    const chain = tokenFiles.map(f => JSON.parse(fs.readFileSync(f, 'utf-8')));
+    const credential = vcFile ? JSON.parse(fs.readFileSync(vcFile, 'utf-8')) : undefined;
+    const accreditedRootDids = rootsStr ? rootsStr.split(',').map(d => d.trim()) : [];
+
+    const result = core.TrustChainEngine.verifyTrustChain({
+      chain,
+      credential,
+      accreditedRootDids,
+      leafIssuerDid: leafIssuer
+    });
+
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m Trust Chain Verification \x1b[1m\x1b[32mPASSED\x1b[0m (Chain is VALID)`);
+      console.log(`  Root Authority: ${result.rootAuthorityDid}`);
+      console.log(`  Leaf Issuer: ${result.leafIssuerDid}`);
+      console.log(`  Chain Depth: ${result.chainDepth}`);
+      console.log(`  Tokens Verified: ${result.tokensVerified}`);
+    } else {
+      console.log(`\x1b[31m✖\x1b[0m Trust Chain Verification \x1b[1m\x1b[31mFAILED\x1b[0m: ${result.errors.join(', ')}`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // ==========================================
+  // v6.0.0 Post-Quantum Dual Hybrid KEM Armor
+  // ==========================================
+  if (command === 'quantum-armor-keygen') {
+    const outFile = getArgValue('--out') || getArgValue('-o') || 'dual-kem-keys.json';
+    const keys = core.DualHybridKEMEngine.generateDualKeyPair();
+    safeWriteFileSync(outFile, JSON.stringify(keys, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m Dual Hybrid KEM KeyPair generated and saved to \x1b[1m${outFile}\x1b[0m (DID: ${keys.hybridPublicKey.did})`);
+    return;
+  }
+
+  if (command === 'quantum-armor-seal') {
+    const docFile = getArgValue('--doc') || getArgValue('--in') || getArgValue('-d') || getArgValue('-i');
+    const pubFile = getArgValue('--pub') || getArgValue('--key') || getArgValue('-p') || getArgValue('-k');
+    const outFile = getArgValue('--out') || getArgValue('-o') || 'quantum-envelope.json';
+
+    if (!docFile || !pubFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --doc/--in <vc.json> or --pub/--key <dual-keys.json>');
+      process.exit(1);
+    }
+
+    const payload = JSON.parse(fs.readFileSync(docFile, 'utf-8'));
+    const pubData = JSON.parse(fs.readFileSync(pubFile, 'utf-8'));
+    const recipientPub = pubData.hybridPublicKey || pubData;
+
+    const envelope = core.DualHybridKEMEngine.sealCredential(payload, recipientPub);
+    safeWriteFileSync(outFile, JSON.stringify(envelope, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m Quantum-Sealed Envelope created and saved to \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'quantum-armor-unseal') {
+    const envFile = getArgValue('--envelope') || getArgValue('--in') || getArgValue('-e') || getArgValue('-i');
+    const privFile = getArgValue('--priv') || getArgValue('--key') || getArgValue('-k');
+    const outFile = getArgValue('--out') || getArgValue('-o') || 'unsealed-vc.json';
+
+    if (!envFile || !privFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --envelope/--in <envelope.json> or --priv/--key <dual-keys.json>');
+      process.exit(1);
+    }
+
+    const envelope = JSON.parse(fs.readFileSync(envFile, 'utf-8'));
+    const privData = JSON.parse(fs.readFileSync(privFile, 'utf-8'));
+    const recipientPriv = privData.hybridSecretKey || privData;
+
+    const unsealed = core.DualHybridKEMEngine.unsealCredential(envelope, recipientPriv);
+    safeWriteFileSync(outFile, JSON.stringify(unsealed, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m Envelope unsealed successfully and saved to \x1b[1m${outFile}\x1b[0m`);
     return;
   }
 

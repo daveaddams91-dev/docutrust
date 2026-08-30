@@ -86,21 +86,23 @@ curl -X POST https://api.docutrust.org/api/v1/credentials/verify \\
   -H "Content-Type: application/json" \\
   -d '{"credential": { ... }}'`,
 
-    cli: `# 1. AnonCreds 2.0 Blind Request & Blind Issuance
-$ docutrust anoncreds-blind-request --schema "schema:degree" --out req.json
-$ docutrust anoncreds-blind-issue --req req.json --claims claims.json --key keys.json
+    cli: `# 1. Confidential Paillier KeyGen & Homomorphic Arithmetic
+$ docutrust confidential-keygen --out paillier.json
+$ docutrust confidential-encrypt --key paillier.json --claim "salary" --val 125000 --out enc1.json
+$ docutrust confidential-sum --key paillier.json --ciphertexts "enc1.json,enc2.json" --out sum.json
 
-# 2. FROST Distributed Key Generation (2-of-3)
-$ docutrust dkg-setup --nodes 3 --threshold 2 --out ceremony.json
-$ docutrust dkg-sign-share --index 1 --share "a3f..." --msg "Block 89" --out s1.json
-$ docutrust dkg-aggregate --pub "04e..." --threshold 2 --shares "s1.json,s2.json"
+# 2. W3C URDNA2015 RDF Dataset Canonicalization & JSON-LD Signatures
+$ docutrust jsonld-canonicalize --doc credential.jsonld
+$ docutrust jsonld-sign --doc credential.jsonld --key issuer_key.json --out signed.jsonld
 
-# 3. Export Solidity On-Chain Verifier Smart Contract
-$ docutrust solidity-export-verifier --name DocuTrustVerifier --out DocuTrustVerifier.sol
+# 3. Hierarchical Trust Chain Issue & Path Verification
+$ docutrust trustchain-issue --issuer "did:key:z6MkuRoot" --delegatee "did:key:z6MkuBoard" --out token1.json
+$ docutrust trustchain-verify --chain "token1.json,token2.json" --cred signed.jsonld --roots "did:key:z6MkuRoot"
 
-# 4. Generate Signed Cryptographic Audit Bundle
-$ docutrust audit-bundle-create --org "Global Trust Foundation" --key keys.json --out audit.dtbundle
-$ docutrust audit-bundle-verify --bundle audit.dtbundle`
+# 4. Post-Quantum Dual Hybrid KEM (NIST FIPS 203 ML-KEM-768 Kyber)
+$ docutrust quantum-armor-keygen --out kem_keys.json
+$ docutrust quantum-armor-seal --key kem_keys.json --payload sensitive_vc.json --out sealed.envelope
+$ docutrust quantum-armor-unseal --key kem_keys.json --envelope sealed.envelope`
   };
 
   const copyCode = () => {
@@ -115,13 +117,13 @@ $ docutrust audit-bundle-verify --bundle audit.dtbundle`
       <div className="mb-10">
         <div className="flex items-center gap-2 text-xs font-mono text-blue-400 mb-2 uppercase tracking-widest">
           <Terminal className="w-3.5 h-3.5" />
-          <span>Developer SDKs & OpenAPI Specification (v5.0.0)</span>
+          <span>Developer SDKs & OpenAPI Specification (v6.0.0)</span>
         </div>
         <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
           Developer Hub & Quickstart
         </h2>
         <p className="text-sm text-gray-400 mt-2">
-          Integrate programmatic credential issuance, AnonCreds 2.0 blind requests, FROST DKG signing, and on-chain Solidity verifiers directly into your stack.
+          Integrate programmatic confidential homomorphic arithmetic, W3C URDNA2015 JSON-LD signatures, hierarchical trust chains, and post-quantum dual hybrid KEM armor directly into your stack.
         </p>
       </div>
 

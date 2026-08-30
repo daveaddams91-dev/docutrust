@@ -75,7 +75,12 @@ const {
   AnonCredsEngine,
   DKGEngine,
   SolidityEngine,
-  AuditBundleEngine
+  AuditBundleEngine,
+  PaillierCryptosystem,
+  ConfidentialClaimsEngine,
+  JsonLdCanonicalizationEngine,
+  TrustChainEngine,
+  DualHybridKEMEngine
 } = require('@docutrust/core');
 
 const PORT = process.env.PORT || 4000;
@@ -1727,6 +1732,206 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // 51. Confidential Homomorphic Computing Endpoints
+    if ((pathname === '/api/v1/confidential/keys/generate' || pathname === '/api/v1/confidential/keygen') && (req.method === 'GET' || req.method === 'POST')) {
+      const body = req.method === 'POST' ? await readJsonBody() : {};
+      const bitLength = body.bitLength || 512;
+      const keys = PaillierCryptosystem.generateKeyPair(bitLength);
+      return jsonResponse(200, { success: true, keys, ...keys });
+    }
+
+    if (pathname === '/api/v1/confidential/encrypt' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { claimKey, value, publicKey } = body;
+      if (!claimKey || value === undefined || !publicKey) {
+        return jsonResponse(400, { error: 'Missing claimKey, value, or publicKey.' });
+      }
+      try {
+        const encrypted = ConfidentialClaimsEngine.encryptClaim(claimKey, value, publicKey);
+        return jsonResponse(200, { success: true, encryptedClaim: encrypted, ...encrypted });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if ((pathname === '/api/v1/confidential/compute/sum' || pathname === '/api/v1/confidential/sum') && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { ciphertexts, publicKey } = body;
+      if (!ciphertexts || !publicKey) {
+        return jsonResponse(400, { error: 'Missing ciphertexts array or publicKey.' });
+      }
+      try {
+        const result = ConfidentialClaimsEngine.homomorphicSum(ciphertexts, publicKey);
+        return jsonResponse(200, { success: true, result, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if ((pathname === '/api/v1/confidential/proof/threshold' || pathname === '/api/v1/confidential/threshold-prove') && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { claimKey, actualValue, threshold, operator, publicKey } = body;
+      if (!claimKey || actualValue === undefined || threshold === undefined || !operator || !publicKey) {
+        return jsonResponse(400, { error: 'Missing claimKey, actualValue, threshold, operator, or publicKey.' });
+      }
+      try {
+        const proof = ConfidentialClaimsEngine.proveThreshold(claimKey, actualValue, threshold, operator, publicKey);
+        return jsonResponse(200, { success: true, proof, ...proof });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if ((pathname === '/api/v1/confidential/verify/threshold' || pathname === '/api/v1/confidential/threshold-verify') && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { proof } = body;
+      if (!proof) {
+        return jsonResponse(400, { error: 'Missing proof payload.' });
+      }
+      try {
+        const valid = ConfidentialClaimsEngine.verifyThresholdProof(proof);
+        return jsonResponse(200, { success: true, valid });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // 52. W3C URDNA2015 JSON-LD Linked Data Endpoints
+    if (pathname === '/api/v1/jsonld/canonicalize' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const doc = body.document || body.doc;
+      if (!doc) {
+        return jsonResponse(400, { error: 'Missing document or doc payload.' });
+      }
+      try {
+        const canonical = JsonLdCanonicalizationEngine.canonicalize(doc);
+        const digest = JsonLdCanonicalizationEngine.digest(doc);
+        return jsonResponse(200, { success: true, canonicalNQuads: canonical, datasetDigestHex: digest, digest });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/jsonld/sign' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const doc = body.document || body.doc;
+      const { keyPair, options } = body;
+      if (!doc || !keyPair) {
+        return jsonResponse(400, { error: 'Missing document/doc or keyPair.' });
+      }
+      try {
+        const signed = JsonLdCanonicalizationEngine.signJsonLd(doc, keyPair, options);
+        return jsonResponse(200, { success: true, signedDoc: signed, document: signed });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/jsonld/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const doc = body.document || body.signedDoc || body.doc;
+      const { expectedPublicKeyHex } = body;
+      if (!doc) {
+        return jsonResponse(400, { error: 'Missing document payload.' });
+      }
+      try {
+        const result = JsonLdCanonicalizationEngine.verifyJsonLd(doc, expectedPublicKeyHex);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // 53. Hierarchical Verifiable Trust Chain Endpoints
+    if (pathname === '/api/v1/trustchain/token/create' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { delegatorKeyPair, delegateDid, allowedCredentialTypes, maxDepth, validFrom, validUntil } = body;
+      if (!delegatorKeyPair || !delegateDid) {
+        return jsonResponse(400, { error: 'Missing delegatorKeyPair or delegateDid.' });
+      }
+      try {
+        const token = TrustChainEngine.createDelegationToken({
+          delegatorKeyPair,
+          delegateDid,
+          allowedCredentialTypes,
+          maxDepth,
+          validFrom,
+          validUntil
+        });
+        return jsonResponse(200, { success: true, token, delegationToken: token });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/trustchain/token/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { token, delegationToken, expectedDelegatorPublicKeyHex } = body;
+      const tok = token || delegationToken;
+      if (!tok) {
+        return jsonResponse(400, { error: 'Missing token in request.' });
+      }
+      try {
+        const valid = TrustChainEngine.verifyDelegationToken(tok, expectedDelegatorPublicKeyHex);
+        return jsonResponse(200, { success: true, valid });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if ((pathname === '/api/v1/trustchain/verify' || pathname === '/api/v1/trustchain/verify-path') && req.method === 'POST') {
+      const body = await readJsonBody();
+      const chain = body.chain || body.delegationTokens;
+      if (!chain || !Array.isArray(chain)) {
+        return jsonResponse(400, { error: 'Missing chain or delegationTokens.' });
+      }
+      try {
+        const result = TrustChainEngine.verifyTrustChain(body);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // 54. Post-Quantum Dual Hybrid KEM Armor Endpoints
+    if ((pathname === '/api/v1/quantum-armor/keys/generate' || pathname === '/api/v1/quantum-armor/keygen') && (req.method === 'GET' || req.method === 'POST')) {
+      try {
+        const keys = DualHybridKEMEngine.generateDualKeyPair();
+        return jsonResponse(200, { success: true, keys, ...keys });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/quantum-armor/seal' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { payload, recipientHybridPub } = body;
+      if (!payload || !recipientHybridPub) {
+        return jsonResponse(400, { error: 'Missing payload or recipientHybridPub.' });
+      }
+      try {
+        const envelope = DualHybridKEMEngine.sealCredential(payload, recipientHybridPub);
+        return jsonResponse(200, { success: true, envelope });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/quantum-armor/unseal' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { envelope, recipientHybridPriv, recipientHybridKeys } = body;
+      const priv = recipientHybridPriv || recipientHybridKeys;
+      if (!envelope || !priv) {
+        return jsonResponse(400, { error: 'Missing envelope or recipientHybridPriv/recipientHybridKeys.' });
+      }
+      try {
+        const payload = DualHybridKEMEngine.unsealCredential(envelope, priv);
+        return jsonResponse(200, { success: true, payload });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
     // Default 404
     jsonResponse(404, { error: 'Route not found' });
   } catch (err) {
@@ -1736,7 +1941,7 @@ const server = http.createServer(async (req, res) => {
 
 if (require.main === module) {
   server.listen(PORT, () => {
-    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v5.0.0 running on http://localhost:${PORT}`);
+    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v6.0.0 running on http://localhost:${PORT}`);
   });
 }
 

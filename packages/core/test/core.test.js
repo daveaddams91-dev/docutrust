@@ -131,7 +131,14 @@ const {
   // Solidity EVM Engine
   SolidityEngine,
   // Audit Bundle Engine
-  AuditBundleEngine
+  AuditBundleEngine,
+  // v6.0.0 Modules
+  PaillierCryptosystem,
+  ConfidentialClaimsEngine,
+  JsonLdCanonicalizationEngine,
+  JsonLdSignaturesEngine,
+  TrustChainEngine,
+  DualHybridKEMEngine
 } = require('../dist/index.js');
 
 // 1. Cryptography Tests
@@ -1947,9 +1954,219 @@ test('54. W3C DataIntegrityProof: Issuance with eddsa-jcs-2022 & ml-dsa-65-2026 
   assert.equal(auditPqc.isQuantumSafe, true);
 });
 
+// 51. Paillier Homomorphic Cryptosystem Engine
+test('51. Confidential: Paillier Cryptosystem encryption, decryption, and homomorphic addition', () => {
+  const keys = PaillierCryptosystem.generateKeyPair(128);
+  assert.ok(keys.publicKey.n);
+  assert.ok(keys.lambda);
 
+  const m1 = 1500n;
+  const m2 = 3500n;
 
+  const c1 = PaillierCryptosystem.encrypt(m1, keys.publicKey);
+  const c2 = PaillierCryptosystem.encrypt(m2, keys.publicKey);
 
+  const decrypted1 = PaillierCryptosystem.decrypt(c1, keys);
+  assert.equal(decrypted1, m1);
 
+  // Homomorphic addition: cSum = (c1 * c2) mod n^2
+  const cSum = PaillierCryptosystem.add(c1, c2, keys.publicKey);
+  const decryptedSum = PaillierCryptosystem.decrypt(cSum, keys);
+  assert.equal(decryptedSum, 5000n);
 
+  // Scalar multiplication: cMul = (c1 ^ 3) mod n^2
+  const cMul = PaillierCryptosystem.multiplyScalar(c1, 3n, keys.publicKey);
+  const decryptedMul = PaillierCryptosystem.decrypt(cMul, keys);
+  assert.equal(decryptedMul, 4500n);
+});
 
+// 52. Confidential Claims & ZK Threshold Proofs
+test('52. Confidential: Encrypted claims, homomorphic batch summation, and ZK range threshold proofs', () => {
+  const keys = PaillierCryptosystem.generateKeyPair(128);
+
+  const encSalary = ConfidentialClaimsEngine.encryptClaim('salary', 120000, keys.publicKey);
+  const encBonus = ConfidentialClaimsEngine.encryptClaim('bonus', 30000, keys.publicKey);
+
+  assert.equal(encSalary.claimKey, 'salary');
+  assert.equal(encSalary.algorithm, 'PaillierHomomorphic2026');
+
+  const decSalary = PaillierCryptosystem.decrypt(encSalary.ciphertextHex, keys);
+  assert.equal(decSalary, 120000n);
+
+  // Homomorphic sum of claims
+  const sumClaim = ConfidentialClaimsEngine.homomorphicSum([encSalary.ciphertextHex, encBonus.ciphertextHex], keys.publicKey);
+  const decSum = PaillierCryptosystem.decrypt(sumClaim.resultCiphertextHex, keys);
+  assert.equal(decSum, 150000n);
+
+  // ZK Threshold Proof: Prove salary >= 100,000 without revealing salary
+  const proof = ConfidentialClaimsEngine.proveThreshold('salary', 120000, 100000, 'gte', keys.publicKey);
+  assert.equal(proof.isSatisfied, true);
+  assert.equal(proof.operator, 'gte');
+
+  const isProofValid = ConfidentialClaimsEngine.verifyThresholdProof(proof);
+  assert.equal(isProofValid, true);
+
+  // Negative test: Invalid threshold
+  const failProof = ConfidentialClaimsEngine.proveThreshold('salary', 120000, 200000, 'gte', keys.publicKey);
+  assert.equal(failProof.isSatisfied, false);
+});
+
+// 53. W3C URDNA2015 JSON-LD RDF Canonicalization
+test('53. JSON-LD: W3C URDNA2015 deterministic N-Quads conversion and dataset digest calculation', () => {
+  const doc = {
+    "@context": ["https://www.w3.org/2018/credentials/v1"],
+    "id": "urn:uuid:credential-alpha-01",
+    "type": ["VerifiableCredential", "IdentityCredential"],
+    "issuer": "did:key:z6Mku7V2K3pB58X9zW",
+    "credentialSubject": {
+      "id": "did:key:z6MkpTHR8VNsBxYAAWH",
+      "name": "Alice Developer",
+      "country": "Switzerland"
+    }
+  };
+
+  const canonicalNQuads = JsonLdCanonicalizationEngine.canonicalize(doc);
+  assert.ok(canonicalNQuads.includes('Alice Developer'));
+  
+  const digest = JsonLdCanonicalizationEngine.digest(doc);
+  assert.equal(digest.length, 64);
+
+  // Re-ordering JSON keys must result in the exact same canonical output and digest
+  const reorderedDoc = {
+    "issuer": "did:key:z6Mku7V2K3pB58X9zW",
+    "type": ["VerifiableCredential", "IdentityCredential"],
+    "credentialSubject": {
+      "country": "Switzerland",
+      "name": "Alice Developer",
+      "id": "did:key:z6MkpTHR8VNsBxYAAWH"
+    },
+    "id": "urn:uuid:credential-alpha-01",
+    "@context": ["https://www.w3.org/2018/credentials/v1"]
+  };
+
+  const canonical2 = JsonLdCanonicalizationEngine.canonicalize(reorderedDoc);
+  assert.equal(canonical2, canonicalNQuads);
+  assert.equal(JsonLdCanonicalizationEngine.digest(reorderedDoc), digest);
+});
+
+// 54. W3C Linked Data Signatures 2020 Suite
+test('54. JSON-LD: Linked Data Signature creation and tamper-evident verification', () => {
+  const issuerKp = generateKeyPair();
+  const doc = {
+    "@context": ["https://www.w3.org/2018/credentials/v1"],
+    "id": "urn:uuid:doc-signed-001",
+    "type": ["VerifiableCredential", "MembershipCredential"],
+    "issuer": issuerKp.did,
+    "credentialSubject": {
+      "id": "did:key:z6MkpTHR8VNsBxYAAWH",
+      "membershipLevel": "DiamondTier"
+    }
+  };
+
+  const signed = JsonLdCanonicalizationEngine.signJsonLd(doc, issuerKp, { type: 'JsonLdSignature2020' });
+  assert.ok(signed.proof);
+  assert.equal(signed.proof.type, 'JsonLdSignature2020');
+  assert.ok(signed.proof.proofValue);
+
+  const verification = JsonLdCanonicalizationEngine.verifyJsonLd(signed, issuerKp.publicKeyHex);
+  assert.equal(verification.valid, true);
+
+  // Tamper detection: modifying a property should invalidate the signature
+  const tampered = JSON.parse(JSON.stringify(signed));
+  tampered.credentialSubject.membershipLevel = 'BronzeTier';
+  const tamperedVerification = JsonLdCanonicalizationEngine.verifyJsonLd(tampered, issuerKp.publicKeyHex);
+  assert.equal(tamperedVerification.valid, false);
+});
+
+// 55. Hierarchical Verifiable Trust Chains & Delegation Proofs
+test('55. TrustChain: Multi-hop delegation tokens, depth constraints, and trust path validation', () => {
+  const rootKp = generateKeyPair();
+  const registrarKp = generateKeyPair();
+  const deptKp = generateKeyPair();
+
+  // Root accredits Registrar
+  const token1 = TrustChainEngine.createDelegationToken({
+    delegatorKeyPair: rootKp,
+    delegateDid: registrarKp.did,
+    maxDepth: 2,
+    allowedCredentialTypes: ['UniversityDegreeCredential', 'DoctoralDiploma']
+  });
+
+  assert.equal(token1.delegatorDid, rootKp.did);
+  assert.equal(token1.delegateDid, registrarKp.did);
+  assert.equal(token1.constraints.maxDepth, 2);
+
+  // Registrar delegates to Department
+  const token2 = TrustChainEngine.createDelegationToken({
+    delegatorKeyPair: registrarKp,
+    delegateDid: deptKp.did,
+    maxDepth: 1,
+    allowedCredentialTypes: ['UniversityDegreeCredential']
+  });
+
+  // Department issues final leaf credential
+  const leafVc = VerifiableCredentialsEngine.issue({
+    type: ['UniversityDegreeCredential'],
+    issuer: { id: deptKp.did, name: 'Physics Department' },
+    credentialSubject: { student: 'Alice', degree: 'B.Sc. Quantum Computing' },
+    keyPair: deptKp
+  }).credential;
+
+  // Verify valid chain from Root -> Registrar -> Dept
+  const chainResult = TrustChainEngine.verifyTrustChain({
+    delegationTokens: [token1, token2],
+    rootAuthorityDid: rootKp.did,
+    leafIssuerDid: deptKp.did,
+    targetCredentialType: 'UniversityDegreeCredential',
+    maxAllowedDepth: 3
+  });
+
+  assert.equal(chainResult.valid, true);
+  assert.equal(chainResult.rootAuthorityDid, rootKp.did);
+  assert.equal(chainResult.leafIssuerDid, deptKp.did);
+  assert.equal(chainResult.chainDepth, 2);
+
+  // Test failure on mismatched root
+  const fakeRootKp = generateKeyPair();
+  const unaccreditedResult = TrustChainEngine.verifyTrustChain({
+    delegationTokens: [token1, token2],
+    rootAuthorityDid: fakeRootKp.did,
+    leafIssuerDid: deptKp.did,
+    targetCredentialType: 'UniversityDegreeCredential',
+    maxAllowedDepth: 3
+  });
+  assert.equal(unaccreditedResult.valid, false);
+});
+
+// 56. Post-Quantum Dual Hybrid KEM Armor Engine
+test('56. Quantum Armor: Dual Hybrid KEM (Classical + ML-KEM-768 Kyber) sealing and unsealing', () => {
+  const recipientKeys = DualHybridKEMEngine.generateDualKeyPair();
+  assert.ok(recipientKeys.classicalPublicKeyHex);
+  assert.ok(recipientKeys.pqcPublicKeyHex);
+
+  const payload = {
+    secretMission: 'Operation Quantum Shield',
+    classification: 'TOP SECRET',
+    coordinates: { lat: 46.2044, lng: 6.1432 }
+  };
+
+  const envelope = DualHybridKEMEngine.sealCredential(payload, recipientKeys.hybridPublicKey);
+  assert.equal(envelope.type, 'DocuTrustQuantumSealedEnvelope2026');
+  assert.equal(envelope.ciphertextBundle.algorithm, 'X25519-ML-KEM-768-HKDF-SHA512');
+  assert.ok(envelope.ciphertextBundle.classicalEphemeralPub);
+  assert.ok(envelope.ciphertextBundle.pqcEncapsulation.ciphertext);
+
+  // Decapsulate & Decrypt
+  const unsealed = DualHybridKEMEngine.unsealCredential(envelope, recipientKeys.hybridSecretKey);
+  assert.deepEqual(unsealed, payload);
+
+  // Tamper detection: modifying ciphertext must fail GCM auth tag check
+  const tamperedEnvelope = JSON.parse(JSON.stringify(envelope));
+  const ctBytes = Buffer.from(tamperedEnvelope.encryptedPayload.ciphertext, 'hex');
+  ctBytes[0] ^= 0xff;
+  tamperedEnvelope.encryptedPayload.ciphertext = ctBytes.toString('hex');
+
+  assert.throws(() => {
+    DualHybridKEMEngine.unsealCredential(tamperedEnvelope, recipientKeys.hybridSecretKey);
+  });
+});

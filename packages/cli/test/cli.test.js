@@ -565,6 +565,104 @@ test('CLI Suite', async (t) => {
     const verifyOut = execSync(`node "${cliPath}" dataintegrity-verify --vc "${diVcFile}"`).toString();
     assert.ok(verifyOut.includes('VALID'));
   });
+
+  const confKeyFile = path.join(tempDir, 'conf-key.json');
+  const confClaimFile = path.join(tempDir, 'conf-claim.json');
+  const confProofFile = path.join(tempDir, 'conf-proof.json');
+  await t.test('36. docutrust confidential commands (keygen, encrypt, sum, threshold-prove, threshold-verify)', () => {
+    // 1. Keygen
+    const keygenOut = execSync(`node "${cliPath}" confidential-keygen --bits 128 --out "${confKeyFile}"`).toString();
+    assert.ok(keygenOut.includes('Paillier') && keygenOut.includes('Homomorphic KeyPair'));
+    assert.ok(fs.existsSync(confKeyFile));
+
+    // 2. Encrypt
+    const encOut = execSync(`node "${cliPath}" confidential-encrypt --key salary --val 125000 --pub "${confKeyFile}" --out "${confClaimFile}"`).toString();
+    assert.ok(encOut.includes('Homomorphic claim'));
+    assert.ok(fs.existsSync(confClaimFile));
+
+    // 3. Prove Threshold
+    const proveOut = execSync(`node "${cliPath}" confidential-threshold-prove --key salary --val 125000 --threshold 100000 --op gte --pub "${confKeyFile}" --out "${confProofFile}"`).toString();
+    assert.ok(proveOut.includes('Proof generated'));
+    assert.ok(fs.existsSync(confProofFile));
+
+    // 4. Verify Threshold
+    const verifyOut = execSync(`node "${cliPath}" confidential-threshold-verify --proof "${confProofFile}"`).toString();
+    assert.ok(verifyOut.includes('VALID'));
+  });
+
+  const jsonldDocFile = path.join(tempDir, 'jsonld-doc.json');
+  const jsonldSignedFile = path.join(tempDir, 'jsonld-signed.json');
+  await t.test('37. docutrust jsonld commands (canonicalize, sign, verify)', () => {
+    fs.writeFileSync(jsonldDocFile, JSON.stringify({
+      "@context": ["https://www.w3.org/2018/credentials/v1"],
+      "id": "urn:uuid:cli-jsonld-01",
+      "type": ["VerifiableCredential"],
+      "issuer": "did:key:z6Mku7V2K3pB58X9zW",
+      "credentialSubject": { "name": "Eve Developer", "role": "Architect" }
+    }), 'utf-8');
+
+    // 1. Canonicalize
+    const canonOut = execSync(`node "${cliPath}" jsonld-canonicalize --in "${jsonldDocFile}"`).toString();
+    assert.ok(canonOut.includes('Dataset Digest (SHA-256):'));
+
+    // 2. Sign
+    const signOut = execSync(`node "${cliPath}" jsonld-sign --in "${jsonldDocFile}" --key "${keysFile}" --out "${jsonldSignedFile}"`).toString();
+    assert.ok(signOut.includes('Linked Data Document signed'));
+    assert.ok(fs.existsSync(jsonldSignedFile));
+
+    // 3. Verify
+    const keys = JSON.parse(fs.readFileSync(keysFile, 'utf-8'));
+    const verifyOut = execSync(`node "${cliPath}" jsonld-verify --in "${jsonldSignedFile}" --pub "${keys.publicKeyHex}"`).toString();
+    assert.ok(verifyOut.includes('VALID'));
+  });
+
+  const rootKeyFile = path.join(tempDir, 'root-key.json');
+  const regKeyFile = path.join(tempDir, 'reg-key.json');
+  const delTokenFile = path.join(tempDir, 'del-token.json');
+  await t.test('38. docutrust trustchain commands (create-token, verify-token, verify-chain)', () => {
+    execSync(`node "${cliPath}" keygen --out "${rootKeyFile}"`);
+    execSync(`node "${cliPath}" keygen --out "${regKeyFile}"`);
+    const regKeys = JSON.parse(fs.readFileSync(regKeyFile, 'utf-8'));
+
+    // 1. Create Delegation Token
+    const createOut = execSync(`node "${cliPath}" trustchain-create-token --key "${rootKeyFile}" --delegate "${regKeys.did}" --types "UniversityDegreeCredential,*" --depth 2 --out "${delTokenFile}"`).toString();
+    assert.ok(createOut.includes('Delegation Token created'));
+    assert.ok(fs.existsSync(delTokenFile));
+
+    // 2. Verify Delegation Token
+    const rootKeys = JSON.parse(fs.readFileSync(rootKeyFile, 'utf-8'));
+    const verifyOut = execSync(`node "${cliPath}" trustchain-verify-token --token "${delTokenFile}" --pub "${rootKeys.publicKeyHex}"`).toString();
+    assert.ok(verifyOut.includes('VALID'));
+
+    // 3. Verify Trust Chain
+    const chainOut = execSync(`node "${cliPath}" trustchain-verify-chain --tokens "${delTokenFile}" --root "${rootKeys.did}" --issuer "${regKeys.did}"`).toString();
+    assert.ok(chainOut.includes('VALID'));
+  });
+
+  const armorKeyFile = path.join(tempDir, 'armor-key.json');
+  const secretDataFile = path.join(tempDir, 'secret-data.json');
+  const sealedEnvFile = path.join(tempDir, 'sealed-env.json');
+  const unsealedFile = path.join(tempDir, 'unsealed.json');
+  await t.test('39. docutrust quantum-armor commands (keygen, seal, unseal)', () => {
+    // 1. Keygen
+    const keygenOut = execSync(`node "${cliPath}" quantum-armor-keygen --out "${armorKeyFile}"`).toString();
+    assert.ok(keygenOut.includes('Dual Hybrid KEM KeyPair generated'));
+    assert.ok(fs.existsSync(armorKeyFile));
+
+    // 2. Seal
+    fs.writeFileSync(secretDataFile, JSON.stringify({ mission: 'Artemis IV', clearance: 'L5' }), 'utf-8');
+    const sealOut = execSync(`node "${cliPath}" quantum-armor-seal --in "${secretDataFile}" --key "${armorKeyFile}" --out "${sealedEnvFile}"`).toString();
+    assert.ok(sealOut.includes('Quantum-Sealed Envelope created'));
+    assert.ok(fs.existsSync(sealedEnvFile));
+
+    // 3. Unseal
+    const unsealOut = execSync(`node "${cliPath}" quantum-armor-unseal --in "${sealedEnvFile}" --key "${armorKeyFile}" --out "${unsealedFile}"`).toString();
+    assert.ok(unsealOut.includes('Envelope unsealed'));
+    assert.ok(fs.existsSync(unsealedFile));
+
+    const unsealed = JSON.parse(fs.readFileSync(unsealedFile, 'utf-8'));
+    assert.equal(unsealed.mission, 'Artemis IV');
+  });
 });
 
 

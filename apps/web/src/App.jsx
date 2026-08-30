@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import Navbar from './components/Navbar.jsx';
 import HeroSection from './components/HeroSection.jsx';
 import IssuerStudio from './components/IssuerStudio.jsx';
@@ -21,6 +21,10 @@ import AnonCredsStudio from './components/AnonCredsStudio.jsx';
 import DKGStudio from './components/DKGStudio.jsx';
 import SmartContractStudio from './components/SmartContractStudio.jsx';
 import AuditBundleStudio from './components/AuditBundleStudio.jsx';
+import ConfidentialComputeStudio from './components/ConfidentialComputeStudio.jsx';
+import JsonLdStudio from './components/JsonLdStudio.jsx';
+import TrustChainStudio from './components/TrustChainStudio.jsx';
+import QuantumArmorStudio from './components/QuantumArmorStudio.jsx';
 import Footer from './components/Footer.jsx';
 
 export default function App() {
@@ -38,6 +42,10 @@ export default function App() {
 
       <main className="flex-1">
         {activeTab === 'hero' && <HeroSection setActiveTab={setActiveTab} />}
+        {activeTab === 'confidential' && <ConfidentialComputeStudio />}
+        {activeTab === 'jsonld' && <JsonLdStudio />}
+        {activeTab === 'trustchain' && <TrustChainStudio />}
+        {activeTab === 'quantum-armor' && <QuantumArmorStudio />}
         {activeTab === 'anoncreds' && <AnonCredsStudio />}
         {activeTab === 'dkg' && <DKGStudio />}
         {activeTab === 'solidity' && <SmartContractStudio />}

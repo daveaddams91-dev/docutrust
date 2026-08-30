@@ -2,24 +2,24 @@
 
 # 🛡️ DocuTrust
 
-### The Open-Source Sovereign Trust Fabric for Verifiable Credentials, AnonCreds 2.0 Blind Signatures, FROST Threshold DKG, Solidity On-Chain Verifiers & Cryptographic Audit Bundles
+### The Open-Source Sovereign Trust Fabric for Verifiable Credentials, Paillier Homomorphic Compute, W3C URDNA2015 JSON-LD Signatures, Hierarchical Trust Chains & Post-Quantum Dual-KEM Armor
 
-[![Version](https://img.shields.io/badge/Version-v5.0.0-cyan.svg)]()
+[![Version](https://img.shields.io/badge/Version-v6.0.0-cyan.svg)]()
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CI Status](https://img.shields.io/badge/CI-100%25%20Passing-brightgreen.svg)]()
+[![Confidential Compute](https://img.shields.io/badge/Privacy-Paillier%20Homomorphic%20%7C%20ZK%20Threshold-purple.svg)]()
+[![W3C JSON-LD](https://img.shields.io/badge/Standard-W3C%20URDNA2015%20%7C%20RDFC--1.0-emerald.svg)]()
+[![Trust Chains](https://img.shields.io/badge/Governance-Hierarchical%20Delegation%20Tokens-blue.svg)]()
+[![Quantum Armor](https://img.shields.io/badge/Post--Quantum-Dual%20Hybrid%20KEM%20(X25519%20%2B%20ML--KEM--768)-magenta.svg)]()
 [![AnonCreds 2.0](https://img.shields.io/badge/Privacy-AnonCreds%202.0%20Blind%20BBS%2B-purple.svg)]()
 [![FROST DKG](https://img.shields.io/badge/Threshold-FROST%20K--of--N%20DKG-blue.svg)]()
 [![Solidity Verifier](https://img.shields.io/badge/On--Chain-Solidity%20EVM%20Verifier-emerald.svg)]()
 [![Audit Bundles](https://img.shields.io/badge/Compliance-SOC2%20%7C%20ISO27001%20.dtbundle-teal.svg)]()
-[![Data Integrity](https://img.shields.io/badge/W3C-DataIntegrityProof%202026-indigo.svg)]()
-[![MultiSig](https://img.shields.io/badge/Governance-M--of--N%20Threshold%20Senate-blue.svg)]()
-[![Universal DID](https://img.shields.io/badge/Resolver-Universal%20W3C%20DID-indigo.svg)]()
-[![Post-Quantum](https://img.shields.io/badge/Quantum_Safe-NIST%20FIPS%20203%20%26%20204%20(ML--KEM%20%7C%20ML--DSA)-purple.svg)]()
 [![Python SDK](https://img.shields.io/badge/Python-3.8+-3776AB?logo=python&logoColor=white)]()
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)]()
 
 <p align="center">
-  <b>DocuTrust</b> enables universities, enterprises, and governments to issue tamper-proof academic degrees, employment certificates, and licenses with <b>sub-50ms instant verification</b>, <b>AnonCreds 2.0 blind issuance & unlinkable presentations</b>, <b>FROST distributed key generation (DKG)</b>, <b>EVM Solidity smart contract verifiers & Web3 ABI calldata</b>, <b>cryptographic audit bundle packaging (.dtbundle)</b>, <b>W3C DataIntegrityProof 2026 suite</b>, <b>M-of-N MultiSig threshold signatures</b>, <b>Universal W3C DID resolution</b>, <b>W3C Bitstring Status List 2024</b>, <b>DIF Presentation Exchange 2.0</b>, <b>RSA dynamic cryptographic accumulators ($O(1)$ Bezout non-membership witnesses)</b>, <b>Recursive Zero-Knowledge Predicate Graphs</b>, <b>multi-recipient General JWE encryption</b>, <b>EIP-712 Ethereum typed credential signing</b>, <b>cross-chain ledger anchoring</b>, <b>decentralized guardian social recovery & timelocked escrow</b>, <b>DIDComm v2 encrypted agent messaging</b>, <b>Merkle Mountain Range streaming logs</b>, <b>BBS+ unlinkable zero-knowledge proofs</b>, <b>RFC 3161 TSA attestation oracles</b>, <b>IETF SD-JWT mobile wallet interoperability</b>, and <b>NIST ML-KEM & ML-DSA quantum armor</b>.
+  <b>DocuTrust</b> enables universities, enterprises, and governments to issue tamper-proof academic degrees, employment certificates, and licenses with <b>sub-50ms instant verification</b>, <b>Paillier additive homomorphic confidential computation</b>, <b>W3C VC 2.0 URDNA2015 RDF dataset canonicalization & Linked Data Signatures</b>, <b>hierarchical verifiable trust chains & multi-tier delegation tokens</b>, <b>post-quantum Dual Hybrid KEM armor (X25519 + NIST ML-KEM-768)</b>, <b>AnonCreds 2.0 blind issuance & unlinkable presentations</b>, <b>FROST distributed key generation (DKG)</b>, <b>EVM Solidity smart contract verifiers & Web3 ABI calldata</b>, <b>cryptographic audit bundle packaging (.dtbundle)</b>, <b>W3C DataIntegrityProof 2026 suite</b>, <b>M-of-N MultiSig threshold signatures</b>, <b>Universal W3C DID resolution</b>, <b>W3C Bitstring Status List 2024</b>, <b>DIF Presentation Exchange 2.0</b>, <b>RSA dynamic cryptographic accumulators ($O(1)$ Bezout non-membership witnesses)</b>, <b>Recursive Zero-Knowledge Predicate Graphs</b>, <b>multi-recipient General JWE encryption</b>, <b>EIP-712 Ethereum typed credential signing</b>, <b>cross-chain ledger anchoring</b>, <b>decentralized guardian social recovery & timelocked escrow</b>, <b>DIDComm v2 encrypted agent messaging</b>, <b>Merkle Mountain Range streaming logs</b>, <b>BBS+ unlinkable zero-knowledge proofs</b>, <b>RFC 3161 TSA attestation oracles</b>, and <b>IETF SD-JWT mobile wallet interoperability</b>.
 </p>
 
 [Quickstart Demo](#-10-second-quickstart-demo) • [Architecture](#-system-architecture--workflow) • [Security Hardening](#-defense-in-depth-security-hardening-uncrackable-guarantee) • [CLI Toolkit](#-cli-toolkit) • [Python SDK](#-python-sdk-docutrust) • [REST API](#-rest-api-endpoints)

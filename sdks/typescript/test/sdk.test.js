@@ -160,6 +160,42 @@ describe('DocuTrust TypeScript SDK (@docutrust/sdk)', () => {
     // 27. Vault Credentials
     await client.getVaultCredentials({ search: 'Stanford', limit: 10 });
     assert.strictEqual(mockCalls[26].url, 'https://test-api.docutrust.org/api/v1/vault/credentials?search=Stanford&limit=10');
+
+    // 28. Confidential Encrypt
+    await client.encryptConfidentialClaim('salary', 75000, { n: '123' });
+    assert.strictEqual(mockCalls[27].url, 'https://test-api.docutrust.org/api/v1/confidential/encrypt');
+
+    // 29. Homomorphic Sum
+    await client.homomorphicSum(['c1', 'c2'], { n: '123' });
+    assert.strictEqual(mockCalls[28].url, 'https://test-api.docutrust.org/api/v1/confidential/compute/sum');
+
+    // 30. JSON-LD Canonicalize
+    await client.canonicalizeJsonLd({ id: 'doc1' });
+    assert.strictEqual(mockCalls[29].url, 'https://test-api.docutrust.org/api/v1/jsonld/canonicalize');
+
+    // 31. JSON-LD Sign
+    await client.signJsonLd({ id: 'doc1' }, { privateKeyHex: 'abc' });
+    assert.strictEqual(mockCalls[30].url, 'https://test-api.docutrust.org/api/v1/jsonld/sign');
+
+    // 32. TrustChain Token Create
+    await client.createDelegationToken({ delegatorKeyPair: {}, delegateDid: 'did:key:z1' });
+    assert.strictEqual(mockCalls[31].url, 'https://test-api.docutrust.org/api/v1/trustchain/token/create');
+
+    // 33. TrustChain Verify
+    await client.verifyTrustChain({ chain: [], credential: {}, accreditedRootDids: [] });
+    assert.strictEqual(mockCalls[32].url, 'https://test-api.docutrust.org/api/v1/trustchain/verify');
+
+    // 34. Quantum Armor KeyGen
+    await client.generateDualKEMKeys();
+    assert.strictEqual(mockCalls[33].url, 'https://test-api.docutrust.org/api/v1/quantum-armor/keys/generate');
+
+    // 35. Quantum Armor Seal
+    await client.sealCredentialWithQuantumArmor({ secret: 1 }, {});
+    assert.strictEqual(mockCalls[34].url, 'https://test-api.docutrust.org/api/v1/quantum-armor/seal');
+
+    // 36. Quantum Armor Unseal
+    await client.unsealCredentialWithQuantumArmor({}, {});
+    assert.strictEqual(mockCalls[35].url, 'https://test-api.docutrust.org/api/v1/quantum-armor/unseal');
   });
 
   test('DocuTrustClient handles HTTP error responses gracefully', async () => {

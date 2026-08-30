@@ -1,5 +1,91 @@
 # 📝 DocuTrust Changelog & Release Notes
 
+## [v6.0.0] - Sovereign Trust Fabric: Confidential Homomorphic Computing, W3C URDNA2015 JSON-LD Normalization, Hierarchical Trust Chains & Post-Quantum Dual-KEM Armor - 2026-08-30
+
+### 🌟 Release Overview (v6.0.0 - Major Milestone Release)
+DocuTrust 6.0.0 delivers the next generation of cryptographic privacy, enterprise governance, and post-quantum security with four groundbreaking architectural pillars:
+1. **Paillier Additive Homomorphic Computing & Confidential Identity (`@docutrust/core/confidential`, `docutrust.confidential`)**: Compute aggregate metrics (sums, averages, scalar products) and Zero-Knowledge Threshold Proofs directly over encrypted Verifiable Credential claims without ever decrypting raw values.
+2. **W3C VC 2.0 URDNA2015 RDF Dataset Canonicalization & JSON-LD Signatures (`@docutrust/core/jsonld`, `docutrust.jsonld`)**: Pure, zero-external-dependency canonicalization of JSON-LD credentials into deterministic W3C URDNA2015 / RDFC-1.0 N-Quads, with support for `JsonLdSignature2020` Linked Data proofs.
+3. **Hierarchical Verifiable Trust Chains & Multi-Tier Institutional Delegation (`@docutrust/core/trustchain`, `docutrust.trustchain`)**: Multi-tier governance architecture with cryptographic `DocuTrustDelegationToken2026` issuance, sub-delegation depth enforcement, credential type whitelisting, and recursive trust path verification against accredited root anchors.
+4. **Post-Quantum Dual Hybrid KEM Armor (`@docutrust/core/quantum-armor`, `docutrust.quantum_armor`)**: Dual-layer key encapsulation combining classical X25519 ECDH and NIST FIPS 203 ML-KEM-768 (Kyber), HKDF-SHA512 secret expansion, and AES-256-GCM quantum-sealed credential envelopes (`DocuTrustQuantumSealedEnvelope2026`).
+5. **Full-Stack Parity & Interactive Studios**: REST API endpoints, TypeScript client SDK methods, comprehensive CLI commands, Python SDK parity, and 4 new interactive Web Studios (`ConfidentialComputeStudio`, `JsonLdStudio`, `TrustChainStudio`, and `QuantumArmorStudio`).
+
+---
+
+### 🛡️ Core Cryptographic Capabilities (`@docutrust/core`)
+- **Paillier Additive Homomorphic Cryptosystem (`PaillierCryptosystem`, `ConfidentialClaimsEngine`)**:
+  - Arbitrary-precision BigInt implementation with prime generation, modular inverse, and GCD/LCM arithmetic.
+  - Homomorphic addition: $\text{Dec}(E(m_1) \cdot E(m_2) \pmod{N^2}) = m_1 + m_2 \pmod N$.
+  - Scalar multiplication: $\text{Dec}(E(m)^k \pmod{N^2}) = k \cdot m \pmod N$.
+  - Zero-Knowledge Threshold Proofs (`proveThreshold`, `verifyThresholdProof`) with cryptographic challenge commitments.
+- **W3C URDNA2015 RDF Dataset Canonicalizer (`JsonLdCanonicalizationEngine`)**:
+  - Deterministic N-Quads extraction and lexicographical dataset sorting.
+  - Linked Data Signature suite (`JsonLdSignature2020`) supporting Ed25519 verification.
+- **Hierarchical Trust Chain Engine (`TrustChainEngine`)**:
+  - Cryptographic delegation token issuance (`DocuTrustDelegationToken2026`).
+  - Recursive multi-hop trust path verification with `maxDepth` sub-delegation constraint checking and type scoping.
+- **Dual Hybrid KEM Engine (`DualHybridKEMEngine`)**:
+  - Composite key encapsulation combining X25519 and ML-KEM-768.
+  - HKDF-SHA512 key derivation with domain-separated salt and info parameters.
+  - Quantum-sealed credential envelopes with authenticated encryption.
+
+---
+
+### 🌐 REST API Server v6.0.0 (`apps/api`)
+- Added 12 new REST API endpoints:
+  - `POST /api/v1/confidential/encrypt`
+  - `POST /api/v1/confidential/compute/sum`
+  - `POST /api/v1/confidential/proof/threshold`
+  - `POST /api/v1/confidential/verify/threshold`
+  - `POST /api/v1/jsonld/canonicalize`
+  - `POST /api/v1/jsonld/sign`
+  - `POST /api/v1/jsonld/verify`
+  - `POST /api/v1/trustchain/token/create`
+  - `POST /api/v1/trustchain/verify`
+  - `GET /api/v1/quantum-armor/keys/generate`
+  - `POST /api/v1/quantum-armor/seal`
+  - `POST /api/v1/quantum-armor/unseal`
+- 100% test pass rate across 51 integration tests.
+
+---
+
+### 💻 Command-Line Interface v6.0.0 (`@docutrust/cli`)
+- Added CLI commands:
+  - `confidential-keygen`, `confidential-encrypt`, `confidential-sum`, `confidential-threshold-prove`, `confidential-threshold-verify`
+  - `jsonld-canonicalize`, `jsonld-sign`, `jsonld-verify`
+  - `trustchain-create-token`, `trustchain-verify-token`, `trustchain-verify-chain`
+  - `quantum-armor-keygen`, `quantum-armor-seal`, `quantum-armor-unseal`
+- 100% test pass rate across 40 CLI integration tests.
+
+---
+
+### 🐍 Python SDK Parity v6.0.0 (`sdks/python/docutrust`)
+- Native pure-Python implementation of all 4 v6 engines in `confidential.py`, `jsonld.py`, `trustchain.py`, and `quantum_armor.py`.
+- 100% test pass rate across 54 unit tests (`python -m unittest discover -s sdks/python/tests`).
+
+---
+
+### 🎨 Web Platform Studios v6.0.0 (`apps/web`)
+- Added 4 new interactive studios:
+  - `ConfidentialComputeStudio`: Visual Paillier homomorphic compute and ZK threshold proof verification.
+  - `JsonLdStudio`: Live JSON-LD URDNA2015 N-Quads canonicalization and Linked Data Signatures.
+  - `TrustChainStudio`: Visual hierarchical delegation chain builder and recursive path validator.
+  - `QuantumArmorStudio`: Interactive Dual Hybrid KEM post-quantum armor sealing and unsealing.
+
+---
+
+### 📦 Monorepo Synchronization
+- Synchronized all workspace packages to version `6.0.0`:
+  - `@docutrust/core` -> `6.0.0`
+  - `@docutrust/cli` -> `6.0.0`
+  - `@docutrust/api` -> `6.0.0`
+  - `@docutrust/sdk` -> `6.0.0`
+  - `@docutrust/web` -> `6.0.0`
+  - `docutrust` (Python) -> `6.0.0`
+- Monorepo test suite: 210 total automated tests passing across Core, API, CLI, TypeScript SDK, and Python SDK.
+
+---
+
 ## [v5.0.0] - Sovereign Trust Fabric: Python SDK Complete Parity & Multi-Language Interoperability Mesh - 2026-08-30
 
 ### 🌟 Release Overview (v5.0.0 - Major Milestone Release)

@@ -1033,3 +1033,132 @@ class DocuTrustClient:
         """Verifies a W3C DataIntegrityProof credential."""
         from .dataintegrity import DataIntegrityEngine
         return DataIntegrityEngine.verify(credential, expected_public_key_hex)
+
+    # ==========================================
+    # v6.0.0 Confidential Homomorphic Computing
+    # ==========================================
+
+    def generate_paillier_key_pair(self, bit_length: int = 512) -> Dict[str, Any]:
+        """Generates a Paillier KeyPair for confidential arithmetic."""
+        from .confidential import PaillierCryptosystem
+        return PaillierCryptosystem.generate_key_pair(bit_length)
+
+    def encrypt_confidential_claim(self, claim_key: str, value: int, public_key: Dict[str, Any]) -> Dict[str, Any]:
+        """Encrypts a numeric claim with Paillier Homomorphic encryption."""
+        from .confidential import ConfidentialClaimsEngine
+        return ConfidentialClaimsEngine.encrypt_claim(claim_key, value, public_key)
+
+    def homomorphic_sum(self, ciphertexts: List[str], public_key: Dict[str, Any]) -> Dict[str, Any]:
+        """Sums multiple encrypted claim ciphertexts homomorphically."""
+        from .confidential import ConfidentialClaimsEngine
+        return ConfidentialClaimsEngine.homomorphic_sum(ciphertexts, public_key)
+
+    def prove_confidential_threshold(
+        self,
+        claim_key: str,
+        actual_value: int,
+        threshold: int,
+        operator: str,
+        public_key: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Generates a confidential zero-knowledge threshold proof."""
+        from .confidential import ConfidentialClaimsEngine
+        return ConfidentialClaimsEngine.prove_threshold(claim_key, actual_value, threshold, operator, public_key)
+
+    def verify_confidential_threshold(self, proof: Dict[str, Any]) -> bool:
+        """Verifies a confidential threshold proof."""
+        from .confidential import ConfidentialClaimsEngine
+        return ConfidentialClaimsEngine.verify_threshold_proof(proof)
+
+    # ==========================================
+    # v6.0.0 W3C URDNA2015 JSON-LD Engine
+    # ==========================================
+
+    def canonicalize_jsonld(self, doc: Dict[str, Any]) -> str:
+        """Canonicalizes a JSON-LD document into deterministic URDNA2015 N-Quads."""
+        from .jsonld import JsonLdCanonicalizationEngine
+        return JsonLdCanonicalizationEngine.canonicalize(doc)
+
+    def sign_jsonld(
+        self,
+        doc: Dict[str, Any],
+        key_pair: Dict[str, Any],
+        options: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Signs a JSON-LD document with Linked Data Signatures."""
+        from .jsonld import JsonLdCanonicalizationEngine
+        return JsonLdCanonicalizationEngine.sign_jsonld(doc, key_pair, options)
+
+    def verify_jsonld(
+        self,
+        signed_doc: Dict[str, Any],
+        expected_public_key_hex: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Verifies a Linked Data Signed JSON-LD document."""
+        from .jsonld import JsonLdCanonicalizationEngine
+        return JsonLdCanonicalizationEngine.verify_jsonld(signed_doc, expected_public_key_hex)
+
+    # ==========================================
+    # v6.0.0 Hierarchical Verifiable Trust Chains
+    # ==========================================
+
+    def create_delegation_token(
+        self,
+        delegator_key_pair: Dict[str, Any],
+        delegate_did: str,
+        allowed_credential_types: Optional[List[str]] = None,
+        max_depth: int = 2,
+        valid_from: Optional[str] = None,
+        valid_until: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Issues a signed delegation token to a subordinate authority."""
+        from .trustchain import TrustChainEngine
+        return TrustChainEngine.create_delegation_token(
+            delegator_key_pair=delegator_key_pair,
+            delegate_did=delegate_did,
+            allowed_credential_types=allowed_credential_types,
+            max_depth=max_depth,
+            valid_from=valid_from,
+            valid_until=valid_until
+        )
+
+    def verify_trust_chain(
+        self,
+        chain: List[Dict[str, Any]],
+        credential: Dict[str, Any],
+        accredited_root_dids: List[str]
+    ) -> Dict[str, Any]:
+        """Recursively verifies an end-to-end delegation trust chain."""
+        from .trustchain import TrustChainEngine
+        return TrustChainEngine.verify_trust_chain(
+            chain=chain,
+            credential=credential,
+            accredited_root_dids=accredited_root_dids
+        )
+
+    # ==========================================
+    # v6.0.0 Post-Quantum Dual Hybrid KEM Armor
+    # ==========================================
+
+    def generate_dual_kem_keys(self) -> Dict[str, Any]:
+        """Generates a Dual-KEM Hybrid KeyPair (X25519 + NIST ML-KEM-768)."""
+        from .quantum_armor import DualHybridKEMEngine
+        return DualHybridKEMEngine.generate_dual_key_pair()
+
+    def seal_credential_with_quantum_armor(
+        self,
+        payload: Dict[str, Any],
+        recipient_hybrid_pub: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Seals a credential payload in a quantum-armored envelope."""
+        from .quantum_armor import DualHybridKEMEngine
+        return DualHybridKEMEngine.seal_credential(payload, recipient_hybrid_pub)
+
+    def unseal_credential_with_quantum_armor(
+        self,
+        envelope: Dict[str, Any],
+        recipient_hybrid_priv: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Unseals a quantum-armored envelope."""
+        from .quantum_armor import DualHybridKEMEngine
+        return DualHybridKEMEngine.unseal_credential(envelope, recipient_hybrid_priv)

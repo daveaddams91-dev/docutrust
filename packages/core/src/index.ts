@@ -109,3 +109,15 @@ export * from './solidity';
 // Export Cryptographic Audit Bundle Packaging & Compliance Verification (.dtbundle)
 export * from './bundle';
 
+// Export Confidential Computing & Paillier Homomorphic Cryptosystem
+export * from './confidential';
+
+// Export W3C URDNA2015 RDF Dataset Canonicalization & JSON-LD Linked Data Signatures
+export * from './jsonld';
+
+// Export Hierarchical Verifiable Trust Chains & Delegation Engine
+export * from './trustchain';
+
+// Export Post-Quantum Dual Hybrid KEM Armor (X25519 + NIST ML-KEM-768)
+export * from './quantum-armor';
+
