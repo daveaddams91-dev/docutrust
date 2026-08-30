@@ -196,6 +196,18 @@ describe('DocuTrust TypeScript SDK (@docutrust/sdk)', () => {
     // 36. Quantum Armor Unseal
     await client.unsealCredentialWithQuantumArmor({}, {});
     assert.strictEqual(mockCalls[35].url, 'https://test-api.docutrust.org/api/v1/quantum-armor/unseal');
+
+    // 37. Accumulator Batch Witness
+    await client.createAccumulatorBatchWitness('acc1', ['docA', 'docB']);
+    assert.strictEqual(mockCalls[36].url, 'https://test-api.docutrust.org/api/v1/accumulator/batch-witness');
+
+    // 38. Accumulator Verify Batch
+    await client.verifyAccumulatorBatchWitness({ witness: '123' }, '456');
+    assert.strictEqual(mockCalls[37].url, 'https://test-api.docutrust.org/api/v1/accumulator/verify-batch');
+
+    // 39. Confidential Linear Combination
+    await client.evaluateConfidentialLinearCombination([{ ciphertextHex: 'c1', weight: 2 }], { n: '123' });
+    assert.strictEqual(mockCalls[38].url, 'https://test-api.docutrust.org/api/v1/confidential/compute/linear-combination');
   });
 
   test('DocuTrustClient handles HTTP error responses gracefully', async () => {

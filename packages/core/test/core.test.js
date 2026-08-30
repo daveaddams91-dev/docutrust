@@ -2170,3 +2170,92 @@ test('56. Quantum Armor: Dual Hybrid KEM (Classical + ML-KEM-768 Kyber) sealing 
     DualHybridKEMEngine.unsealCredential(tamperedEnvelope, recipientKeys.hybridSecretKey);
   });
 });
+
+// 57. Batch Accumulator Membership Witnessing
+test('57. Accumulator: Constant-size batch membership witness creation and O(1) verification', () => {
+  const acc = new CryptographicAccumulator('batch-acc-test-01');
+  const elements = ['cred-alice-101', 'cred-bob-102', 'cred-charlie-103', 'cred-dave-104', 'cred-eve-105'];
+
+  acc.addBatch(elements);
+  const state = acc.exportState();
+
+  // Prover creates batch witness for subset of elements
+  const subset = ['cred-alice-101', 'cred-charlie-103', 'cred-eve-105'];
+  const batchWitness = acc.createBatchWitness(subset);
+
+  assert.deepEqual(batchWitness.elements, subset);
+  assert.ok(batchWitness.witness);
+  assert.ok(batchWitness.productPrimeHex);
+
+  // Verifier validates batch witness against current accumulator in O(1) verification space
+  const isValid = CryptographicAccumulator.verifyBatchWitness(batchWitness, state.accumulator);
+  assert.equal(isValid, true);
+
+  // Tamper check: modifying subset elements should invalidate witness
+  const tamperedWitness = { ...batchWitness, elements: ['cred-alice-101', 'cred-bob-102', 'cred-eve-105'] };
+  const isTamperedValid = CryptographicAccumulator.verifyBatchWitness(tamperedWitness, state.accumulator);
+  assert.equal(isTamperedValid, false);
+});
+
+// 58. Paillier Homomorphic Subtraction & Weighted Linear Combinations
+test('58. Confidential: Paillier homomorphic subtraction and weighted linear combinations', () => {
+  const keyPair = PaillierCryptosystem.generateKeyPair(256);
+  const pubKey = keyPair.publicKey;
+
+  // 1. Homomorphic Subtraction: E(500) - E(150) = E(350)
+  const c1 = PaillierCryptosystem.encrypt(500n, pubKey);
+  const c2 = PaillierCryptosystem.encrypt(150n, pubKey);
+  const cDiff = PaillierCryptosystem.subtract(c1, c2, pubKey);
+
+  const decryptedDiff = PaillierCryptosystem.decrypt(cDiff, keyPair);
+  assert.equal(decryptedDiff, 350n);
+
+  // 2. Weighted Linear Combination: 3 * E(40) + 2 * E(25) - 1 * E(10) = 120 + 50 - 10 = 160
+  const cA = PaillierCryptosystem.encrypt(40n, pubKey);
+  const cB = PaillierCryptosystem.encrypt(25n, pubKey);
+  const cC = PaillierCryptosystem.encrypt(10n, pubKey);
+
+  const linResult = ConfidentialClaimsEngine.evaluateLinearCombination([
+    { ciphertext: cA, weight: 3 },
+    { ciphertext: cB, weight: 2 },
+    { ciphertext: cC, weight: -1 }
+  ], pubKey);
+
+  assert.equal(linResult.operation, 'linear_combination');
+  assert.equal(linResult.operandsCount, 3);
+
+  const decryptedLin = PaillierCryptosystem.decrypt(linResult.resultCiphertextHex, keyPair);
+  assert.equal(decryptedLin, 160n);
+});
+
+// 59. TrustChain Revocation Checking and Normalized DID Handling
+test('59. TrustChain: Delegation token revocation checking and normalized DID resolution', () => {
+  const rootKp = generateKeyPair();
+  const delegateKp = generateKeyPair();
+
+  const token = TrustChainEngine.createDelegationToken({
+    delegatorKeyPair: rootKp,
+    delegateDid: `${delegateKp.did}#key-1`,
+    maxDepth: 1,
+    allowedCredentialTypes: ['*']
+  });
+
+  // Valid verification with normalized DID
+  const validCheck = TrustChainEngine.verifyTrustChain({
+    delegationTokens: [token],
+    rootAuthorityDid: rootKp.did,
+    leafIssuerDid: delegateKp.did
+  });
+  assert.equal(validCheck.valid, true);
+
+  // Revoked verification: specifying token ID in revokedTokenIds must fail
+  const revokedCheck = TrustChainEngine.verifyTrustChain({
+    delegationTokens: [token],
+    rootAuthorityDid: rootKp.did,
+    leafIssuerDid: delegateKp.did,
+    revokedTokenIds: [token.id]
+  });
+  assert.equal(revokedCheck.valid, false);
+  assert.ok(revokedCheck.errors.some(e => e.includes('has been revoked')));
+});
+

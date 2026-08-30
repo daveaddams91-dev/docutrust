@@ -663,6 +663,35 @@ test('CLI Suite', async (t) => {
     const unsealed = JSON.parse(fs.readFileSync(unsealedFile, 'utf-8'));
     assert.equal(unsealed.mission, 'Artemis IV');
   });
+
+  const batchWitFile = path.join(tempDir, 'batch-witness.json');
+  await t.test('40. docutrust accumulator batch-witness and verify-batch', () => {
+    // 1. Create accumulator
+    execSync(`node "${cliPath}" accumulator-create --id batch-cli-acc --elements "doc-1,doc-2,doc-3"`);
+
+    // 2. Generate batch witness
+    const witOut = execSync(`node "${cliPath}" accumulator-batch-witness --id batch-cli-acc --elements "doc-1,doc-3" --out "${batchWitFile}"`).toString();
+    assert.ok(witOut.includes('Batch Membership Witness saved'));
+    assert.ok(fs.existsSync(batchWitFile));
+
+    // 3. Verify batch witness
+    const verifyOut = execSync(`node "${cliPath}" accumulator-verify-batch --witness "${batchWitFile}"`).toString();
+    assert.ok(verifyOut.includes('VALID'));
+  });
+
+  const paillierKeyFile = path.join(tempDir, 'paillier-key.json');
+  const claimAFile = path.join(tempDir, 'claim-a.json');
+  const claimBFile = path.join(tempDir, 'claim-b.json');
+  const lincombFile = path.join(tempDir, 'lincomb.json');
+  await t.test('41. docutrust confidential-linear-combination', () => {
+    execSync(`node "${cliPath}" confidential-keygen --bits 256 --out "${paillierKeyFile}"`);
+    execSync(`node "${cliPath}" confidential-encrypt --key salary --value 100 --pub "${paillierKeyFile}" --out "${claimAFile}"`);
+    execSync(`node "${cliPath}" confidential-encrypt --key bonus --value 20 --pub "${paillierKeyFile}" --out "${claimBFile}"`);
+
+    const linOut = execSync(`node "${cliPath}" confidential-linear-combination --terms "${claimAFile}:2,${claimBFile}:3" --pub "${paillierKeyFile}" --out "${lincombFile}"`).toString();
+    assert.ok(linOut.includes('Homomorphic linear combination computed'));
+    assert.ok(fs.existsSync(lincombFile));
+  });
 });
 
 

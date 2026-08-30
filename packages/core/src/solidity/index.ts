@@ -36,7 +36,7 @@ pragma solidity ${version};
 
 /**
  * @title ${name}
- * @author DocuTrust Sovereign Trust Engine v7.0.0
+ * @author DocuTrust Sovereign Trust Engine v8.0.0
  * @notice Verifies W3C Verifiable Credentials, Merkle Inclusion Proofs, and EIP-712 attestations on-chain.
  */
 contract ${name} {

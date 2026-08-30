@@ -177,7 +177,7 @@ const server = http.createServer(async (req, res) => {
       return jsonResponse(200, {
         status: 'healthy',
         service: 'DocuTrust Sovereign Verifiable Credentials Engine',
-        version: '7.0.0',
+        version: '8.0.0',
         features: [
           'W3C VC 2.0',
           'DID Key Ed25519',
@@ -1177,6 +1177,34 @@ const server = http.createServer(async (req, res) => {
       return jsonResponse(200, { valid });
     }
 
+    if (pathname === '/api/v1/accumulator/batch-witness' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { id, elements } = body;
+      if (!id || !elements || !Array.isArray(elements)) {
+        return jsonResponse(400, { error: 'Missing accumulator id or elements array.' });
+      }
+      const acc = accumulatorStore.get(id);
+      if (!acc) return jsonResponse(404, { error: `Accumulator '${id}' not found.` });
+      try {
+        const witness = acc.createBatchWitness(elements);
+        return jsonResponse(200, { success: true, witness, batchWitness: witness });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/accumulator/verify-batch' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { witness, batchWitness, modulusHex } = body;
+      const wit = witness || batchWitness;
+      const accHex = body.currentAccumulatorHex || (wit && wit.accumulatorHex);
+      if (!wit || !accHex) {
+        return jsonResponse(400, { error: 'Missing witness or currentAccumulatorHex.' });
+      }
+      const valid = CryptographicAccumulator.verifyBatchWitness(wit, accHex, modulusHex);
+      return jsonResponse(200, { success: true, valid });
+    }
+
     // 37. Multi-Recipient JWE Endpoints
     if (pathname === '/api/v1/jwe/generate-keys' && req.method === 'POST') {
       const kp = MultiRecipientJWE.generateRecipientKeyPair();
@@ -1768,6 +1796,20 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    if ((pathname === '/api/v1/confidential/compute/linear-combination' || pathname === '/api/v1/confidential/linear-combination') && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { terms, publicKey } = body;
+      if (!terms || !Array.isArray(terms) || !publicKey) {
+        return jsonResponse(400, { error: 'Missing terms array or publicKey.' });
+      }
+      try {
+        const result = ConfidentialClaimsEngine.evaluateLinearCombination(terms, publicKey);
+        return jsonResponse(200, { success: true, result, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
     if ((pathname === '/api/v1/confidential/proof/threshold' || pathname === '/api/v1/confidential/threshold-prove') && req.method === 'POST') {
       const body = await readJsonBody();
       const { claimKey, actualValue, threshold, operator, publicKey } = body;
@@ -1941,7 +1983,7 @@ const server = http.createServer(async (req, res) => {
 
 if (require.main === module) {
   server.listen(PORT, () => {
-    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v7.0.0 running on http://localhost:${PORT}`);
+    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v8.0.0 running on http://localhost:${PORT}`);
   });
 }
 

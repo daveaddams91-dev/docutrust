@@ -22,6 +22,7 @@ import { RevocationBloomFilter, SignedBloomFilter } from '../bloom';
 import { SchemaValidator } from '../schema';
 import { DecentralizedTrustRegistry } from '../trust-registry';
 import { JsonLdCanonicalizationEngine } from '../jsonld';
+import { MultiSigEngine } from '../multisig';
 
 export interface CredentialSubject {
   id?: string;
@@ -428,30 +429,10 @@ export class VerifiableCredentialsEngine {
           errors.push(eipRes.error || 'Ethereum EIP-712 structured signature verification failed.');
         }
       } else if (credential.proof.type === 'MultiSigThresholdSignature2026') {
-        const multiProof = credential.proof as any;
-        const signatures = multiProof.signatures || [];
-        const required = multiProof.threshold?.required || 1;
-        const { proof, ...unsigned } = credential;
-        const canonicalPayload = canonicalizeJson({
-          ...unsigned,
-          ...(proof.claimsRoot ? { claimsRoot: proof.claimsRoot } : {})
-        });
-        const computedHash = multiProof.jcsCanonicalHash || sha256Hex(canonicalPayload);
-
-        let validSigCount = 0;
-        for (const sigEntry of signatures) {
-          try {
-            const didDoc = await DIDResolver.resolve(sigEntry.signerDid);
-            const vm = didDoc.verificationMethod[0];
-            const sigPubKey = vm?.publicKeyHex || vm?.publicKeyMultibase;
-            if (sigPubKey && verifySignature(computedHash, sigEntry.signature, sigPubKey)) {
-              validSigCount++;
-            }
-          } catch (_) {}
-        }
-        signatureValid = validSigCount >= required;
+        const msRes = MultiSigEngine.verifyMultiSigCredential(credential as any);
+        signatureValid = msRes.valid;
         if (!signatureValid) {
-          errors.push(`MultiSig threshold not met: verified ${validSigCount} of ${required} required signatures.`);
+          errors.push(...msRes.errors);
         }
       } else if (
         credential.proof.type === 'ML-DSA-65-Ed25519-Hybrid-2026' ||
@@ -462,7 +443,11 @@ export class VerifiableCredentialsEngine {
           ...unsigned,
           ...(proof.claimsRoot ? { claimsRoot: proof.claimsRoot } : {})
         });
-        const computedHash = proof.jcsCanonicalHash || sha256Hex(canonicalPayload);
+        const computedHash = sha256Hex(canonicalPayload);
+
+        if (proof.jcsCanonicalHash && proof.jcsCanonicalHash !== computedHash) {
+          errors.push('Post-Quantum hybrid canonical hash mismatch: credential payload has been altered.');
+        }
 
         let classicalPub = expectedPublicKeyHex;
         if (!classicalPub) {
@@ -474,10 +459,10 @@ export class VerifiableCredentialsEngine {
         }
 
         const pqcRes = verifyPQCHybrid(computedHash, proof.proofValue || '', classicalPub || issuerId);
-        signatureValid = pqcRes.valid;
+        signatureValid = pqcRes.valid && (!proof.jcsCanonicalHash || proof.jcsCanonicalHash === computedHash);
         isQuantumSafe = pqcRes.isQuantumSafe;
 
-        if (!signatureValid) {
+        if (!pqcRes.valid) {
           errors.push('Post-Quantum ML-DSA Hybrid signature verification failed.');
         }
       } else if (

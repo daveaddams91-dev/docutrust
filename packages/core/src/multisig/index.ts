@@ -185,9 +185,19 @@ export class MultiSigEngine {
       authorizedSigners: proof.signatures.map(s => ({ did: s.signerDid, role: s.role }))
     };
 
-    // 1. Recompute canonical hash
+    // 1. Recompute or load canonical hash
     const { proof: _, ...unsigned } = credential;
-    const { canonicalHash } = this.createMultiSigDraft(unsigned, effectivePolicy);
+    let canonicalHash = proof.jcsCanonicalHash;
+
+    if (policy) {
+      const draft = this.createMultiSigDraft(unsigned, effectivePolicy);
+      if (proof.jcsCanonicalHash && proof.jcsCanonicalHash !== draft.canonicalHash) {
+        errors.push('MultiSig canonical hash mismatch: credential payload or threshold policy has been modified.');
+      }
+      canonicalHash = draft.canonicalHash;
+    } else if (!canonicalHash) {
+      canonicalHash = this.createMultiSigDraft(unsigned, effectivePolicy).canonicalHash;
+    }
 
     // 2. Validate individual signatures
     const verifiedDids = new Set<string>();

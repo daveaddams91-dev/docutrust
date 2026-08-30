@@ -29,6 +29,14 @@ export interface NonMembershipWitness {
   accumulatorId: string;
 }
 
+export interface BatchMembershipWitness {
+  elements: string[];
+  productPrimeHex: string; // product of primes for elements
+  witness: string; // hex (W_S = g^(product of non-subset primes) mod N)
+  accumulatorId: string;
+  accumulatorHex?: string;
+}
+
 export class CryptographicAccumulator {
   // High-entropy 1024-bit RSA composite default modulus (or configurable)
   public static readonly DEFAULT_MODULUS_HEX =
@@ -337,6 +345,43 @@ export class CryptographicAccumulator {
   }
 
   /**
+   * Generates a constant-size batch membership witness for a subset of elements in O(1) verification size.
+   */
+  public createBatchWitness(elements: string[]): BatchMembershipWitness {
+    if (!elements || elements.length === 0) {
+      throw new Error('Cannot create batch witness for empty elements array.');
+    }
+
+    for (const elem of elements) {
+      if (!this.members.has(elem)) {
+        throw new Error(`Cannot create batch witness: element "${elem}" is not present in accumulator.`);
+      }
+    }
+
+    const subsetSet = new Set(elements);
+    let productPrime = 1n;
+    for (const elem of elements) {
+      productPrime *= this.primeMap.get(elem)!;
+    }
+
+    // Witness W_S = g^(product of primes not in subset) mod N
+    let WS = this.g;
+    for (const [elem, p] of this.primeMap.entries()) {
+      if (!subsetSet.has(elem)) {
+        WS = CryptographicAccumulator.modPow(WS, p, this.N);
+      }
+    }
+
+    return {
+      elements,
+      productPrimeHex: productPrime.toString(16),
+      witness: WS.toString(16),
+      accumulatorId: this.id,
+      accumulatorHex: this.V.toString(16)
+    };
+  }
+
+  /**
    * Verifies an O(1) membership witness against current accumulator value in constant time.
    * Check: (W^prime) mod N === V
    */
@@ -357,6 +402,37 @@ export class CryptographicAccumulator {
 
       // Verify accumulator equation: W^e == V (mod N)
       const computedV = this.modPow(W, prime, N);
+      return computedV === V;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Verifies a constant-size Batch Membership Witness against the current accumulator value.
+   * Check: (W_S^(product of primes in S)) mod N === V
+   */
+  public static verifyBatchWitness(
+    witness: BatchMembershipWitness,
+    currentAccumulatorHex: string,
+    modulusHex: string = CryptographicAccumulator.DEFAULT_MODULUS_HEX
+  ): boolean {
+    try {
+      if (!witness.elements || witness.elements.length === 0) return false;
+      const N = BigInt('0x' + modulusHex);
+      const WS = BigInt('0x' + witness.witness);
+      const claimedProduct = BigInt('0x' + witness.productPrimeHex);
+      const V = BigInt('0x' + currentAccumulatorHex);
+
+      let expectedProduct = 1n;
+      for (const elem of witness.elements) {
+        const p = this.elementToPrime(elem);
+        expectedProduct *= p;
+      }
+
+      if (expectedProduct !== claimedProduct) return false;
+
+      const computedV = this.modPow(WS, expectedProduct, N);
       return computedV === V;
     } catch {
       return false;

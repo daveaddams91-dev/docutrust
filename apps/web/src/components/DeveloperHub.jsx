@@ -117,7 +117,7 @@ $ docutrust quantum-armor-unseal --key kem_keys.json --envelope sealed.envelope`
       <div className="mb-10">
         <div className="flex items-center gap-2 text-xs font-mono text-blue-400 mb-2 uppercase tracking-widest">
           <Terminal className="w-3.5 h-3.5" />
-          <span>Developer SDKs & OpenAPI Specification (v7.0.0)</span>
+          <span>Developer SDKs & OpenAPI Specification (v8.0.0)</span>
         </div>
         <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
           Developer Hub & Quickstart

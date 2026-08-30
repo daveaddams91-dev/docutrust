@@ -13,7 +13,7 @@ import { CryptographicTSAOracle, TimestampToken } from '../oracle/index.js';
 
 export interface AuditBundleManifest {
   bundleId: string;
-  version: '7.0.0' | string;
+  version: '8.0.0' | string;
   generator: string;
   organization: string;
   createdAt: string;
@@ -103,8 +103,8 @@ export class AuditBundleEngine {
     // 5. Build Manifest
     const manifest: AuditBundleManifest = {
       bundleId,
-      version: '7.0.0',
-      generator: 'DocuTrust Sovereign Trust Engine v7.0.0',
+      version: '8.0.0',
+      generator: 'DocuTrust Sovereign Trust Engine v8.0.0',
       organization: options.organization || 'Unknown Organization',
       createdAt,
       complianceStandards: standards,
@@ -259,7 +259,7 @@ ${bundle.manifest.complianceStandards.map(s => `- **${s}** — Validated`).join(
 - **MMR Active Peaks:** ${bundle.mmrSnapshot.peakCount}
 - **Bundle Seal Timestamp:** \`${bundle.manifest.createdAt}\`
 
-${result.errors.length > 0 ? `### ⚠️ Errors Encountered:\n${result.errors.map(e => `- ${e}`).join('\n')}` : `*Cryptographically sealed and signed by DocuTrust Sovereign Trust Engine v7.0.0.*`}
+${result.errors.length > 0 ? `### ⚠️ Errors Encountered:\n${result.errors.map(e => `- ${e}`).join('\n')}` : `*Cryptographically sealed and signed by DocuTrust Sovereign Trust Engine v8.0.0.*`}
 `;
   }
 }

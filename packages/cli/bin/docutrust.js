@@ -213,7 +213,7 @@ const command = args[0];
 
 function printHelp() {
   console.log(`
-\x1b[1m\x1b[36m🛡️ DocuTrust CLI v7.0.0\x1b[0m — Sovereign Trust Mesh & Post-Quantum Governance
+\x1b[1m\x1b[36m🛡️ DocuTrust CLI v8.0.0\x1b[0m — Sovereign Trust Mesh & Post-Quantum Governance
 
 \x1b[1mCORE COMMANDS:\x1b[0m
   \x1b[32mdemo / wizard\x1b[0m                                 Run interactive 10-second end-to-end credential issuance & verification
@@ -233,6 +233,7 @@ function printHelp() {
   \x1b[32mconfidential-keygen\x1b[0m [--bits <num>] [--out <f>]  Generate Paillier public/private keypair (default 2048-bit)
   \x1b[32mconfidential-encrypt\x1b[0m -v <val> -k <pub> [--out <f>] Encrypt numerical value with Paillier public key
   \x1b[32mconfidential-sum\x1b[0m -c <c1,c2...> -k <pub> [--out <f>] Homomorphically add encrypted ciphertexts without decrypting
+  \x1b[32mconfidential-linear-combination\x1b[0m -t <c1:w1,c2:w2> Evaluate homomorphic weighted sum on ciphertexts
   \x1b[32mconfidential-threshold-prove\x1b[0m -v <n> -t <t> -k <k> Generate ZK proof that encrypted value exceeds threshold
   \x1b[32mconfidential-threshold-verify\x1b[0m -p <f> -k <k> -c <c> Verify Paillier zero-knowledge threshold proof
 
@@ -283,6 +284,8 @@ function printHelp() {
   \x1b[32mstatuslist-check\x1b[0m --list <file> --index <num>    Check revocation/suspension status at index
   \x1b[32mstatuslist-update\x1b[0m --list <file> --index <i> -s <s> Update status in BitstringStatusList2024
   \x1b[32maccumulator-create\x1b[0m --members <csv>             Initialize RSA dynamic accumulator
+  \x1b[32maccumulator-batch-witness\x1b[0m --elements <e1,e2>   Compute constant-size batch membership witness
+  \x1b[32maccumulator-verify-batch\x1b[0m --witness <w>         Verify constant-size batch membership witness
   \x1b[32maccumulator-non-membership-witness\x1b[0m --elem <e>   Compute Bezout constant-size non-membership witness
   \x1b[32maccumulator-verify-non-membership\x1b[0m --witness <w> Verify accumulator non-membership witness
 
@@ -1230,9 +1233,12 @@ async function main() {
 
   if (command === 'accumulator-create') {
     const id = getArgValue('--id') || `acc_${crypto.randomBytes(4).toString('hex')}`;
+    const membersStr = getArgValue('--members') || getArgValue('--elements') || getArgValue('-m') || getArgValue('-e');
     const store = loadAccStore();
     const acc = new core.CryptographicAccumulator(id);
-    store[id] = { state: acc.exportState(), members: [] };
+    const initialMembers = membersStr ? membersStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+    for (const m of initialMembers) acc.add(m);
+    store[id] = { state: acc.exportState(), members: initialMembers };
     saveAccStore(store);
     console.log(`\x1b[32m✔\x1b[0m Dynamic Cryptographic Accumulator initialized: \x1b[1m${id}\x1b[0m`);
     console.log(JSON.stringify(store[id].state, null, 2));
@@ -1330,6 +1336,57 @@ async function main() {
       console.log(`\x1b[32m✔\x1b[0m Accumulator Membership Witness is \x1b[1m\x1b[32mVALID\x1b[0m (Cryptographically Verified)`);
     } else {
       console.log(`\x1b[31m✖\x1b[0m Accumulator Membership Witness is \x1b[1m\x1b[31mINVALID\x1b[0m`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  if (command === 'accumulator-batch-witness') {
+    const id = getArgValue('--id');
+    const elementsStr = getArgValue('--elements') || getArgValue('-e');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+    if (!id || !elementsStr) {
+      console.error('\x1b[31mError:\x1b[0m Missing --id <string> or --elements <elem1,elem2>');
+      process.exit(1);
+    }
+    const elements = elementsStr.split(',').map(e => e.trim());
+    const store = loadAccStore();
+    if (!store[id]) {
+      console.error(`\x1b[31mError:\x1b[0m Accumulator '${id}' not found`);
+      process.exit(1);
+    }
+    const acc = new core.CryptographicAccumulator(id, store[id].state.modulus, store[id].state.generator);
+    for (const m of store[id].members || []) acc.add(m);
+    const witness = acc.createBatchWitness(elements);
+    const outStr = JSON.stringify(witness, null, 2);
+    if (outFile) {
+      fs.writeFileSync(outFile, outStr, 'utf-8');
+      console.log(`\x1b[32m✔\x1b[0m Batch Membership Witness saved to: \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(outStr);
+    }
+    return;
+  }
+
+  if (command === 'accumulator-verify-batch') {
+    const witnessFile = getArgValue('--witness') || getArgValue('-w');
+    const accHex = getArgValue('--acc') || getArgValue('-a');
+    const modHex = getArgValue('--mod') || getArgValue('-m');
+    if (!witnessFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --witness <file.json>');
+      process.exit(1);
+    }
+    const witness = JSON.parse(fs.readFileSync(witnessFile, 'utf-8'));
+    const targetAccHex = accHex || witness.accumulatorHex;
+    if (!targetAccHex) {
+      console.error('\x1b[31mError:\x1b[0m Missing --acc <hex> (and not present in witness file)');
+      process.exit(1);
+    }
+    const valid = core.CryptographicAccumulator.verifyBatchWitness(witness, targetAccHex, modHex || undefined);
+    if (valid) {
+      console.log(`\x1b[32m✔\x1b[0m Accumulator Batch Membership Witness is \x1b[1m\x1b[32mVALID\x1b[0m (Cryptographically Verified)`);
+    } else {
+      console.log(`\x1b[31m✖\x1b[0m Accumulator Batch Membership Witness is \x1b[1m\x1b[31mINVALID\x1b[0m`);
       process.exit(1);
     }
     return;
@@ -2090,6 +2147,41 @@ async function main() {
     const result = core.ConfidentialClaimsEngine.homomorphicSum(ciphertexts, pubKey);
     safeWriteFileSync(outFile, JSON.stringify(result, null, 2));
     console.log(`\x1b[32m✔\x1b[0m Homomorphic addition computed over ${files.length} claims -> \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'confidential-linear-combination') {
+    const termsStr = getArgValue('--terms') || getArgValue('-t');
+    const keyFile = getArgValue('--pub') || getArgValue('--key') || getArgValue('-k');
+    const outFile = getArgValue('--out') || getArgValue('-o') || 'lincomb-result.json';
+
+    if (!termsStr || !keyFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --terms <c1.json:w1,c2.json:w2> or --pub/--key <key.json>');
+      process.exit(1);
+    }
+
+    const termEntries = termsStr.split(',').map(entry => {
+      const trimmed = entry.trim();
+      const lastColon = trimmed.lastIndexOf(':');
+      let filePath = trimmed;
+      let weight = 1;
+      if (lastColon > 1) {
+        const potentialWeight = parseInt(trimmed.slice(lastColon + 1), 10);
+        if (!isNaN(potentialWeight)) {
+          filePath = trimmed.slice(0, lastColon);
+          weight = potentialWeight;
+        }
+      }
+      const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+      const ciphertextHex = parsed.ciphertextHex || parsed.ciphertext || parsed;
+      return { ciphertextHex, weight };
+    });
+
+    const keyData = JSON.parse(fs.readFileSync(keyFile, 'utf-8'));
+    const pubKey = keyData.publicKey || keyData;
+    const result = core.ConfidentialClaimsEngine.evaluateLinearCombination(termEntries, pubKey);
+    safeWriteFileSync(outFile, JSON.stringify(result, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m Homomorphic linear combination computed over ${termEntries.length} terms -> \x1b[1m${outFile}\x1b[0m`);
     return;
   }
 

@@ -291,6 +291,19 @@ export class PaillierCryptosystem {
   }
 
   /**
+   * Homomorphic Subtraction: E(m1 - m2) = (c1 * c2^-1) mod n^2
+   */
+  public static subtract(ciphertextHex1: string, ciphertextHex2: string, publicKey: PaillierPublicKey): string {
+    const c1 = BigInt('0x' + ciphertextHex1);
+    const c2 = BigInt('0x' + ciphertextHex2);
+    const n2 = BigInt('0x' + publicKey.n2);
+
+    const c2Inv = this.modInverse(c2, n2);
+    const cDiff = (c1 * c2Inv) % n2;
+    return cDiff.toString(16);
+  }
+
+  /**
    * Homomorphic Scalar Multiplication: E(k * m) = (c^k) mod n^2
    */
   public static multiplyScalar(ciphertextHex: string, scalar: bigint | number, publicKey: PaillierPublicKey): string {
@@ -352,6 +365,51 @@ export class ConfidentialClaimsEngine {
       operation: 'add',
       resultCiphertextHex: acc,
       operandsCount: ciphertexts.length,
+      publicKeyN: publicKey.n,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  /**
+   * Computes a weighted homomorphic linear combination: sum(w_i * m_i)
+   */
+  public static evaluateLinearCombination(
+    terms: Array<{ ciphertext?: string; ciphertextHex?: string; weight: number }>,
+    publicKey: PaillierPublicKey
+  ): HomomorphicComputationResult {
+    if (!terms || terms.length === 0) {
+      throw new Error('At least one term required for linear combination.');
+    }
+
+    const n2 = BigInt('0x' + publicKey.n2);
+    let acc = 1n; // Multiplicative identity for Paillier ciphertexts (corresponds to E(0) with r=1)
+
+    for (const term of terms) {
+      const weight = BigInt(term.weight);
+      const hex = term.ciphertextHex || term.ciphertext;
+      if (!hex) {
+        throw new Error('Term missing ciphertext or ciphertextHex.');
+      }
+      const c = BigInt('0x' + hex);
+      let termCiphertext: bigint;
+
+      if (weight > 0n) {
+        termCiphertext = PaillierCryptosystem.modPow(c, weight, n2);
+      } else if (weight === 0n) {
+        termCiphertext = 1n;
+      } else {
+        const posWeight = -weight;
+        const posProd = PaillierCryptosystem.modPow(c, posWeight, n2);
+        termCiphertext = PaillierCryptosystem.modInverse(posProd, n2);
+      }
+
+      acc = (acc * termCiphertext) % n2;
+    }
+
+    return {
+      operation: 'linear_combination',
+      resultCiphertextHex: acc.toString(16),
+      operandsCount: terms.length,
       publicKeyN: publicKey.n,
       timestamp: new Date().toISOString()
     };

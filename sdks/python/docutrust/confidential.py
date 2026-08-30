@@ -182,6 +182,15 @@ class PaillierCryptosystem:
         return hex(c_sum)[2:]
 
     @staticmethod
+    def subtract(ciphertext_hex1: str, ciphertext_hex2: str, public_key: Dict[str, Any]) -> str:
+        c1 = int(ciphertext_hex1, 16)
+        c2 = int(ciphertext_hex2, 16)
+        n2 = int(public_key["n2"], 16)
+        c2_inv = PaillierCryptosystem.mod_inverse(c2, n2)
+        c_diff = (c1 * c2_inv) % n2
+        return hex(c_diff)[2:]
+
+    @staticmethod
     def multiply_scalar(ciphertext_hex: str, scalar: int, public_key: Dict[str, Any]) -> str:
         c = int(ciphertext_hex, 16)
         k = int(scalar)
@@ -220,6 +229,39 @@ class ConfidentialClaimsEngine:
             "resultCiphertextHex": acc,
             "sumCiphertextHex": acc,
             "operandsCount": len(ciphertexts),
+            "publicKeyN": public_key["n"],
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        }
+
+    @staticmethod
+    def evaluate_linear_combination(
+        terms: List[Dict[str, Any]],
+        public_key: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        if not terms:
+            raise ValueError("At least one term required for linear combination.")
+        n2 = int(public_key["n2"], 16)
+        acc = 1
+        for term in terms:
+            weight = int(term.get("weight", 1))
+            raw_hex = term.get("ciphertextHex") or term.get("ciphertext")
+            if not raw_hex:
+                raise ValueError("Term missing ciphertext or ciphertextHex.")
+            c = int(raw_hex, 16)
+            if weight > 0:
+                term_ct = pow(c, weight, n2)
+            elif weight == 0:
+                term_ct = 1
+            else:
+                pos_weight = -weight
+                pos_prod = pow(c, pos_weight, n2)
+                term_ct = PaillierCryptosystem.mod_inverse(pos_prod, n2)
+            acc = (acc * term_ct) % n2
+
+        return {
+            "operation": "linear_combination",
+            "resultCiphertextHex": hex(acc)[2:],
+            "operandsCount": len(terms),
             "publicKeyN": public_key["n"],
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         }

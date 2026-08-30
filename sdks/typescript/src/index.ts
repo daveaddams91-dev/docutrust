@@ -824,6 +824,31 @@ export class DocuTrustClient {
   }
 
   /**
+   * Generates a constant-size batch membership witness for a subset of elements.
+   */
+  public async createAccumulatorBatchWitness(
+    id: string,
+    elements: string[]
+  ): Promise<any> {
+    return this.request('/accumulator/batch-witness', 'POST', { id, elements });
+  }
+
+  /**
+   * Verifies a constant-size batch membership witness.
+   */
+  public async verifyAccumulatorBatchWitness(
+    witness: Record<string, any>,
+    currentAccumulatorHex?: string,
+    modulusHex?: string
+  ): Promise<any> {
+    return this.request('/accumulator/verify-batch', 'POST', {
+      witness,
+      currentAccumulatorHex,
+      modulusHex
+    });
+  }
+
+  /**
    * Creates a W3C BitstringStatusList2024 bitstring instance and optional StatusList2024Credential.
    */
   public async createStatusList2024(
@@ -1230,6 +1255,16 @@ export class DocuTrustClient {
    */
   public async verifyConfidentialThreshold(proof: any): Promise<any> {
     return this.request('/confidential/verify/threshold', 'POST', { proof });
+  }
+
+  /**
+   * Evaluates a homomorphic linear combination (weighted sum) over encrypted Paillier ciphertexts.
+   */
+  public async evaluateConfidentialLinearCombination(
+    terms: Array<{ ciphertext?: string; ciphertextHex?: string; weight: number }>,
+    publicKey: any
+  ): Promise<any> {
+    return this.request('/confidential/compute/linear-combination', 'POST', { terms, publicKey });
   }
 
   // ==========================================

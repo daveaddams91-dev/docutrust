@@ -42,6 +42,7 @@ from docutrust.bundle import AuditBundleEngine
 from docutrust.dataintegrity import DataIntegrityEngine
 from docutrust.confidential import PaillierCryptosystem, ConfidentialClaimsEngine
 from docutrust.jsonld import JsonLdCanonicalizationEngine
+from docutrust.accumulator import CryptographicAccumulator
 from docutrust.trustchain import TrustChainEngine
 from docutrust.quantum_armor import DualHybridKEMEngine
 
@@ -861,7 +862,7 @@ class TestDocuTrustPython(unittest.TestCase):
             mmr=mmr
         )
         self.assertEqual(bundle["type"], "DocuTrustAuditBundle2026")
-        self.assertEqual(bundle["manifest"]["version"], "7.0.0")
+        self.assertEqual(bundle["manifest"]["version"], "8.0.0")
 
         verify_res = AuditBundleEngine.verify_audit_bundle(bundle)
         self.assertTrue(verify_res["valid"])
@@ -1033,6 +1034,44 @@ class TestDocuTrustPython(unittest.TestCase):
         unsealed = DualHybridKEMEngine.unseal_credential(envelope, recipient_keys["hybridSecretKey"])
         self.assertEqual(unsealed["secretClearance"], "Omega-7")
         self.assertEqual(unsealed["authCode"], 987654)
+
+    def test_accumulator_batch_witness(self):
+        acc = CryptographicAccumulator("test-batch-acc")
+        acc.add("doc-1")
+        acc.add("doc-2")
+        acc.add("doc-3")
+        acc.add("doc-4")
+
+        batch_wit = acc.create_batch_witness(["doc-1", "doc-3"])
+        self.assertEqual(batch_wit["elements"], ["doc-1", "doc-3"])
+        self.assertTrue(CryptographicAccumulator.verify_batch_witness(batch_wit, hex(acc.V)[2:]))
+
+        # Tampered element should fail
+        tampered_wit = dict(batch_wit)
+        tampered_wit["elements"] = ["doc-1", "doc-4"]
+        self.assertFalse(CryptographicAccumulator.verify_batch_witness(tampered_wit, hex(acc.V)[2:]))
+
+    def test_confidential_linear_combination(self):
+        keys = PaillierCryptosystem.generate_key_pair(bit_length=256)
+        pub = keys["publicKey"]
+        priv = keys["privateKey"]
+
+        c1 = PaillierCryptosystem.encrypt(10, pub)
+        c2 = PaillierCryptosystem.encrypt(5, pub)
+
+        # Linear combination: 2*c1 + 3*c2 = 2*10 + 3*5 = 35
+        terms = [
+            {"ciphertextHex": c1, "weight": 2},
+            {"ciphertextHex": c2, "weight": 3}
+        ]
+        res = ConfidentialClaimsEngine.evaluate_linear_combination(terms, pub)
+        decrypted = PaillierCryptosystem.decrypt(res["resultCiphertextHex"], priv, pub)
+        self.assertEqual(decrypted, 35)
+
+        # Subtraction: c1 - c2 = 10 - 5 = 5
+        c_sub = PaillierCryptosystem.subtract(c1, c2, pub)
+        dec_sub = PaillierCryptosystem.decrypt(c_sub, priv, pub)
+        self.assertEqual(dec_sub, 5)
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,5 +1,28 @@
 # 📝 DocuTrust Changelog & Release Notes
 
+## [v8.0.0] - Dynamic Accumulator Batch Witnesses, Confidential Linear Combinations, DID Fragment Normalization & Sovereign Trust Mesh Hardening - 2026-08-30
+
+### 🌟 Release Overview (v8.0.0 - Major Milestone Release)
+DocuTrust 8.0.0 advances the sovereign trust fabric with constant-size batch zero-knowledge membership proofs, homomorphic linear combinations, and robust protocol hardening across all layers:
+1. **Dynamic RSA Cryptographic Accumulator Batch Membership Witnesses (`@docutrust/core/accumulator`, `docutrust.accumulator`)**:
+   - Implemented constant-size $O(1)$ batch witness generation ($W_S = g^{\prod_{x_i \notin S} p_i} \pmod N$) and batch verification ($W_S^{\prod_{x_j \in S} p_j} \equiv V \pmod N$) for arbitrary element subsets.
+   - Eliminates linear proof overhead when verifying multiple credential elements or revocation statuses simultaneously.
+2. **Confidential Homomorphic Linear Combinations & Ciphertext Subtraction (`@docutrust/core/confidential`, `docutrust.confidential`)**:
+   - Implemented `evaluateLinearCombination` to compute arbitrary weighted sums ($\sum_{i} w_i \cdot m_i$) over Paillier ciphertexts without decrypting sensitive claims.
+   - Added `subtract` method for homomorphic difference calculation using modular inversion ($c_1 \cdot c_2^{-1} \pmod{N^2}$).
+3. **MultiSig Engine & Canonical Hash Hardening (`@docutrust/core/multisig`, `@docutrust/core/vc`)**:
+   - Fixed canonical JCS hash calculation and proof-embedded hash extraction across `MultiSigEngine.verifyMultiSigCredential`.
+   - Dynamic threshold policy reconstruction and seamless verification of `MultiSigThresholdSignature2026` credentials within `VerifiableCredentialsEngine.verify`.
+4. **Hierarchical Trust Chain DID Fragment Normalization (`@docutrust/core/trustchain`)**:
+   - Hardened `TrustChainEngine.verifyTrustChain` and `verifyDelegationToken` to automatically normalize DID URIs containing key fragments (e.g. `did:key:z6M...#key-1` matches `did:key:z6M...`).
+5. **Full-Stack Synchronization & 100% Test Suite Coverage**:
+   - REST API: Added `/api/v1/accumulator/batch-witness`, `/api/v1/accumulator/verify-batch`, and `/api/v1/confidential/compute/linear-combination`.
+   - CLI: Added `accumulator-batch-witness`, `accumulator-verify-batch`, and `confidential-linear-combination` with cross-platform Windows path parsing.
+   - SDKs: TypeScript client (`@docutrust/sdk`) and Python client (`docutrust`) with complete API parity.
+   - 100% test pass rate across all 64 Core tests, 53 API tests, 42 CLI tests, 4 TypeScript SDK tests, and 56 Python SDK tests.
+
+---
+
 ## [v7.0.0] - Quantum Sovereign Trust Mesh: Unified Verification Pipeline, Post-Quantum Multi-Engine Hardening, Comprehensive CLI Synchronization & Zero-Friction Monorepo Governance - 2026-08-30
 
 ### 🌟 Release Overview (v7.0.0 - Major Milestone Release)

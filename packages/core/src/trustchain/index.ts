@@ -116,7 +116,8 @@ export class TrustChainEngine {
     let pubHex = expectedDelegatorPublicKeyHex;
     if (!pubHex && token.delegatorDid.startsWith('did:key:')) {
       try {
-        const raw = decodeBase58(token.delegatorDid.replace('did:key:z', ''));
+        const cleanDid = token.delegatorDid.split('#')[0];
+        const raw = decodeBase58(cleanDid.replace('did:key:z', ''));
         pubHex = raw.subarray(2).toString('hex');
       } catch (_) {}
     }
@@ -142,6 +143,7 @@ export class TrustChainEngine {
     leafIssuerDid?: string;
     targetCredentialType?: string;
     maxAllowedDepth?: number;
+    revokedTokenIds?: Set<string> | string[];
   }): TrustChainVerificationResult {
     const errors: string[] = [];
     const chain = options.chain || options.delegationTokens || [];
@@ -166,9 +168,12 @@ export class TrustChainEngine {
       credTypes = Array.isArray(options.credential.type) ? options.credential.type : [options.credential.type];
     }
 
+    const normalizeDid = (did?: string) => (did ? did.split('#')[0] : '');
+
     // 1. Root token delegator must be in accreditedRootDids
     const rootToken = chain[0];
-    const isAccreditedRoot = accreditedRootDids.length === 0 || accreditedRootDids.includes(rootToken.delegatorDid);
+    const isAccreditedRoot = accreditedRootDids.length === 0 ||
+      accreditedRootDids.some(d => normalizeDid(d) === normalizeDid(rootToken.delegatorDid));
     if (!isAccreditedRoot) {
       errors.push(`Root delegator ${rootToken.delegatorDid} is not accredited.`);
     }
@@ -179,8 +184,18 @@ export class TrustChainEngine {
       const token = chain[i];
 
       // Delegator linkage check
-      if (token.delegatorDid !== currentDelegator) {
+      if (normalizeDid(token.delegatorDid) !== normalizeDid(currentDelegator)) {
         errors.push(`Chain broken at step ${i}: expected delegator ${currentDelegator}, found ${token.delegatorDid}`);
+      }
+
+      // Check if token has been revoked
+      if (options.revokedTokenIds) {
+        const isRevoked = options.revokedTokenIds instanceof Set
+          ? options.revokedTokenIds.has(token.id)
+          : options.revokedTokenIds.includes(token.id);
+        if (isRevoked) {
+          errors.push(`Delegation token at step ${i} (ID: ${token.id}) has been revoked.`);
+        }
       }
 
       // Cryptographic signature check
@@ -212,7 +227,7 @@ export class TrustChainEngine {
 
     // 3. Final delegate in chain must match the credential issuer if specified
     const leafToken = chain[chain.length - 1];
-    if (credIssuer && leafToken.delegateDid !== credIssuer) {
+    if (credIssuer && normalizeDid(leafToken.delegateDid) !== normalizeDid(credIssuer)) {
       errors.push(`Leaf delegate ${leafToken.delegateDid} does not match credential issuer ${credIssuer}.`);
     }
 

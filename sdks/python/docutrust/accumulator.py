@@ -155,6 +155,33 @@ class CryptographicAccumulator:
             "accumulator_id": self.id
         }
 
+    def create_batch_witness(self, elements: List[str]) -> Dict[str, Any]:
+        """Generates a constant-size batch membership witness for a subset of elements in O(1) verification size."""
+        if not elements:
+            raise ValueError("Cannot create batch witness for empty elements list.")
+
+        for elem in elements:
+            if elem not in self.members:
+                raise ValueError(f"Cannot create batch witness: element '{elem}' is not present in accumulator.")
+
+        subset_set = set(elements)
+        product_prime = 1
+        for elem in elements:
+            product_prime *= self.prime_map[elem]
+
+        ws = self.g
+        for elem, p in self.prime_map.items():
+            if elem not in subset_set:
+                ws = pow(ws, p, self.N)
+
+        return {
+            "elements": elements,
+            "product_prime_hex": hex(product_prime)[2:],
+            "witness": hex(ws)[2:],
+            "accumulator_id": self.id,
+            "accumulator_hex": hex(self.V)[2:]
+        }
+
     def create_non_membership_witness(self, element: str) -> Dict[str, str]:
         """
         Generates an O(1) Non-Membership Witness for an element NOT in the accumulator.
@@ -243,6 +270,36 @@ class CryptographicAccumulator:
 
             lhs = (dx * vb) % n
             return lhs == (g % n)
+        except Exception:
+            return False
+
+    @classmethod
+    def verify_batch_witness(
+        cls,
+        witness: Dict[str, Any],
+        current_accumulator_hex: str,
+        modulus_hex: str = DEFAULT_MODULUS_HEX
+    ) -> bool:
+        """Verifies a constant-size batch membership witness against the current accumulator value."""
+        try:
+            elems = witness.get("elements", [])
+            if not elems:
+                return False
+            n = int(modulus_hex, 16)
+            ws = int(witness["witness"], 16)
+            claimed_product = int(witness.get("product_prime_hex") or witness.get("productPrimeHex", "0"), 16)
+            v = int(current_accumulator_hex, 16)
+
+            expected_product = 1
+            for elem in elems:
+                p = cls.element_to_prime(elem)
+                expected_product *= p
+
+            if expected_product != claimed_product:
+                return False
+
+            computed_v = pow(ws, expected_product, n)
+            return computed_v == v
         except Exception:
             return False
 

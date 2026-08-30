@@ -6,7 +6,7 @@ from typing import Dict, Any, List, Optional, Union
 from .crypto import canonicalize_json, sha256_hex, MerkleTree
 
 class DocuTrustClient:
-    """Client for DocuTrust Sovereign Trust API v7.0.0."""
+    """Client for DocuTrust Sovereign Trust API v8.0.0."""
     def __init__(self, api_url: str = "https://api.docutrust.org/api/v1", api_key: Optional[str] = None):
         self.api_url = api_url.rstrip("/")
         self.api_key = api_key
@@ -617,6 +617,26 @@ class DocuTrustClient:
             kwargs["generator_hex"] = generator_hex
         return CryptographicAccumulator(accumulator_id, **kwargs)
 
+    def create_accumulator_batch_witness(
+        self,
+        accumulator: Any,
+        elements: List[str]
+    ) -> Dict[str, Any]:
+        """Generates a constant-size batch membership witness for a subset of elements."""
+        return accumulator.create_batch_witness(elements)
+
+    def verify_accumulator_batch_witness(
+        self,
+        witness: Dict[str, Any],
+        current_accumulator_hex: str,
+        modulus_hex: Optional[str] = None
+    ) -> bool:
+        """Verifies a constant-size batch membership witness."""
+        from .accumulator import CryptographicAccumulator
+        if modulus_hex:
+            return CryptographicAccumulator.verify_batch_witness(witness, current_accumulator_hex, modulus_hex)
+        return CryptographicAccumulator.verify_batch_witness(witness, current_accumulator_hex)
+
     def encrypt_jwe(
         self,
         payload: Union[str, bytes, Dict[str, Any]],
@@ -1069,6 +1089,15 @@ class DocuTrustClient:
         """Verifies a confidential threshold proof."""
         from .confidential import ConfidentialClaimsEngine
         return ConfidentialClaimsEngine.verify_threshold_proof(proof)
+
+    def evaluate_confidential_linear_combination(
+        self,
+        terms: List[Dict[str, Any]],
+        public_key: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Evaluates a homomorphic linear combination (weighted sum) over Paillier ciphertexts."""
+        from .confidential import ConfidentialClaimsEngine
+        return ConfidentialClaimsEngine.evaluate_linear_combination(terms, public_key)
 
     # ==========================================
     # v6.0.0 W3C URDNA2015 JSON-LD Engine

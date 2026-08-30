@@ -60,7 +60,7 @@ test('API Server Suite', async (t) => {
     const res = await makeRequest('GET', '/api/v1/health');
     assert.equal(res.status, 200);
     assert.equal(res.body.status, 'healthy');
-    assert.equal(res.body.version, '7.0.0');
+    assert.equal(res.body.version, '8.0.0');
     assert.ok(Array.isArray(res.body.features));
     assert.ok(res.body.systemDid.startsWith('did:key:z6M'));
   });
@@ -1253,6 +1253,53 @@ test('API Server Suite', async (t) => {
     });
     assert.equal(unsealRes.status, 200);
     assert.deepEqual(unsealRes.body.payload, payload);
+  });
+
+  await t.test('51. POST /api/v1/accumulator (Batch Witness Generation & Verification)', async () => {
+    const accCreate = await makeRequest('POST', '/api/v1/accumulator/create', { id: 'batch-test-acc' });
+    assert.equal(accCreate.status, 200);
+
+    const docA = 'doc-001-alpha';
+    const docB = 'doc-002-beta';
+    const docC = 'doc-003-gamma';
+
+    await makeRequest('POST', '/api/v1/accumulator/add', { id: 'batch-test-acc', elements: [docA, docB, docC] });
+
+    const batchWitRes = await makeRequest('POST', '/api/v1/accumulator/batch-witness', {
+      id: 'batch-test-acc',
+      elements: [docA, docC]
+    });
+    assert.equal(batchWitRes.status, 200);
+    assert.equal(batchWitRes.body.success, true);
+    assert.equal(batchWitRes.body.witness.elements.length, 2);
+
+    const verifyBatchRes = await makeRequest('POST', '/api/v1/accumulator/verify-batch', {
+      witness: batchWitRes.body.witness,
+      currentAccumulatorHex: batchWitRes.body.witness.accumulatorHex,
+      modulusHex: accCreate.body.state.modulusHex
+    });
+    assert.equal(verifyBatchRes.status, 200);
+    assert.equal(verifyBatchRes.body.valid, true);
+  });
+
+  await t.test('52. POST /api/v1/confidential/compute/linear-combination', async () => {
+    const keygenRes = await makeRequest('POST', '/api/v1/confidential/keygen', { bitLength: 256 });
+    assert.equal(keygenRes.status, 200);
+    const pubKey = keygenRes.body.keys.publicKey;
+
+    const encA = (await makeRequest('POST', '/api/v1/confidential/encrypt', { claimKey: 'scoreA', value: 50, publicKey: pubKey })).body.encryptedClaim;
+    const encB = (await makeRequest('POST', '/api/v1/confidential/encrypt', { claimKey: 'scoreB', value: 20, publicKey: pubKey })).body.encryptedClaim;
+
+    const linRes = await makeRequest('POST', '/api/v1/confidential/compute/linear-combination', {
+      publicKey: pubKey,
+      terms: [
+        { ciphertextHex: encA.ciphertextHex, weight: 3 },
+        { ciphertextHex: encB.ciphertextHex, weight: 2 }
+      ]
+    });
+    assert.equal(linRes.status, 200);
+    assert.equal(linRes.body.success, true);
+    assert.equal(linRes.body.result.operandsCount, 2);
   });
 });
 
