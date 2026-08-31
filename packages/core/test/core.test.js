@@ -146,7 +146,14 @@ const {
   BitstringStatusListAggregator,
   RingSignatureEngine,
   SparseMerkleTree,
-  generateSMTVerifierContract
+  generateSMTVerifierContract,
+  // v11.0.0 Engines
+  SLHDSAEngine,
+  WebAuthnAttestationEngine,
+  CrossChainBridgeEngine,
+  Groth16Engine,
+  generateBridgeRelayerContract,
+  generateGroth16VerifierContract
 } = require('../dist/index.js');
 
 // 1. Cryptography Tests
@@ -2694,6 +2701,157 @@ test('77. verifySignature: native public key parsing for did:peer:0 and did:jwk'
   const isJwkValid = verifySignature(message, sig, jwk);
   assert.equal(isJwkValid, true);
 });
+
+// 78. NIST FIPS 205 SLH-DSA Stateless Hash-Based Post-Quantum Signatures
+test('78. SLHDSAEngine: generateKeyPair, sign, verify, and did:slh resolution', async () => {
+  const kp = SLHDSAEngine.generateKeyPair();
+  assert.equal(kp.algorithm, 'SLH-DSA-SHA2-128s');
+  assert.ok(kp.did.startsWith('did:slh:z'));
+  assert.equal(kp.publicKeyHex.length, 128);
+
+  const message = 'Post-Quantum Sovereign Assertion 2026';
+  const sig = SLHDSAEngine.sign(message, kp);
+  assert.equal(sig.algorithm, 'SLH-DSA-SHA2-128s');
+  assert.ok(sig.signatureValue.startsWith('slh1_'));
+
+  // Direct verify
+  const isValid = SLHDSAEngine.verify(message, sig, kp.publicKeyHex);
+  assert.equal(isValid, true);
+
+  // Verify with did:slh string
+  const isDidValid = SLHDSAEngine.verify(message, sig.signatureValue, kp.did);
+  assert.equal(isDidValid, true);
+
+  // DID Resolver test
+  const didDoc = await DIDResolver.resolve(kp.did);
+  assert.equal(didDoc.id, kp.did);
+  assert.equal(didDoc.verificationMethod[0].type, 'SLHDSAVerificationKey2026');
+
+  // Verify tampering detection
+  const isTamperedValid = SLHDSAEngine.verify('Altered message', sig, kp.publicKeyHex);
+  assert.equal(isTamperedValid, false);
+});
+
+// 79. WebAuthn / FIDO2 Passkey Hardware Attestation Engine
+test('79. WebAuthnAttestationEngine: generateKeyPair, createAssertion, and verifyAssertion', async () => {
+  const kp = WebAuthnAttestationEngine.generateKeyPair('docutrust.id');
+  assert.equal(kp.algorithm, 'ES256');
+  assert.ok(kp.did.startsWith('did:webauthn:z'));
+
+  const challenge = sha256Hex('webauthn-authentication-challenge-123');
+  const assertion = WebAuthnAttestationEngine.createAssertion(challenge, kp, {
+    rpId: 'docutrust.id',
+    userPresent: true,
+    userVerified: true
+  });
+
+  assert.ok(assertion.clientDataJSON);
+  assert.ok(assertion.authenticatorData);
+  assert.ok(assertion.signatureHex);
+
+  const result = WebAuthnAttestationEngine.verifyAssertion(assertion, challenge, kp, {
+    expectedRpId: 'docutrust.id',
+    requireUserVerification: true
+  });
+
+  assert.equal(result.valid, true);
+  assert.equal(result.userPresent, true);
+  assert.equal(result.userVerified, true);
+  assert.equal(result.rpIdMatch, true);
+  assert.equal(result.challengeMatch, true);
+
+  // Challenge mismatch check
+  const badResult = WebAuthnAttestationEngine.verifyAssertion(assertion, 'wrong-challenge', kp);
+  assert.equal(badResult.valid, false);
+
+  // DID Resolver test
+  const didDoc = await DIDResolver.resolve(kp.did);
+  assert.equal(didDoc.id, kp.did);
+  assert.equal(didDoc.verificationMethod[0].type, 'JsonWebKey2020');
+});
+
+// 80. Multi-Chain Verifiable Attestation Bridge & Interoperability Relayer
+test('80. CrossChainBridgeEngine: message creation, signing, multi-relayer quorum, and verification', () => {
+  const relayer1 = generateKeyPair();
+  const relayer2 = generateKeyPair();
+
+  const stateRoot = sha256Hex('merkle-smt-state-root-batch-001');
+  const payloadHash = sha256Hex('revocation-list-v11');
+
+  const msg = CrossChainBridgeEngine.createMessage({
+    sourceChainId: 1, // Ethereum
+    destinationChainId: 42161, // Arbitrum
+    sequenceNonce: 101,
+    stateRoot,
+    payloadHash,
+    senderAddress: '0x1111111111111111111111111111111111111111',
+    recipientAddress: '0x2222222222222222222222222222222222222222'
+  });
+
+  const sig1 = CrossChainBridgeEngine.signMessage(msg, relayer1);
+  const sig2 = CrossChainBridgeEngine.signMessage(msg, relayer2);
+
+  const attestation = CrossChainBridgeEngine.assembleAttestation(msg, [sig1, sig2], 2);
+  assert.equal(attestation.relayStatus, 'RELAYED');
+
+  const verifyResult = CrossChainBridgeEngine.verifyAttestation(attestation, [
+    relayer1.publicKeyHex,
+    relayer2.publicKeyHex
+  ]);
+
+  assert.equal(verifyResult.valid, true);
+  assert.equal(verifyResult.validSignaturesCount, 2);
+
+  // Replay check
+  const replayResult = CrossChainBridgeEngine.verifyAttestation(attestation);
+  assert.equal(replayResult.valid, false);
+  assert.ok(replayResult.errors.some(e => e.includes('Replay attack detected')));
+});
+
+// 81. Zero-Knowledge Succinct Proofs (ZK-SNARK / Groth16) & Proof Aggregation
+test('81. Groth16Engine: generateVerificationKey, createProof, verifyProof, and aggregateProofs', () => {
+  const circuitName = 'AgeAndIdentityComplianceCircuit';
+  const vk = Groth16Engine.generateVerificationKey(circuitName, 2);
+
+  const publicInputs = [
+    '0x0000000000000000000000000000000000000000000000000000000000000015', // Age 21
+    '0x000000000000000000000000000000000000000000000000000000000000034a'  // Country Code 842
+  ];
+
+  const proof = Groth16Engine.createProof(circuitName, publicInputs, { secretSSN: '999-00-1111' });
+  assert.equal(proof.type, 'DocuTrustGroth16Proof2026');
+  assert.equal(proof.curve, 'BN254');
+
+  const result = Groth16Engine.verifyProof(proof, vk);
+  assert.equal(result.valid, true);
+  assert.equal(result.errors.length, 0);
+
+  // Aggregate multiple proofs
+  const proof2 = Groth16Engine.createProof(circuitName, publicInputs, { secretSSN: '888-00-2222' });
+  const aggregated = Groth16Engine.aggregateProofs([proof, proof2]);
+  assert.equal(aggregated.proofCount, 2);
+  assert.ok(aggregated.publicInputsCommitment);
+});
+
+// 82. EVM Bridge Relayer and Groth16 Verifier Smart Contract Generators
+test('82. SolidityEngine: generateBridgeRelayerContract & generateGroth16VerifierContract', () => {
+  const bridgeSol = generateBridgeRelayerContract({
+    contractName: 'DocuTrustProductionBridge',
+    solidityVersion: '^0.8.20'
+  });
+  assert.ok(bridgeSol.includes('contract DocuTrustProductionBridge'));
+  assert.ok(bridgeSol.includes('relayCrossChainState'));
+  assert.ok(bridgeSol.includes('computeDigest'));
+
+  const groth16Sol = generateGroth16VerifierContract({
+    contractName: 'DocuTrustBN254Verifier',
+    solidityVersion: '^0.8.20'
+  });
+  assert.ok(groth16Sol.includes('contract DocuTrustBN254Verifier'));
+  assert.ok(groth16Sol.includes('verifyProof'));
+  assert.ok(groth16Sol.includes('staticcall(sub(gas(), 2000), 8'));
+});
+
 
 
 

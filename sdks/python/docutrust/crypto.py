@@ -84,6 +84,8 @@ def sign_data(payload: Union[str, bytes], private_key: Union[str, Dict[str, Any]
     priv_bytes = bytes.fromhex(private_key_hex) if len(private_key_hex) == 64 else private_key_hex.encode('utf-8')
     return hashlib.sha512(priv_bytes + data_bytes).hexdigest()
 
+sign_message = sign_data
+
 
 def verify_signature(payload: Union[str, bytes], signature_hex: str, public_key_hex: str) -> bool:
     """Verifies data signature."""

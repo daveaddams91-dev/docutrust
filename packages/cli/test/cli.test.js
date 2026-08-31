@@ -800,15 +800,15 @@ test('CLI Suite', async (t) => {
     assert.ok(aggOut.includes('Status List Multi-Partition Root matches'));
   });
 
-  await t.test('29. docutrust version displays v10.0.0', () => {
+  await t.test('29. docutrust version displays v11.0.0', () => {
     const out1 = execSync(`node "${cliPath}" version`).toString().trim();
-    assert.equal(out1, '10.0.0');
+    assert.equal(out1, '11.0.0');
 
     const out2 = execSync(`node "${cliPath}" --version`).toString().trim();
-    assert.equal(out2, '10.0.0');
+    assert.equal(out2, '11.0.0');
 
     const out3 = execSync(`node "${cliPath}" -v`).toString().trim();
-    assert.equal(out3, '10.0.0');
+    assert.equal(out3, '11.0.0');
   });
 
   await t.test('30. docutrust ringsig-sign and ringsig-verify (Linkable Ring Signatures)', () => {
@@ -854,6 +854,92 @@ test('CLI Suite', async (t) => {
     const code = fs.readFileSync(smtSolFile, 'utf-8');
     assert.ok(code.includes('contract DocuTrustSMTVerifier'));
     assert.ok(code.includes('verifySMTProof'));
+  });
+
+  await t.test('33. docutrust slhdsa-keygen, slhdsa-sign, and slhdsa-verify', () => {
+    const slhKpFile = path.join(tempDir, 'slh-keypair.json');
+    const slhSigFile = path.join(tempDir, 'slh-sig.json');
+    const message = 'SLH-DSA CLI Test Message';
+
+    const keygenOut = execSync(`node "${cliPath}" slhdsa-keygen --out "${slhKpFile}"`).toString();
+    assert.ok(keygenOut.includes('SLH-DSA-SHA2-128s KeyPair generated'));
+    assert.ok(fs.existsSync(slhKpFile));
+
+    const signOut = execSync(`node "${cliPath}" slhdsa-sign --msg "${message}" --key "${slhKpFile}" --out "${slhSigFile}"`).toString();
+    assert.ok(signOut.includes('Message signed with NIST FIPS 205 SLH-DSA'));
+    assert.ok(fs.existsSync(slhSigFile));
+
+    const verifyOut = execSync(`node "${cliPath}" slhdsa-verify --msg "${message}" --sig "${slhSigFile}" --pub "${slhKpFile}"`).toString();
+    assert.ok(verifyOut.includes('100% CRYPTOGRAPHICALLY AUTHENTIC'));
+  });
+
+  await t.test('34. docutrust webauthn-keygen, webauthn-assert, and webauthn-verify', () => {
+    const passkeyFile = path.join(tempDir, 'passkey.json');
+    const assertFile = path.join(tempDir, 'assertion.json');
+    const challenge = 'cli-passkey-challenge-77';
+
+    const keygenOut = execSync(`node "${cliPath}" webauthn-keygen --rp "cli.docutrust.id" --out "${passkeyFile}"`).toString();
+    assert.ok(keygenOut.includes('WebAuthn P-256 Passkey KeyPair generated'));
+    assert.ok(fs.existsSync(passkeyFile));
+
+    const assertOut = execSync(`node "${cliPath}" webauthn-assert --challenge "${challenge}" --key "${passkeyFile}" --rp "cli.docutrust.id" --out "${assertFile}"`).toString();
+    assert.ok(assertOut.includes('Hardware WebAuthn Passkey Assertion created'));
+    assert.ok(fs.existsSync(assertFile));
+
+    const verifyOut = execSync(`node "${cliPath}" webauthn-verify --assertion "${assertFile}" --challenge "${challenge}" --pub "${passkeyFile}" --rp "cli.docutrust.id"`).toString();
+    assert.ok(verifyOut.includes('AUTHENTIC'));
+    assert.ok(verifyOut.includes('User Present (UP): YES'));
+  });
+
+  await t.test('35. docutrust crosschain-bridge, crosschain-sign, and crosschain-verify', () => {
+    const msgFile = path.join(tempDir, 'bridge-msg.json');
+    const sigFile = path.join(tempDir, 'relayer-sig.json');
+    const attestFile = path.join(tempDir, 'bridge-attestation.json');
+    const relayerKpFile = path.join(tempDir, 'relayer-keys.json');
+
+    execSync(`node "${cliPath}" keygen --out "${relayerKpFile}"`);
+    const relayerKp = JSON.parse(fs.readFileSync(relayerKpFile, 'utf-8'));
+
+    const bridgeOut = execSync(`node "${cliPath}" crosschain-bridge --source 1 --dest 42161 --nonce 10 --root "${'0x' + 'c'.repeat(64)}" --payload "${'0x' + 'd'.repeat(64)}" --out "${msgFile}"`).toString();
+    assert.ok(bridgeOut.includes('Cross-Chain Bridge Message constructed'));
+
+    const signOut = execSync(`node "${cliPath}" crosschain-sign --msg "${msgFile}" --relayer "${relayerKpFile}" --out "${sigFile}"`).toString();
+    assert.ok(signOut.includes('Relayer signed cross-chain message'));
+
+    const msg = JSON.parse(fs.readFileSync(msgFile, 'utf-8'));
+    const sig = JSON.parse(fs.readFileSync(sigFile, 'utf-8'));
+    const attestation = core.CrossChainBridgeEngine.assembleAttestation(msg, [sig], 1);
+    fs.writeFileSync(attestFile, JSON.stringify(attestation, null, 2), 'utf-8');
+
+    const verifyOut = execSync(`node "${cliPath}" crosschain-verify --attestation "${attestFile}" --relayers "${relayerKp.publicKeyHex}"`).toString();
+    assert.ok(verifyOut.includes('VALID & QUORUM SATISFIED'));
+  });
+
+  await t.test('36. docutrust groth16-setup, groth16-prove, and groth16-verify', () => {
+    const vkFile = path.join(tempDir, 'circuit.vk.json');
+    const proofFile = path.join(tempDir, 'circuit.proof.json');
+
+    const setupOut = execSync(`node "${cliPath}" groth16-setup --circuit "IdentityCompliance" --inputs 2 --out "${vkFile}"`).toString();
+    assert.ok(setupOut.includes('Groth16 Verification Key generated'));
+
+    const proveOut = execSync(`node "${cliPath}" groth16-prove --circuit "IdentityCompliance" --inputs "100,200" --out "${proofFile}"`).toString();
+    assert.ok(proveOut.includes('Zero-Knowledge Groth16 Proof generated'));
+
+    const verifyOut = execSync(`node "${cliPath}" groth16-verify --proof "${proofFile}" --vk "${vkFile}"`).toString();
+    assert.ok(verifyOut.includes('CRYPTOGRAPHICALLY VALID'));
+  });
+
+  await t.test('37. docutrust solidity-export-bridge and solidity-export-groth16', () => {
+    const bridgeSol = path.join(tempDir, 'DocuTrustBridgeRelayer.sol');
+    const grothSol = path.join(tempDir, 'DocuTrustGroth16Verifier.sol');
+
+    const bOut = execSync(`node "${cliPath}" solidity-export-bridge --out "${bridgeSol}"`).toString();
+    assert.ok(bOut.includes('Solidity Cross-Chain Bridge Relayer smart contract exported'));
+    assert.ok(fs.existsSync(bridgeSol));
+
+    const gOut = execSync(`node "${cliPath}" solidity-export-groth16 --out "${grothSol}"`).toString();
+    assert.ok(gOut.includes('Solidity Groth16 Verifier smart contract exported'));
+    assert.ok(fs.existsSync(grothSol));
   });
 });
 

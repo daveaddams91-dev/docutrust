@@ -83,7 +83,83 @@ export class DIDResolver {
       return this.resolveDidWeb(did);
     }
 
+    if (did.startsWith('did:webauthn:')) {
+      return this.resolveDidWebAuthn(did);
+    }
+
+    if (did.startsWith('did:slh:')) {
+      return this.resolveDidSLH(did);
+    }
+
     throw new Error(`Unsupported DID method: ${did}`);
+  }
+
+  /**
+   * Deterministically resolve a did:webauthn (NIST P-256 / ES256 Passkey).
+   */
+  public static resolveDidWebAuthn(did: string): DIDDocument {
+    const multibase = did.replace('did:webauthn:', '');
+    if (!multibase.startsWith('z')) {
+      throw new Error(`Invalid did:webauthn format. Expected multibase 'z' prefix.`);
+    }
+
+    const decoded = decodeBase58(multibase.substring(1));
+    const rawPub = decoded.subarray(2);
+    const publicKeyHex = rawPub.toString('hex');
+    const keyId = `${did}#passkey-1`;
+
+    return {
+      '@context': [
+        'https://www.w3.org/ns/did/v1',
+        'https://w3id.org/security/suites/jws-2020/v1'
+      ],
+      id: did,
+      verificationMethod: [
+        {
+          id: keyId,
+          type: 'JsonWebKey2020',
+          controller: did,
+          publicKeyHex,
+          publicKeyMultibase: multibase
+        }
+      ],
+      authentication: [keyId],
+      assertionMethod: [keyId]
+    };
+  }
+
+  /**
+   * Deterministically resolve a did:slh (NIST FIPS 205 SLH-DSA-SHA2-128s).
+   */
+  public static resolveDidSLH(did: string): DIDDocument {
+    const multibase = did.replace('did:slh:', '');
+    if (!multibase.startsWith('z')) {
+      throw new Error(`Invalid did:slh format. Expected multibase 'z' prefix.`);
+    }
+
+    const decoded = decodeBase58(multibase.substring(1));
+    const rawPub = decoded.subarray(2);
+    const publicKeyHex = rawPub.toString('hex');
+    const keyId = `${did}#slh-dsa-1`;
+
+    return {
+      '@context': [
+        'https://www.w3.org/ns/did/v1',
+        'https://w3id.org/security/data-integrity/v1'
+      ],
+      id: did,
+      verificationMethod: [
+        {
+          id: keyId,
+          type: 'SLHDSAVerificationKey2026',
+          controller: did,
+          publicKeyHex,
+          publicKeyMultibase: multibase
+        }
+      ],
+      authentication: [keyId],
+      assertionMethod: [keyId]
+    };
   }
 
   /**

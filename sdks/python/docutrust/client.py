@@ -1326,4 +1326,116 @@ class DocuTrustClient:
             solidity_version=solidity_version
         )
 
+    # ========================================================
+    # v11.0.0 NIST FIPS 205 SLH-DSA Methods
+    # ========================================================
+
+    def generate_slhdsa_key_pair(self) -> Dict[str, Any]:
+        """Generates a NIST FIPS 205 SLH-DSA keypair."""
+        from .slhdsa import SLHDSAEngine
+        return SLHDSAEngine.generate_key_pair()
+
+    def sign_slhdsa(self, message: Any, key_pair: Dict[str, Any]) -> Dict[str, Any]:
+        """Signs a message with SLH-DSA."""
+        from .slhdsa import SLHDSAEngine
+        return SLHDSAEngine.sign(message, key_pair)
+
+    def verify_slhdsa(self, message: Any, signature: Any, public_key: Any) -> bool:
+        """Verifies an SLH-DSA post-quantum signature."""
+        from .slhdsa import SLHDSAEngine
+        return SLHDSAEngine.verify(message, signature, public_key)
+
+    # ========================================================
+    # v11.0.0 WebAuthn / FIDO2 Passkey Methods
+    # ========================================================
+
+    def generate_webauthn_key_pair(self, rp_id: str = "localhost") -> Dict[str, Any]:
+        """Generates a WebAuthn P-256 passkey keypair."""
+        from .webauthn import WebAuthnAttestationEngine
+        return WebAuthnAttestationEngine.generate_key_pair(rp_id)
+
+    def create_webauthn_assertion(self, challenge: str, key_pair: Dict[str, Any], options: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Creates a signed hardware passkey assertion."""
+        from .webauthn import WebAuthnAttestationEngine
+        return WebAuthnAttestationEngine.create_assertion(challenge, key_pair, options)
+
+    def verify_webauthn_assertion(self, assertion: Dict[str, Any], challenge: str, public_key: Any, options: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Verifies a WebAuthn passkey assertion."""
+        from .webauthn import WebAuthnAttestationEngine
+        return WebAuthnAttestationEngine.verify_assertion(assertion, challenge, public_key, options)
+
+    # ========================================================
+    # v11.0.0 Multi-Chain Verifiable Attestation Bridge Methods
+    # ========================================================
+
+    def create_crosschain_message(
+        self,
+        source_chain_id: int,
+        destination_chain_id: int,
+        sequence_nonce: int,
+        state_root: str,
+        payload_hash: str,
+        sender_address: str = "0x0000000000000000000000000000000000000001",
+        recipient_address: str = "0x0000000000000000000000000000000000000002"
+    ) -> Dict[str, Any]:
+        """Constructs a standard cross-chain attestation bridge message."""
+        from .crosschain import CrossChainBridgeEngine
+        return CrossChainBridgeEngine.create_message(
+            source_chain_id, destination_chain_id, sequence_nonce, state_root, payload_hash, sender_address, recipient_address
+        )
+
+    def sign_crosschain_message(self, message: Dict[str, Any], relayer_key_pair: Dict[str, Any]) -> Dict[str, Any]:
+        """Signs a cross-chain packet as an authorized relayer."""
+        from .crosschain import CrossChainBridgeEngine
+        return CrossChainBridgeEngine.sign_message(message, relayer_key_pair)
+
+    def assemble_crosschain_attestation(self, message: Dict[str, Any], signatures: List[Dict[str, Any]], quorum_threshold: int = 1) -> Dict[str, Any]:
+        """Assembles relayer signatures into a cross-chain attestation."""
+        from .crosschain import CrossChainBridgeEngine
+        return CrossChainBridgeEngine.assemble_attestation(message, signatures, quorum_threshold)
+
+    def verify_crosschain_attestation(self, attestation: Dict[str, Any], authorized_relayers: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Verifies a multi-relayer cross-chain attestation against quorum threshold."""
+        from .crosschain import CrossChainBridgeEngine
+        return CrossChainBridgeEngine.verify_attestation(attestation, authorized_relayers)
+
+    # ========================================================
+    # v11.0.0 BN254 Groth16 Zero-Knowledge SNARK Methods
+    # ========================================================
+
+    def setup_groth16_circuit(self, circuit_name: str, public_input_count: int = 2) -> Dict[str, Any]:
+        """Generates a Groth16 circuit verification key."""
+        from .groth16 import Groth16Engine
+        return Groth16Engine.generate_verification_key(circuit_name, public_input_count)
+
+    def prove_groth16(self, circuit_name: str, public_inputs: List[Any], witness_secret: Optional[Any] = None) -> Dict[str, Any]:
+        """Generates a BN254 Groth16 Zero-Knowledge proof."""
+        from .groth16 import Groth16Engine
+        return Groth16Engine.create_proof(circuit_name, public_inputs, witness_secret)
+
+    def verify_groth16_proof(self, proof: Dict[str, Any], vk: Dict[str, Any]) -> Dict[str, Any]:
+        """Verifies a BN254 Groth16 ZK-SNARK proof against a verification key."""
+        from .groth16 import Groth16Engine
+        return Groth16Engine.verify_proof(proof, vk)
+
+    def aggregate_groth16_proofs(self, proofs: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Aggregates multiple Groth16 proofs into a batched verification payload."""
+        from .groth16 import Groth16Engine
+        return Groth16Engine.aggregate_proofs(proofs)
+
+    # ========================================================
+    # v11.0.0 Solidity Exporters
+    # ========================================================
+
+    def generate_solidity_bridge_relayer(self, contract_name: str = "DocuTrustBridgeRelayer", solidity_version: str = "^0.8.20") -> str:
+        """Generates production-ready Solidity contract for Cross-Chain Bridge Relayer."""
+        from .solidity import SolidityEngine
+        return SolidityEngine.generate_bridge_relayer_contract(contract_name, solidity_version)
+
+    def generate_solidity_groth16_verifier(self, contract_name: str = "DocuTrustGroth16Verifier", solidity_version: str = "^0.8.20") -> str:
+        """Generates production-ready Solidity contract for Groth16 SNARK verification."""
+        from .solidity import SolidityEngine
+        return SolidityEngine.generate_groth16_verifier_contract(contract_name, solidity_version)
+
+
 

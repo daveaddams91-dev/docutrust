@@ -87,7 +87,13 @@ const {
   generateRegistryContract,
   RingSignatureEngine,
   SparseMerkleTree,
-  generateSMTVerifierContract
+  generateSMTVerifierContract,
+  SLHDSAEngine,
+  WebAuthnAttestationEngine,
+  CrossChainBridgeEngine,
+  Groth16Engine,
+  generateBridgeRelayerContract,
+  generateGroth16VerifierContract
 } = require('@docutrust/core');
 
 const PORT = process.env.PORT || 4000;
@@ -184,10 +190,14 @@ const server = http.createServer(async (req, res) => {
       return jsonResponse(200, {
         status: 'healthy',
         service: 'DocuTrust Sovereign Verifiable Credentials Engine',
-        version: '10.0.0',
+        version: '11.0.0',
         features: [
           'W3C VC 2.0',
           'DID Key Ed25519',
+          'NIST FIPS 205 Stateless Hash-Based Signatures (SLH-DSA)',
+          'WebAuthn / FIDO2 Passkey Hardware Attestation',
+          'Multi-Chain Verifiable Attestation Bridge & Interoperability Relayer',
+          'Zero-Knowledge Succinct Proofs (ZK-SNARK / Groth16)',
           'Post-Quantum ML-DSA Hybrid Dual Signing',
           'Zero-Knowledge Predicates & Range Proofs',
           'BBS+ Unlinkable Multi-Message Signatures',
@@ -201,7 +211,8 @@ const server = http.createServer(async (req, res) => {
           'Universal DID Resolution',
           'Linkable Ring Signatures (LSAG)',
           '256-bit Sparse Merkle Trees (SMT)',
-          'Solidity SMT Verifier Generator'
+          'Solidity SMT Verifier Generator',
+          'Solidity Cross-Chain Bridge Relayer & Groth16 Verifier Generators'
         ],
         systemDid: systemKeyPair.did,
         uptime: process.uptime()
@@ -2229,6 +2240,221 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // ========================================================
+    // v11.0.0 NIST FIPS 205 SLH-DSA Post-Quantum Endpoints
+    // ========================================================
+    if (pathname === '/api/v1/slhdsa/keygen' && req.method === 'POST') {
+      try {
+        const kp = SLHDSAEngine.generateKeyPair();
+        return jsonResponse(200, { success: true, keyPair: kp });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/slhdsa/sign' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { message, keyPair } = body;
+      if (!message || !keyPair) {
+        return jsonResponse(400, { error: 'Missing message or keyPair object.' });
+      }
+      try {
+        const signature = SLHDSAEngine.sign(message, keyPair);
+        return jsonResponse(200, { success: true, signature });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/slhdsa/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { message, signature, publicKey } = body;
+      if (!message || !signature || !publicKey) {
+        return jsonResponse(400, { error: 'Missing message, signature, or publicKey.' });
+      }
+      try {
+        const valid = SLHDSAEngine.verify(message, signature, publicKey);
+        return jsonResponse(200, { success: true, valid });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ========================================================
+    // v11.0.0 WebAuthn / FIDO2 Passkey Hardware Attestation Endpoints
+    // ========================================================
+    if (pathname === '/api/v1/webauthn/keygen' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { rpId = 'localhost' } = body;
+      try {
+        const kp = WebAuthnAttestationEngine.generateKeyPair(rpId);
+        return jsonResponse(200, { success: true, keyPair: kp });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/webauthn/assertion/create' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { challenge, keyPair, options = {} } = body;
+      if (!challenge || !keyPair) {
+        return jsonResponse(400, { error: 'Missing challenge or keyPair.' });
+      }
+      try {
+        const assertion = WebAuthnAttestationEngine.createAssertion(challenge, keyPair, options);
+        return jsonResponse(200, { success: true, assertion });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/webauthn/assertion/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { assertion, expectedChallenge, publicKey, options = {} } = body;
+      if (!assertion || !expectedChallenge || !publicKey) {
+        return jsonResponse(400, { error: 'Missing assertion, expectedChallenge, or publicKey.' });
+      }
+      try {
+        const result = WebAuthnAttestationEngine.verifyAssertion(assertion, expectedChallenge, publicKey, options);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ========================================================
+    // v11.0.0 Multi-Chain Verifiable Attestation Bridge Endpoints
+    // ========================================================
+    if (pathname === '/api/v1/crosschain/message' && req.method === 'POST') {
+      const body = await readJsonBody();
+      try {
+        const message = CrossChainBridgeEngine.createMessage(body);
+        return jsonResponse(200, { success: true, message });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/crosschain/sign' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { message, relayerKeyPair } = body;
+      if (!message || !relayerKeyPair) {
+        return jsonResponse(400, { error: 'Missing message or relayerKeyPair.' });
+      }
+      try {
+        const signature = CrossChainBridgeEngine.signMessage(message, relayerKeyPair);
+        return jsonResponse(200, { success: true, signature });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/crosschain/attest' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { message, signatures, quorumThreshold } = body;
+      if (!message || !signatures) {
+        return jsonResponse(400, { error: 'Missing message or signatures array.' });
+      }
+      try {
+        const attestation = CrossChainBridgeEngine.assembleAttestation(message, signatures, quorumThreshold);
+        return jsonResponse(200, { success: true, attestation });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/crosschain/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { attestation, authorizedRelayers } = body;
+      if (!attestation) {
+        return jsonResponse(400, { error: 'Missing attestation object.' });
+      }
+      try {
+        const result = CrossChainBridgeEngine.verifyAttestation(attestation, authorizedRelayers);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ========================================================
+    // v11.0.0 Groth16 Zero-Knowledge SNARK Endpoints
+    // ========================================================
+    if (pathname === '/api/v1/groth16/setup' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { circuitName = 'StandardComplianceCircuit', publicInputCount = 2 } = body;
+      try {
+        const verificationKey = Groth16Engine.generateVerificationKey(circuitName, publicInputCount);
+        return jsonResponse(200, { success: true, verificationKey });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/groth16/prove' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { circuitName = 'StandardComplianceCircuit', publicInputs = [], privateWitness = {} } = body;
+      try {
+        const proof = Groth16Engine.createProof(circuitName, publicInputs, privateWitness);
+        return jsonResponse(200, { success: true, proof });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/groth16/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { proof, verificationKey } = body;
+      if (!proof || !verificationKey) {
+        return jsonResponse(400, { error: 'Missing proof or verificationKey.' });
+      }
+      try {
+        const result = Groth16Engine.verifyProof(proof, verificationKey);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/groth16/aggregate' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { proofs } = body;
+      if (!proofs || !Array.isArray(proofs)) {
+        return jsonResponse(400, { error: 'Missing proofs array.' });
+      }
+      try {
+        const aggregated = Groth16Engine.aggregateProofs(proofs);
+        return jsonResponse(200, { success: true, aggregated });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ========================================================
+    // v11.0.0 Solidity Bridge & Groth16 Verifier Generators
+    // ========================================================
+    if (pathname === '/api/v1/solidity/export-bridge' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { contractName = 'DocuTrustBridgeRelayer', solidityVersion = '^0.8.20' } = body;
+      try {
+        const contractCode = generateBridgeRelayerContract({ contractName, solidityVersion });
+        return jsonResponse(200, { success: true, contractCode, contractName, solidityVersion });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/solidity/export-groth16' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { contractName = 'DocuTrustGroth16Verifier', solidityVersion = '^0.8.20' } = body;
+      try {
+        const contractCode = generateGroth16VerifierContract({ contractName, solidityVersion });
+        return jsonResponse(200, { success: true, contractCode, contractName, solidityVersion });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
     // Default 404
     jsonResponse(404, { error: 'Route not found' });
   } catch (err) {
@@ -2238,10 +2464,11 @@ const server = http.createServer(async (req, res) => {
 
 if (require.main === module) {
   server.listen(PORT, () => {
-    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v10.0.0 running on http://localhost:${PORT}`);
+    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v11.0.0 running on http://localhost:${PORT}`);
   });
 }
 
 module.exports = { server, generateKeyPair, generatePQCKeyPair, canonicalizeJson, sha256Hex, MerkleTree };
+
 
 

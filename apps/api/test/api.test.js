@@ -61,7 +61,7 @@ test('API Server Suite', async (t) => {
     const res = await makeRequest('GET', '/api/v1/health');
     assert.equal(res.status, 200);
     assert.equal(res.body.status, 'healthy');
-    assert.equal(res.body.version, '10.0.0');
+    assert.equal(res.body.version, '11.0.0');
     assert.ok(Array.isArray(res.body.features));
     assert.ok(res.body.systemDid.startsWith('did:key:z6M'));
   });
@@ -1491,6 +1491,157 @@ test('API Server Suite', async (t) => {
     assert.ok(res.body.contractCode.includes('contract DocuTrustSMTVerifier'));
     assert.ok(res.body.contractCode.includes('verifySMTProof'));
   });
+
+  await t.test('47. POST /api/v1/slhdsa/keygen, sign, verify (NIST FIPS 205 SLH-DSA)', async () => {
+    const keygenRes = await makeRequest('POST', '/api/v1/slhdsa/keygen');
+    assert.equal(keygenRes.status, 200);
+    assert.equal(keygenRes.body.success, true);
+    const kp = keygenRes.body.keyPair;
+    assert.ok(kp.did.startsWith('did:slh:z'));
+
+    const message = 'SLH-DSA Post-Quantum REST API Assertion';
+    const signRes = await makeRequest('POST', '/api/v1/slhdsa/sign', {
+      message,
+      keyPair: kp
+    });
+    assert.equal(signRes.status, 200);
+    assert.equal(signRes.body.success, true);
+    const signature = signRes.body.signature;
+
+    const verifyRes = await makeRequest('POST', '/api/v1/slhdsa/verify', {
+      message,
+      signature: signature.signatureValue,
+      publicKey: kp.publicKeyHex
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.success, true);
+    assert.equal(verifyRes.body.valid, true);
+  });
+
+  await t.test('48. POST /api/v1/webauthn/keygen, assertion create, and verify', async () => {
+    const keygenRes = await makeRequest('POST', '/api/v1/webauthn/keygen', { rpId: 'api.docutrust.id' });
+    assert.equal(keygenRes.status, 200);
+    assert.equal(keygenRes.body.success, true);
+    const kp = keygenRes.body.keyPair;
+    assert.ok(kp.did.startsWith('did:webauthn:z'));
+
+    const challenge = 'challenge-hash-api-9988';
+    const createRes = await makeRequest('POST', '/api/v1/webauthn/assertion/create', {
+      challenge,
+      keyPair: kp,
+      options: { rpId: 'api.docutrust.id', userPresent: true, userVerified: true }
+    });
+    assert.equal(createRes.status, 200);
+    assert.equal(createRes.body.success, true);
+    const assertion = createRes.body.assertion;
+
+    const verifyRes = await makeRequest('POST', '/api/v1/webauthn/assertion/verify', {
+      assertion,
+      expectedChallenge: challenge,
+      publicKey: kp,
+      options: { expectedRpId: 'api.docutrust.id' }
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.success, true);
+    assert.equal(verifyRes.body.valid, true);
+    assert.equal(verifyRes.body.userVerified, true);
+  });
+
+  await t.test('49. POST /api/v1/crosschain/message, sign, attest, and verify', async () => {
+    const msgRes = await makeRequest('POST', '/api/v1/crosschain/message', {
+      sourceChainId: 1,
+      destinationChainId: 8453,
+      sequenceNonce: 55,
+      stateRoot: '0x' + 'a'.repeat(64),
+      payloadHash: '0x' + 'b'.repeat(64),
+      senderAddress: '0x1111111111111111111111111111111111111111',
+      recipientAddress: '0x2222222222222222222222222222222222222222'
+    });
+    assert.equal(msgRes.status, 200);
+    assert.equal(msgRes.body.success, true);
+    const message = msgRes.body.message;
+
+    // Relayer keys
+    const relayerRes = await makeRequest('POST', '/api/v1/keys/generate');
+    const relayerKp = relayerRes.body.keyPair;
+
+    const signRes = await makeRequest('POST', '/api/v1/crosschain/sign', {
+      message,
+      relayerKeyPair: relayerKp
+    });
+    assert.equal(signRes.status, 200);
+    assert.equal(signRes.body.success, true);
+
+    const attestRes = await makeRequest('POST', '/api/v1/crosschain/attest', {
+      message,
+      signatures: [signRes.body.signature],
+      quorumThreshold: 1
+    });
+    assert.equal(attestRes.status, 200);
+    assert.equal(attestRes.body.success, true);
+
+    const verifyRes = await makeRequest('POST', '/api/v1/crosschain/verify', {
+      attestation: attestRes.body.attestation,
+      authorizedRelayers: [relayerKp.publicKeyHex]
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.success, true);
+    assert.equal(verifyRes.body.valid, true);
+  });
+
+  await t.test('50. POST /api/v1/groth16/setup, prove, verify, and aggregate', async () => {
+    const setupRes = await makeRequest('POST', '/api/v1/groth16/setup', {
+      circuitName: 'FinancialAccreditationCircuit',
+      publicInputCount: 2
+    });
+    assert.equal(setupRes.status, 200);
+    assert.equal(setupRes.body.success, true);
+    const vk = setupRes.body.verificationKey;
+
+    const proveRes = await makeRequest('POST', '/api/v1/groth16/prove', {
+      circuitName: 'FinancialAccreditationCircuit',
+      publicInputs: [
+        '0x0000000000000000000000000000000000000000000000000000000000000064',
+        '0x0000000000000000000000000000000000000000000000000000000000000100'
+      ],
+      privateWitness: { balance: 500000 }
+    });
+    assert.equal(proveRes.status, 200);
+    assert.equal(proveRes.body.success, true);
+    const proof = proveRes.body.proof;
+
+    const verifyRes = await makeRequest('POST', '/api/v1/groth16/verify', {
+      proof,
+      verificationKey: vk
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.success, true);
+    assert.equal(verifyRes.body.valid, true);
+
+    const aggRes = await makeRequest('POST', '/api/v1/groth16/aggregate', {
+      proofs: [proof, proof]
+    });
+    assert.equal(aggRes.status, 200);
+    assert.equal(aggRes.body.success, true);
+    assert.equal(aggRes.body.aggregated.proofCount, 2);
+  });
+
+  await t.test('51. POST /api/v1/solidity/export-bridge and export-groth16', async () => {
+    const bridgeRes = await makeRequest('POST', '/api/v1/solidity/export-bridge', {
+      contractName: 'DocuTrustEnterpriseBridge'
+    });
+    assert.equal(bridgeRes.status, 200);
+    assert.equal(bridgeRes.body.success, true);
+    assert.ok(bridgeRes.body.contractCode.includes('contract DocuTrustEnterpriseBridge'));
+
+    const grothRes = await makeRequest('POST', '/api/v1/solidity/export-groth16', {
+      contractName: 'DocuTrustEnterpriseGroth16'
+    });
+    assert.equal(grothRes.status, 200);
+    assert.equal(grothRes.body.success, true);
+    assert.ok(grothRes.body.contractCode.includes('contract DocuTrustEnterpriseGroth16'));
+  });
 });
+
 
 

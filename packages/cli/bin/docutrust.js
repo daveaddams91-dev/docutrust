@@ -213,9 +213,27 @@ const command = args[0];
 
 function printHelp() {
   console.log(`
-\x1b[1m\x1b[36m🛡️ DocuTrust CLI v10.0.0\x1b[0m — Sovereign Trust Mesh, Sparse Merkle Trees & Linkable Ring Signatures
+\x1b[1m\x1b[36m🛡️ DocuTrust CLI v11.0.0\x1b[0m — NIST SLH-DSA, WebAuthn Passkeys, Cross-Chain Bridge & Groth16 ZK-SNARKs
 
-\x1b[1mLINKABLE RING SIGNATURES (LSAG) & KEY TRANSPARENCY SMT (v10.0.0):\x1b[0m
+\x1b[1mPOST-QUANTUM SLH-DSA & WEBAUTHN PASSKEYS (v11.0.0):\x1b[0m
+  \x1b[32mslhdsa-keygen\x1b[0m [--out <file>]                         Generate NIST FIPS 205 SLH-DSA-SHA2-128s stateless PQC keypair
+  \x1b[32mslhdsa-sign\x1b[0m --msg <f|txt> --key <key.json> [--out <f>] Sign message using SLH-DSA post-quantum private key
+  \x1b[32mslhdsa-verify\x1b[0m --msg <f|txt> --sig <sig|hex> --pub <pub> Verify SLH-DSA post-quantum signature
+  \x1b[32mwebauthn-keygen\x1b[0m [--rp <id>] [--out <file>]              Generate P-256 WebAuthn / FIDO2 Passkey keypair
+  \x1b[32mwebauthn-assert\x1b[0m --challenge <c> --key <k> [--rp <id>]  Create signed hardware passkey assertion
+  \x1b[32mwebauthn-verify\x1b[0m --assertion <f> --challenge <c> --pub <k> Verify passkey assertion with UP/UV flags
+
+\x1b[1mCROSS-CHAIN BRIDGE & GROTH16 ZK-SNARKS (v11.0.0):\x1b[0m
+  \x1b[32mcrosschain-bridge\x1b[0m --source <id> --dest <id> --nonce <n> --root <h> --payload <h> --sender <s> --recipient <r> Create bridge message
+  \x1b[32mcrosschain-sign\x1b[0m --msg <f> --relayer <k> [--out <f>]    Sign cross-chain packet as authorized relayer
+  \x1b[32mcrosschain-verify\x1b[0m --attestation <f> [--relayers <pks>] Verify cross-chain multi-relayer quorum attestation
+  \x1b[32mgroth16-setup\x1b[0m [--circuit <str>] [--inputs <n>] [--out <f>] Generate BN254 Groth16 circuit verification key
+  \x1b[32mgroth16-prove\x1b[0m [--circuit <str>] --inputs <i1,i2..> --witness <f> Generate zero-knowledge Groth16 proof
+  \x1b[32mgroth16-verify\x1b[0m --proof <f> --vk <f>                    Verify Groth16 ZK-SNARK proof against verification key
+  \x1b[32msolidity-export-bridge\x1b[0m [--name <str>] [--out <f>]     Generate DocuTrustBridgeRelayer.sol smart contract
+  \x1b[32msolidity-export-groth16\x1b[0m [--name <str>] [--out <f>]    Generate DocuTrustGroth16Verifier.sol smart contract
+
+\x1b[1mLINKABLE RING SIGNATURES (LSAG) & KEY TRANSPARENCY SMT:\x1b[0m
   \x1b[32mringsig-sign\x1b[0m --msg <f|txt> --ring <p1,p2..> --key <priv> [--pub <pub>] [--out <f>] 1-of-N anonymous signature
   \x1b[32mringsig-verify\x1b[0m --msg <f|txt> --sig <sig.json> [--used-tags <t1,t2..>] Verify LSAG ring proof & double-action
   \x1b[32msmt-set\x1b[0m --key <k> --val <v> [--state <f>] [--out <f>] Update 256-bit Sparse Merkle Tree leaf
@@ -418,7 +436,7 @@ async function runDemoWizard() {
 
 async function main() {
   if (command === 'version' || command === '--version' || command === '-v') {
-    console.log('10.0.0');
+    console.log('11.0.0');
     return;
   }
 
@@ -2844,6 +2862,294 @@ async function main() {
       console.error(`\x1b[31m✖\x1b[0m Root mismatch: computed ${computedRoot}, expected ${cleanRoot}`);
       process.exit(1);
     }
+    return;
+  }
+
+  // ========================================================
+  // v11.0.0 NIST FIPS 205 SLH-DSA CLI Commands
+  // ========================================================
+  if (command === 'slhdsa-keygen') {
+    const outFile = getArgValue('--out') || getArgValue('-o') || 'slhdsa-keypair.json';
+    const kp = core.SLHDSAEngine.generateKeyPair();
+    safeWriteFileSync(outFile, JSON.stringify(kp, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m NIST FIPS 205 SLH-DSA-SHA2-128s KeyPair generated successfully!`);
+    console.log(`  DID Identifier: \x1b[1m\x1b[36m${kp.did}\x1b[0m`);
+    console.log(`  Saved to: \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'slhdsa-sign') {
+    const msgInput = getArgValue('--msg') || getArgValue('-m');
+    const keyFile = getArgValue('--key') || getArgValue('-k');
+    const outFile = getArgValue('--out') || getArgValue('-o') || 'slhdsa-signature.json';
+
+    if (!msgInput || !keyFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --msg <txt|file> or --key <key.json>');
+      process.exit(1);
+    }
+
+    const message = fs.existsSync(msgInput) ? fs.readFileSync(msgInput, 'utf-8') : msgInput;
+    const keyPair = JSON.parse(fs.readFileSync(keyFile, 'utf-8'));
+    const sig = core.SLHDSAEngine.sign(message, keyPair);
+    safeWriteFileSync(outFile, JSON.stringify(sig, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m Message signed with NIST FIPS 205 SLH-DSA!`);
+    console.log(`  Algorithm: ${sig.algorithm}`);
+    console.log(`  Signature saved to: \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'slhdsa-verify') {
+    const msgInput = getArgValue('--msg') || getArgValue('-m');
+    const sigInput = getArgValue('--sig') || getArgValue('-s');
+    const pubInput = getArgValue('--pub') || getArgValue('-p');
+
+    if (!msgInput || !sigInput || !pubInput) {
+      console.error('\x1b[31mError:\x1b[0m Missing --msg <txt|file>, --sig <file|hex>, or --pub <file|hex|did>');
+      process.exit(1);
+    }
+
+    const message = fs.existsSync(msgInput) ? fs.readFileSync(msgInput, 'utf-8') : msgInput;
+    let signature = sigInput;
+    if (fs.existsSync(sigInput)) {
+      const parsed = JSON.parse(fs.readFileSync(sigInput, 'utf-8'));
+      signature = parsed.signatureValue || parsed.signatureHex || parsed;
+    }
+    let publicKey = pubInput;
+    if (fs.existsSync(pubInput)) {
+      const parsed = JSON.parse(fs.readFileSync(pubInput, 'utf-8'));
+      publicKey = parsed.publicKeyHex || parsed.did || parsed;
+    }
+
+    const valid = core.SLHDSAEngine.verify(message, signature, publicKey);
+    if (valid) {
+      console.log(`\x1b[32m✔\x1b[0m SLH-DSA Signature is \x1b[1m\x1b[32m100% CRYPTOGRAPHICALLY AUTHENTIC\x1b[0m`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m SLH-DSA Signature verification \x1b[1m\x1b[31mFAILED\x1b[0m`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // ========================================================
+  // v11.0.0 WebAuthn / FIDO2 Passkey CLI Commands
+  // ========================================================
+  if (command === 'webauthn-keygen') {
+    const rpId = getArgValue('--rp') || 'localhost';
+    const outFile = getArgValue('--out') || getArgValue('-o') || 'webauthn-passkey.json';
+    const kp = core.WebAuthnAttestationEngine.generateKeyPair(rpId);
+    safeWriteFileSync(outFile, JSON.stringify(kp, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m WebAuthn P-256 Passkey KeyPair generated successfully!`);
+    console.log(`  DID Identifier: \x1b[1m\x1b[36m${kp.did}\x1b[0m`);
+    console.log(`  Credential ID: ${kp.credentialId}`);
+    console.log(`  Relying Party: ${kp.rpId}`);
+    console.log(`  Saved to: \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'webauthn-assert') {
+    const challenge = getArgValue('--challenge') || getArgValue('-c');
+    const keyFile = getArgValue('--key') || getArgValue('-k');
+    const rpId = getArgValue('--rp');
+    const outFile = getArgValue('--out') || getArgValue('-o') || 'webauthn-assertion.json';
+
+    if (!challenge || !keyFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --challenge <str> or --key <passkey.json>');
+      process.exit(1);
+    }
+
+    const keyPair = JSON.parse(fs.readFileSync(keyFile, 'utf-8'));
+    const assertion = core.WebAuthnAttestationEngine.createAssertion(challenge, keyPair, { rpId });
+    safeWriteFileSync(outFile, JSON.stringify(assertion, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m Hardware WebAuthn Passkey Assertion created!`);
+    console.log(`  Credential ID: ${assertion.credentialId}`);
+    console.log(`  Saved to: \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'webauthn-verify') {
+    const assertFile = getArgValue('--assertion') || getArgValue('-a');
+    const challenge = getArgValue('--challenge') || getArgValue('-c');
+    const pubInput = getArgValue('--pub') || getArgValue('-p');
+    const rpId = getArgValue('--rp');
+
+    if (!assertFile || !challenge || !pubInput) {
+      console.error('\x1b[31mError:\x1b[0m Missing --assertion <file>, --challenge <str>, or --pub <file|hex|did>');
+      process.exit(1);
+    }
+
+    const assertion = JSON.parse(fs.readFileSync(assertFile, 'utf-8'));
+    let publicKey = pubInput;
+    if (fs.existsSync(pubInput)) {
+      publicKey = JSON.parse(fs.readFileSync(pubInput, 'utf-8'));
+    }
+
+    const result = core.WebAuthnAttestationEngine.verifyAssertion(assertion, challenge, publicKey, { expectedRpId: rpId });
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m WebAuthn Passkey Assertion is \x1b[1m\x1b[32mAUTHENTIC\x1b[0m`);
+      console.log(`  User Present (UP): ${result.userPresent ? 'YES' : 'NO'}`);
+      console.log(`  User Verified (UV): ${result.userVerified ? 'YES' : 'NO'}`);
+      console.log(`  Sign Count: ${result.signCount}`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m WebAuthn verification \x1b[1m\x1b[31mFAILED\x1b[0m:`, result.errors.join(', '));
+      process.exit(1);
+    }
+    return;
+  }
+
+  // ========================================================
+  // v11.0.0 Multi-Chain Verifiable Attestation Bridge CLI Commands
+  // ========================================================
+  if (command === 'crosschain-bridge') {
+    const sourceChainId = parseInt(getArgValue('--source') || '1', 10);
+    const destinationChainId = parseInt(getArgValue('--dest') || '8453', 10);
+    const sequenceNonce = parseInt(getArgValue('--nonce') || '1', 10);
+    const stateRoot = getArgValue('--root') || '0x' + '0'.repeat(64);
+    const payloadHash = getArgValue('--payload') || '0x' + '0'.repeat(64);
+    const senderAddress = getArgValue('--sender') || '0x0000000000000000000000000000000000000001';
+    const recipientAddress = getArgValue('--recipient') || '0x0000000000000000000000000000000000000002';
+    const outFile = getArgValue('--out') || getArgValue('-o') || 'crosschain-message.json';
+
+    const msg = core.CrossChainBridgeEngine.createMessage({
+      sourceChainId,
+      destinationChainId,
+      sequenceNonce,
+      stateRoot,
+      payloadHash,
+      senderAddress,
+      recipientAddress
+    });
+
+    safeWriteFileSync(outFile, JSON.stringify(msg, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m Cross-Chain Bridge Message constructed!`);
+    console.log(`  Message ID: \x1b[1m\x1b[36m${msg.messageId}\x1b[0m`);
+    console.log(`  Route: Chain ${msg.sourceChainId} -> Chain ${msg.destinationChainId} (Nonce: ${msg.sequenceNonce})`);
+    console.log(`  Saved to: \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'crosschain-sign') {
+    const msgFile = getArgValue('--msg') || getArgValue('-m');
+    const relayerKeyFile = getArgValue('--relayer') || getArgValue('-k');
+    const outFile = getArgValue('--out') || getArgValue('-o') || 'relayer-signature.json';
+
+    if (!msgFile || !relayerKeyFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --msg <msg.json> or --relayer <key.json>');
+      process.exit(1);
+    }
+
+    const message = JSON.parse(fs.readFileSync(msgFile, 'utf-8'));
+    const relayerKp = JSON.parse(fs.readFileSync(relayerKeyFile, 'utf-8'));
+    const sig = core.CrossChainBridgeEngine.signMessage(message, relayerKp);
+    safeWriteFileSync(outFile, JSON.stringify(sig, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m Relayer signed cross-chain message packet!`);
+    console.log(`  Relayer DID: ${sig.relayerDid}`);
+    console.log(`  Saved to: \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'crosschain-verify') {
+    const attestationFile = getArgValue('--attestation') || getArgValue('-a');
+    const relayersStr = getArgValue('--relayers');
+
+    if (!attestationFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --attestation <attestation.json>');
+      process.exit(1);
+    }
+
+    const attestation = JSON.parse(fs.readFileSync(attestationFile, 'utf-8'));
+    const authorizedRelayers = relayersStr ? relayersStr.split(',').map(s => s.trim()) : undefined;
+
+    const result = core.CrossChainBridgeEngine.verifyAttestation(attestation, authorizedRelayers);
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m Cross-Chain Attestation is \x1b[1m\x1b[32mVALID & QUORUM SATISFIED\x1b[0m`);
+      console.log(`  Quorum: ${result.verifiedSignatures} / ${result.requiredThreshold} Relayers`);
+      console.log(`  Route: Chain ${attestation.message.sourceChainId} -> Chain ${attestation.message.destinationChainId}`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m Cross-chain verification \x1b[1m\x1b[31mFAILED\x1b[0m:`, result.errors.join(', '));
+      process.exit(1);
+    }
+    return;
+  }
+
+  // ========================================================
+  // v11.0.0 Groth16 Zero-Knowledge SNARK CLI Commands
+  // ========================================================
+  if (command === 'groth16-setup') {
+    const circuitName = getArgValue('--circuit') || 'StandardComplianceCircuit';
+    const inputsCount = parseInt(getArgValue('--inputs') || '2', 10);
+    const outFile = getArgValue('--out') || getArgValue('-o') || `${circuitName}.vk.json`;
+
+    const vk = core.Groth16Engine.generateVerificationKey(circuitName, inputsCount);
+    safeWriteFileSync(outFile, JSON.stringify(vk, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m Groth16 Verification Key generated for circuit: \x1b[1m\x1b[36m${circuitName}\x1b[0m`);
+    console.log(`  Public Input Slots: ${inputsCount}`);
+    console.log(`  Saved to: \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'groth16-prove') {
+    const circuitName = getArgValue('--circuit') || 'StandardComplianceCircuit';
+    const inputsStr = getArgValue('--inputs') || getArgValue('-i') || '100,200';
+    const witnessFile = getArgValue('--witness') || getArgValue('-w');
+    const outFile = getArgValue('--out') || getArgValue('-o') || 'groth16-proof.json';
+
+    const publicInputs = inputsStr.split(',').map(s => s.trim());
+    const witness = witnessFile && fs.existsSync(witnessFile) ? JSON.parse(fs.readFileSync(witnessFile, 'utf-8')) : {};
+
+    const proof = core.Groth16Engine.createProof(circuitName, publicInputs, witness);
+    safeWriteFileSync(outFile, JSON.stringify(proof, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m Zero-Knowledge Groth16 Proof generated!`);
+    console.log(`  Curve: ${proof.curve}`);
+    console.log(`  Circuit: ${proof.circuitName}`);
+    console.log(`  Saved to: \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'groth16-verify') {
+    const proofFile = getArgValue('--proof') || getArgValue('-p');
+    const vkFile = getArgValue('--vk') || getArgValue('-k');
+
+    if (!proofFile || !vkFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --proof <proof.json> or --vk <vk.json>');
+      process.exit(1);
+    }
+
+    const proof = JSON.parse(fs.readFileSync(proofFile, 'utf-8'));
+    const vk = JSON.parse(fs.readFileSync(vkFile, 'utf-8'));
+
+    const result = core.Groth16Engine.verifyProof(proof, vk);
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m Groth16 Zero-Knowledge Proof is \x1b[1m\x1b[32mCRYPTOGRAPHICALLY VALID\x1b[0m`);
+      console.log(`  Pairing Verification: PASS`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m Groth16 verification \x1b[1m\x1b[31mFAILED\x1b[0m:`, result.errors.join(', '));
+      process.exit(1);
+    }
+    return;
+  }
+
+  // ========================================================
+  // v11.0.0 Solidity Bridge & Groth16 Verifier Smart Contract Generators
+  // ========================================================
+  if (command === 'solidity-export-bridge') {
+    const name = getArgValue('--name') || getArgValue('-n') || 'DocuTrustBridgeRelayer';
+    const version = getArgValue('--solc') || '^0.8.20';
+    const outFile = getArgValue('--out') || getArgValue('-o') || `${name}.sol`;
+
+    const code = core.generateBridgeRelayerContract({ contractName: name, solidityVersion: version });
+    safeWriteFileSync(outFile, code);
+    console.log(`\x1b[32m✔\x1b[0m Solidity Cross-Chain Bridge Relayer smart contract exported to \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'solidity-export-groth16') {
+    const name = getArgValue('--name') || getArgValue('-n') || 'DocuTrustGroth16Verifier';
+    const version = getArgValue('--solc') || '^0.8.20';
+    const outFile = getArgValue('--out') || getArgValue('-o') || `${name}.sol`;
+
+    const code = core.generateGroth16VerifierContract({ contractName: name, solidityVersion: version });
+    safeWriteFileSync(outFile, code);
+    console.log(`\x1b[32m✔\x1b[0m Solidity Groth16 Verifier smart contract exported to \x1b[1m${outFile}\x1b[0m`);
     return;
   }
 

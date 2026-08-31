@@ -21,14 +21,20 @@ import {
   Binary,
   Award,
   Fingerprint,
-  Database
+  Database,
+  ArrowRightLeft,
+  Smartphone
 } from 'lucide-react';
 
 export default function Navbar({ activeTab, setActiveTab }) {
   const navItems = [
     { id: 'hero', label: 'Overview', icon: ShieldCheck },
+    { id: 'slhdsa', label: 'SLH-DSA FIPS 205', icon: ShieldAlert },
+    { id: 'webauthn', label: 'Passkeys', icon: Fingerprint },
+    { id: 'crosschain', label: 'Cross-Chain Bridge', icon: ArrowRightLeft },
+    { id: 'groth16', label: 'Groth16 SNARKs', icon: Cpu },
     { id: 'ringsig', label: 'Ring Signatures', icon: Fingerprint },
-    { id: 'smt', label: 'Key Transparency SMT', icon: Database },
+    { id: 'smt', label: 'Key Transparency', icon: Database },
     { id: 'policy', label: 'Policy Studio', icon: Sparkles },
     { id: 'badge', label: 'Badges', icon: Award },
     { id: 'confidential', label: 'Confidential ZK', icon: Binary },
@@ -40,10 +46,8 @@ export default function Navbar({ activeTab, setActiveTab }) {
     { id: 'solidity', label: 'Solidity', icon: Code2 },
     { id: 'bundle', label: 'Audit Bundles', icon: Package },
     { id: 'mesh', label: 'Trust Mesh', icon: Network },
-    { id: 'bbs', label: 'BBS+ Oracles', icon: Sparkles },
     { id: 'issuer', label: 'Issuer', icon: Key },
     { id: 'verify', label: 'Verify', icon: FileCheck2 },
-    { id: 'privacy', label: 'ZK Proofs', icon: EyeOff },
     { id: 'developers', label: 'APIs', icon: Terminal }
   ];
 
@@ -63,7 +67,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
           <div>
             <div className="flex items-center gap-1.5">
               <span className="font-bold text-lg tracking-tight text-white font-sans">DocuTrust</span>
-              <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 font-mono font-semibold">v10.0.0</span>
+              <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 font-mono font-semibold">v11.0.0</span>
             </div>
             <span className="text-[10px] text-gray-400 tracking-wide block font-mono">Quantum Sovereign Trust Mesh</span>
           </div>

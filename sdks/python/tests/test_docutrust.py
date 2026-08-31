@@ -1370,6 +1370,85 @@ class TestDocuTrustPython(unittest.TestCase):
         self.assertIn("contract DocuTrustSMTVerifier", code)
         self.assertIn("verifySMTProof", code)
 
+    def test_slhdsa_fips205(self):
+        from docutrust.slhdsa import SLHDSAEngine
+
+        kp = SLHDSAEngine.generate_key_pair()
+        self.assertEqual(kp["algorithm"], "SLH-DSA-SHA2-128s")
+        self.assertTrue(kp["did"].startswith("did:slh:z"))
+        self.assertEqual(len(kp["publicKeyHex"]), 128)
+
+        msg = {"action": "SOVEREIGN_AUTHORIZATION_FIPS205", "nonce": 42}
+        sig = SLHDSAEngine.sign(msg, kp)
+        self.assertEqual(sig["type"], "DocuTrustSLHDSASignature2026")
+
+        valid = SLHDSAEngine.verify(msg, sig, kp)
+        self.assertTrue(valid)
+
+    def test_webauthn_passkeys(self):
+        from docutrust.webauthn import WebAuthnAttestationEngine
+
+        kp = WebAuthnAttestationEngine.generate_key_pair(rp_id="docutrust.org")
+        self.assertEqual(kp["algorithm"], "ES256")
+        self.assertTrue(kp["did"].startswith("did:webauthn:z"))
+
+        challenge = "random_sec_challenge_99"
+        assertion = WebAuthnAttestationEngine.create_assertion(challenge, kp, {"rpId": "docutrust.org"})
+        self.assertEqual(assertion["type"], "DocuTrustWebAuthnAssertion2026")
+
+        result = WebAuthnAttestationEngine.verify_assertion(assertion, challenge, kp, {"expectedRpId": "docutrust.org"})
+        self.assertTrue(result["valid"])
+        self.assertTrue(result["userPresent"])
+        self.assertTrue(result["userVerified"])
+
+    def test_crosschain_bridge(self):
+        from docutrust.crosschain import CrossChainBridgeEngine
+        from docutrust.crypto import generate_key_pair
+
+        relayer_kp = generate_key_pair()
+        msg = CrossChainBridgeEngine.create_message(
+            source_chain_id=1,
+            destination_chain_id=8453,
+            sequence_nonce=1,
+            state_root="0x1111111111111111111111111111111111111111111111111111111111111111",
+            payload_hash="0x2222222222222222222222222222222222222222222222222222222222222222"
+        )
+        self.assertTrue(msg["messageId"].startswith("0x"))
+
+        sig = CrossChainBridgeEngine.sign_message(msg, relayer_kp)
+        attestation = CrossChainBridgeEngine.assemble_attestation(msg, [sig], quorum_threshold=1)
+        self.assertEqual(attestation["type"], "DocuTrustCrossChainAttestation2026")
+
+        verify_res = CrossChainBridgeEngine.verify_attestation(attestation, [relayer_kp["publicKeyHex"]])
+        self.assertTrue(verify_res["valid"])
+        self.assertEqual(verify_res["verifiedSignatures"], 1)
+
+    def test_groth16_zksnarks(self):
+        from docutrust.groth16 import Groth16Engine
+
+        vk = Groth16Engine.generate_verification_key("DocuTrustMembershipCircuit", public_input_count=2)
+        self.assertEqual(len(vk["ic"]), 3)
+
+        proof = Groth16Engine.create_proof("DocuTrustMembershipCircuit", [100, 200], witness_secret={"privKey": "secret"})
+        self.assertEqual(proof["curve"], "BN254")
+
+        res = Groth16Engine.verify_proof(proof, vk)
+        self.assertTrue(res["valid"])
+
+        agg = Groth16Engine.aggregate_proofs([proof, proof])
+        self.assertEqual(agg["proofCount"], 2)
+
+    def test_solidity_v11_generators(self):
+        from docutrust.solidity import SolidityEngine
+
+        bridge_code = SolidityEngine.generate_bridge_relayer_contract()
+        self.assertIn("contract DocuTrustBridgeRelayer", bridge_code)
+        self.assertIn("function dispatch", bridge_code)
+
+        groth16_code = SolidityEngine.generate_groth16_verifier_contract()
+        self.assertIn("contract DocuTrustGroth16Verifier", groth16_code)
+        self.assertIn("function verifyProof", groth16_code)
+
 if __name__ == '__main__':
     unittest.main()
 

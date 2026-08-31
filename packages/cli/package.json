@@ -1,6 +1,6 @@
 {
   "name": "@docutrust/cli",
-  "version": "10.0.0",
+  "version": "11.0.0",
   "description": "DocuTrust CLI for Sovereign Verifiable Credentials and Ledger Anchoring",
   "bin": {
     "docutrust": "./bin/docutrust.js"
@@ -11,7 +11,7 @@
     "test": "node --test test/cli.test.js"
   },
   "dependencies": {
-    "@docutrust/core": "^10.0.0"
+    "@docutrust/core": "^11.0.0"
   },
   "license": "Apache-2.0"
 }

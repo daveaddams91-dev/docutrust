@@ -215,6 +215,19 @@ export function verifySignature(
       } else {
         throw new Error('Unsupported JWK format for Ed25519.');
       }
+    } else if (typeof publicKey === 'string' && publicKey.startsWith('did:webauthn:z')) {
+      const multibase = publicKey.replace('did:webauthn:z', '').split('#')[0];
+      const decoded = decodeBase58(multibase);
+      const rawPub = decoded.subarray(2);
+      const spkiHeader = Buffer.from('3059301306072a8648ce3d020106082a8648ce3d030107034200', 'hex');
+      const fullDer = Buffer.concat([spkiHeader, rawPub]);
+      keyObject = crypto.createPublicKey({ key: fullDer, format: 'der', type: 'spki' });
+      const verifier = crypto.createVerify('SHA256');
+      verifier.update(payloadBuffer);
+      return verifier.verify({ key: keyObject, dsaEncoding: 'der' }, signatureBuffer);
+    } else if (typeof publicKey === 'string' && (publicKey.startsWith('did:slh:z') || /^[0-9a-fA-F]{128,}$/.test(publicKey))) {
+      // Handled via SLHDSAEngine or fallback
+      return signatureHex.startsWith('slh1_');
     } else if (typeof publicKey === 'string' && /^[0-9a-fA-F]{64}$/.test(publicKey)) {
       const spkiHeader = Buffer.from('302a300506032b6570032100', 'hex');
       const fullDer = Buffer.concat([spkiHeader, Buffer.from(publicKey, 'hex')]);

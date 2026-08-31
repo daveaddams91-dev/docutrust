@@ -57,8 +57,12 @@ from .policy import PolicyEngine
 from .did import create_did_peer_0, create_did_peer_2, create_did_jwk, encode_did_jwk, decode_did_jwk
 from .ringsig import RingSignatureEngine
 from .smt import SparseMerkleTree
+from .slhdsa import SLHDSAEngine
+from .webauthn import WebAuthnAttestationEngine
+from .crosschain import CrossChainBridgeEngine
+from .groth16 import Groth16Engine
 
-__version__ = "10.0.0"
+__version__ = "11.0.0"
 __all__ = [
     "DocuTrustClient",
     "canonicalize_json",
@@ -130,6 +134,10 @@ __all__ = [
     "BadgeEngine",
     "PolicyEngine",
     "RingSignatureEngine",
-    "SparseMerkleTree"
+    "SparseMerkleTree",
+    "SLHDSAEngine",
+    "WebAuthnAttestationEngine",
+    "CrossChainBridgeEngine",
+    "Groth16Engine"
 ]
 

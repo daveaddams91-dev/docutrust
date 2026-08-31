@@ -133,4 +133,17 @@ export * from './ring-sig';
 // Export 256-bit Sparse Merkle Tree (SMT) Key Transparency & Revocation (DocuTrust v10.0.0)
 export * from './smt';
 
+// Export NIST FIPS 205 Stateless Hash-Based Signatures (SLH-DSA) (DocuTrust v11.0.0)
+export * from './slhdsa';
+
+// Export WebAuthn / FIDO2 Passkey Hardware Attestation Engine (DocuTrust v11.0.0)
+export * from './webauthn';
+
+// Export Multi-Chain Verifiable Attestation Bridge & Interoperability Relayer (DocuTrust v11.0.0)
+export * from './crosschain';
+
+// Export Zero-Knowledge Succinct Proofs (ZK-SNARK / Groth16) & Proof Aggregation (DocuTrust v11.0.0)
+export * from './groth16';
+
+
 

@@ -252,6 +252,48 @@ describe('DocuTrust TypeScript SDK (@docutrust/sdk)', () => {
     // 47. Policy Verify Receipt
     await client.verifyPolicyReceipt({ id: 'rec-1' });
     assert.strictEqual(mockCalls[50].url, 'https://test-api.docutrust.org/api/v1/policy/verify-receipt');
+
+    // 48. SLH-DSA
+    await client.generateSLHDSAKeyPair();
+    assert.strictEqual(mockCalls[51].url, 'https://test-api.docutrust.org/api/v1/slhdsa/keygen');
+    await client.signSLHDSA('test msg', {});
+    assert.strictEqual(mockCalls[52].url, 'https://test-api.docutrust.org/api/v1/slhdsa/sign');
+    await client.verifySLHDSA('test msg', 'sig', 'pub');
+    assert.strictEqual(mockCalls[53].url, 'https://test-api.docutrust.org/api/v1/slhdsa/verify');
+
+    // 49. WebAuthn
+    await client.generateWebAuthnKeyPair('example.com');
+    assert.strictEqual(mockCalls[54].url, 'https://test-api.docutrust.org/api/v1/webauthn/keygen');
+    await client.createWebAuthnAssertion('challenge-1', {});
+    assert.strictEqual(mockCalls[55].url, 'https://test-api.docutrust.org/api/v1/webauthn/assertion');
+    await client.verifyWebAuthnAssertion({}, 'challenge-1', {});
+    assert.strictEqual(mockCalls[56].url, 'https://test-api.docutrust.org/api/v1/webauthn/verify');
+
+    // 50. Cross-Chain Bridge
+    await client.createCrossChainMessage({ sourceChainId: 1, destinationChainId: 8453, sequenceNonce: 1, stateRoot: '0x0', payloadHash: '0x0' });
+    assert.strictEqual(mockCalls[57].url, 'https://test-api.docutrust.org/api/v1/crosschain/message');
+    await client.signCrossChainMessage({}, {});
+    assert.strictEqual(mockCalls[58].url, 'https://test-api.docutrust.org/api/v1/crosschain/sign');
+    await client.assembleCrossChainAttestation({}, []);
+    assert.strictEqual(mockCalls[59].url, 'https://test-api.docutrust.org/api/v1/crosschain/attest');
+    await client.verifyCrossChainAttestation({});
+    assert.strictEqual(mockCalls[60].url, 'https://test-api.docutrust.org/api/v1/crosschain/verify');
+
+    // 51. Groth16 ZK-SNARKs
+    await client.setupGroth16Circuit('CircuitA', 2);
+    assert.strictEqual(mockCalls[61].url, 'https://test-api.docutrust.org/api/v1/groth16/setup');
+    await client.proveGroth16('CircuitA', ['1', '2'], {});
+    assert.strictEqual(mockCalls[62].url, 'https://test-api.docutrust.org/api/v1/groth16/prove');
+    await client.verifyGroth16Proof({}, {});
+    assert.strictEqual(mockCalls[63].url, 'https://test-api.docutrust.org/api/v1/groth16/verify');
+    await client.aggregateGroth16Proofs([{}, {}]);
+    assert.strictEqual(mockCalls[64].url, 'https://test-api.docutrust.org/api/v1/groth16/aggregate');
+
+    // 52. Solidity Exporters
+    await client.generateSolidityBridgeRelayer();
+    assert.strictEqual(mockCalls[65].url, 'https://test-api.docutrust.org/api/v1/solidity/export-bridge');
+    await client.generateSolidityGroth16Verifier();
+    assert.strictEqual(mockCalls[66].url, 'https://test-api.docutrust.org/api/v1/solidity/export-groth16');
   });
 
   test('DocuTrustClient handles HTTP error responses gracefully', async () => {

@@ -1474,6 +1474,159 @@ export class DocuTrustClient {
   public async verifyPolicyReceipt(receipt: any, publicKeyHex?: string): Promise<{ success: boolean; valid: boolean }> {
     return this.request('/policy/verify-receipt', 'POST', { receipt, publicKeyHex });
   }
+
+  // ========================================================
+  // v11.0.0 NIST FIPS 205 SLH-DSA Client Methods
+  // ========================================================
+
+  /**
+   * Generates a NIST FIPS 205 SLH-DSA-SHA2-128s stateless hash-based keypair and DID.
+   */
+  public async generateSLHDSAKeyPair(): Promise<{ success: boolean; keyPair: any }> {
+    return this.request('/slhdsa/keygen', 'POST', {});
+  }
+
+  /**
+   * Signs a message using SLH-DSA post-quantum private key.
+   */
+  public async signSLHDSA(message: any, keyPair: any): Promise<{ success: boolean; signature: any }> {
+    return this.request('/slhdsa/sign', 'POST', { message, keyPair });
+  }
+
+  /**
+   * Cryptographically verifies an SLH-DSA post-quantum signature.
+   */
+  public async verifySLHDSA(message: any, signature: any, publicKey: string | any): Promise<{ success: boolean; valid: boolean; algorithm: string }> {
+    return this.request('/slhdsa/verify', 'POST', { message, signature, publicKey });
+  }
+
+  // ========================================================
+  // v11.0.0 WebAuthn / FIDO2 Passkey Client Methods
+  // ========================================================
+
+  /**
+   * Generates a P-256 WebAuthn passkey keypair.
+   */
+  public async generateWebAuthnKeyPair(rpId?: string): Promise<{ success: boolean; keyPair: any }> {
+    return this.request('/webauthn/keygen', 'POST', { rpId });
+  }
+
+  /**
+   * Creates a signed WebAuthn passkey assertion.
+   */
+  public async createWebAuthnAssertion(challenge: string, keyPair: any, options?: { rpId?: string; origin?: string }): Promise<{ success: boolean; assertion: any }> {
+    return this.request('/webauthn/assertion', 'POST', { challenge, keyPair, ...options });
+  }
+
+  /**
+   * Verifies a WebAuthn passkey assertion with hardware flags (UP / UV).
+   */
+  public async verifyWebAuthnAssertion(assertion: any, challenge: string, publicKey: any, options?: { expectedRpId?: string; expectedOrigin?: string }): Promise<{
+    success: boolean;
+    valid: boolean;
+    userPresent: boolean;
+    userVerified: boolean;
+    signCount: number;
+    errors: string[];
+  }> {
+    return this.request('/webauthn/verify', 'POST', { assertion, challenge, publicKey, ...options });
+  }
+
+  // ========================================================
+  // v11.0.0 Multi-Chain Verifiable Attestation Bridge Client Methods
+  // ========================================================
+
+  /**
+   * Constructs a standard cross-chain attestation message.
+   */
+  public async createCrossChainMessage(options: {
+    sourceChainId: number;
+    destinationChainId: number;
+    sequenceNonce: number;
+    stateRoot: string;
+    payloadHash: string;
+    senderAddress?: string;
+    recipientAddress?: string;
+  }): Promise<{ success: boolean; message: any }> {
+    return this.request('/crosschain/message', 'POST', options);
+  }
+
+  /**
+   * Signs a cross-chain message packet as an authorized relayer.
+   */
+  public async signCrossChainMessage(message: any, relayerKeyPair: any): Promise<{ success: boolean; signature: any }> {
+    return this.request('/crosschain/sign', 'POST', { message, relayerKeyPair });
+  }
+
+  /**
+   * Assembles signatures into a verifiable multi-relayer cross-chain attestation.
+   */
+  public async assembleCrossChainAttestation(message: any, signatures: any[], quorumThreshold?: number): Promise<{ success: boolean; attestation: any }> {
+    return this.request('/crosschain/attest', 'POST', { message, signatures, quorumThreshold });
+  }
+
+  /**
+   * Verifies a multi-relayer cross-chain attestation against required quorum threshold.
+   */
+  public async verifyCrossChainAttestation(attestation: any, authorizedRelayers?: string[]): Promise<{
+    success: boolean;
+    valid: boolean;
+    verifiedSignatures: number;
+    requiredThreshold: number;
+    errors: string[];
+  }> {
+    return this.request('/crosschain/verify', 'POST', { attestation, authorizedRelayers });
+  }
+
+  // ========================================================
+  // v11.0.0 BN254 Groth16 Zero-Knowledge SNARK Client Methods
+  // ========================================================
+
+  /**
+   * Performs trusted setup simulation for a Groth16 circuit verification key.
+   */
+  public async setupGroth16Circuit(circuitName?: string, publicInputCount?: number): Promise<{ success: boolean; verificationKey: any }> {
+    return this.request('/groth16/setup', 'POST', { circuitName, publicInputCount });
+  }
+
+  /**
+   * Generates a zero-knowledge Groth16 proof for specified public and witness inputs.
+   */
+  public async proveGroth16(circuitName: string, publicInputs: any[], privateWitness?: any): Promise<{ success: boolean; proof: any }> {
+    return this.request('/groth16/prove', 'POST', { circuitName, publicInputs, privateWitness });
+  }
+
+  /**
+   * Cryptographically verifies a Groth16 ZK-SNARK proof against a verification key.
+   */
+  public async verifyGroth16Proof(proof: any, verificationKey: any): Promise<{ success: boolean; valid: boolean; errors: string[] }> {
+    return this.request('/groth16/verify', 'POST', { proof, verificationKey });
+  }
+
+  /**
+   * Aggregates multiple Groth16 proofs into a batched verification payload.
+   */
+  public async aggregateGroth16Proofs(proofs: any[]): Promise<{ success: boolean; aggregated: any }> {
+    return this.request('/groth16/aggregate', 'POST', { proofs });
+  }
+
+  // ========================================================
+  // v11.0.0 Solidity Bridge & Groth16 Contract Exporters
+  // ========================================================
+
+  /**
+   * Generates production-ready DocuTrustBridgeRelayer.sol EVM smart contract.
+   */
+  public async generateSolidityBridgeRelayer(options?: { contractName?: string; solidityVersion?: string }): Promise<{ success: boolean; contractCode: string }> {
+    return this.request('/solidity/export-bridge', 'POST', options || {});
+  }
+
+  /**
+   * Generates production-ready DocuTrustGroth16Verifier.sol EVM smart contract.
+   */
+  public async generateSolidityGroth16Verifier(options?: { contractName?: string; solidityVersion?: string }): Promise<{ success: boolean; contractCode: string }> {
+    return this.request('/solidity/export-groth16', 'POST', options || {});
+  }
 }
 
 

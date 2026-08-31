@@ -87,6 +87,31 @@ $$\text{LeafHash} = \text{SHA-256}(\text{"SMT\_LEAF:"} \parallel \text{Key}_{256
 $$H_{d} = \begin{cases} \text{SHA-256}(H_{d-1} \parallel S_{d-1}) & \text{if } b_{256-d} = 0 \\ \text{SHA-256}(S_{d-1} \parallel H_{d-1}) & \text{if } b_{256-d} = 1 \end{cases}$$
 Verified on-chain via `DocuTrustSMTVerifier.sol`.
 
+### 2.10 NIST FIPS 205 Stateless Hash-Based Signatures (SLH-DSA)
+Post-quantum digital signatures based on WOTS+ and hypertree hash chains:
+1. Public Key: $\text{PK} = (\text{PK.seed} \parallel \text{PK.root})$
+2. Multicodec Prefix: `0x19, 0x05` $\implies \text{did:slh:z...}$
+3. Stateless Signature Size: 1,120 bytes (Category 1 SLH-DSA-SHA2-128s).
+
+### 2.11 WebAuthn / FIDO2 Hardware Passkey Attestations
+Hardware enclave assertions over P-256 (secp256r1 / ES256):
+1. Assertion digest: $M = \text{authenticatorData} \parallel \text{SHA-256}(\text{clientDataJSON})$
+2. Hardware flags: Bit 0 = User Presence (UP `0x01`), Bit 2 = User Verification (UV `0x04`).
+3. Multicodec Prefix: `0x12, 0x01` $\implies \text{did:webauthn:z...}$.
+
+### 2.12 Multi-Chain Verifiable Attestation Bridge
+Relayer routing across EVM chains with strict monotonic sequence nonces:
+1. Message digest: $\text{MsgID} = \text{SHA-256}(\text{srcChain} \parallel \text{dstChain} \parallel \text{nonce} \parallel \text{stateRoot} \parallel \text{payloadHash})$
+2. Quorum verification: Requires $T$-of-$N$ valid relayer signatures over EIP-191 personal sign format.
+3. On-chain validation: Verified via `DocuTrustBridgeRelayer.sol`.
+
+### 2.13 BN254 Groth16 Zero-Knowledge SNARK Engine
+Constant-size zero-knowledge proof verification over elliptic curve BN254 (alt_bn128):
+1. Proof points: $A \in G_1, B \in G_2, C \in G_1$
+2. Pairing verification equation:
+$$e(A, B) = e(\alpha, \beta) \cdot e\left(\sum_{i=0}^l x_i \cdot \text{IC}_i, \gamma\right) \cdot e(C, \delta)$$
+3. EVM precompile verification via `DocuTrustGroth16Verifier.sol` at address `0x08`.
+
 ---
 
 ## 3. Directory Layout

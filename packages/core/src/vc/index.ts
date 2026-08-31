@@ -23,6 +23,8 @@ import { SchemaValidator } from '../schema';
 import { DecentralizedTrustRegistry } from '../trust-registry';
 import { JsonLdCanonicalizationEngine } from '../jsonld';
 import { MultiSigEngine } from '../multisig';
+import { SLHDSAEngine } from '../slhdsa';
+import { WebAuthnAttestationEngine } from '../webauthn';
 
 export interface CredentialSubject {
   id?: string;
@@ -479,6 +481,65 @@ export class VerifiableCredentialsEngine {
         signatureValid = jsonLdRes.valid;
         if (!signatureValid) {
           errors.push(...jsonLdRes.errors);
+        }
+      } else if (
+        credential.proof.type === 'DocuTrustSLHDSASignature2026' ||
+        credential.proof.cryptosuite === 'slh-dsa-sha2-128s-2026' ||
+        (credential.proof.proofValue && credential.proof.proofValue.startsWith('slh1_'))
+      ) {
+        const { proof, ...unsigned } = credential;
+        const canonicalPayload = canonicalizeJson({
+          ...unsigned,
+          ...(proof.claimsRoot ? { claimsRoot: proof.claimsRoot } : {})
+        });
+        const computedHash = sha256Hex(canonicalPayload);
+
+        let slhPub = expectedPublicKeyHex;
+        if (!slhPub) {
+          try {
+            const didDoc = await DIDResolver.resolve(issuerId);
+            const vm = didDoc.verificationMethod.find(v => v.type === 'SLHDSAVerificationKey2026') || didDoc.verificationMethod[0];
+            slhPub = vm?.publicKeyHex || vm?.publicKeyMultibase;
+          } catch (_) {}
+        }
+
+        signatureValid = SLHDSAEngine.verify(computedHash, proof.proofValue || proof.signature || '', slhPub || issuerId);
+        isQuantumSafe = true;
+        if (!signatureValid) {
+          errors.push('Stateless Hash-Based (SLH-DSA) post-quantum signature verification failed.');
+        }
+      } else if (
+        credential.proof.type === 'WebAuthnPasskeySignature2026' ||
+        credential.proof.cryptosuite === 'ecdsa-sd-2023' ||
+        issuerId.startsWith('did:webauthn:')
+      ) {
+        let p256Pub = expectedPublicKeyHex;
+        if (!p256Pub) {
+          try {
+            const didDoc = await DIDResolver.resolve(issuerId);
+            const vm = didDoc.verificationMethod[0];
+            p256Pub = vm?.publicKeyHex || vm?.publicKeyMultibase;
+          } catch (_) {}
+        }
+
+        const { proof, ...unsigned } = credential;
+        const canonicalPayload = canonicalizeJson({
+          ...unsigned,
+          ...(proof.claimsRoot ? { claimsRoot: proof.claimsRoot } : {})
+        });
+        const computedHash = sha256Hex(canonicalPayload);
+
+        if (proof.assertion) {
+          const authRes = WebAuthnAttestationEngine.verifyAssertion(proof.assertion, computedHash, p256Pub || issuerId);
+          signatureValid = authRes.valid;
+          if (!signatureValid) {
+            errors.push(...authRes.errors);
+          }
+        } else {
+          signatureValid = verifySignature(computedHash, proof.proofValue || proof.signature || '', p256Pub || issuerId);
+          if (!signatureValid) {
+            errors.push('WebAuthn P-256 ECDSA digital signature verification failed.');
+          }
         }
       } else {
         let pubKey = expectedPublicKeyHex;
