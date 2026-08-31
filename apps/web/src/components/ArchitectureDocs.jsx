@@ -184,6 +184,45 @@ export default function ArchitectureDocs() {
           Enables constant-time proof that an identity is NOT part of a restricted set via Extended Euclidean Bezout coefficients (<code className="text-purple-400 bg-gray-900 px-1.5 py-0.5 rounded font-mono text-xs">d^x * V^b = g mod N</code>), and provides a recursive Zero-Knowledge Predicate Graph engine capable of verifying arbitrary hierarchical boolean trees (AND, OR, NOT, THRESHOLD) over heterogeneous atomic ZK proofs.
         </p>
       </div>
+
+      {/* 13. Recursive ZK Proof Aggregation & Fiat-Shamir Folding */}
+      <div className="glass-card p-6 sm:p-8 rounded-2xl border border-gray-800 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center">
+            <Layers className="w-4 h-4" />
+          </div>
+          <h3 className="text-lg font-bold text-white">13. Recursive ZK Proof Aggregation & Fiat-Shamir Folding</h3>
+        </div>
+        <p className="text-sm text-gray-300 leading-relaxed">
+          Compresses arbitrary numbers of heterogeneous Zero-Knowledge sub-proofs into a single constant-size recursive proof (<code className="text-cyan-400 bg-gray-900 px-1.5 py-0.5 rounded font-mono text-xs">DocuTrustRecursiveZKProof2026</code>) using Fiat-Shamir folding, multi-point challenge reduction, and automated EVM Solidity calldata generation.
+        </p>
+      </div>
+
+      {/* 14. 2D Temporal-Spatial Revocation Lattice */}
+      <div className="glass-card p-6 sm:p-8 rounded-2xl border border-gray-800 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+            <CheckCircle2 className="w-4 h-4" />
+          </div>
+          <h3 className="text-lg font-bold text-white">14. 2D Temporal-Spatial Multi-Epoch Revocation Lattice</h3>
+        </div>
+        <p className="text-sm text-gray-300 leading-relaxed">
+          Implements a two-dimensional matrix of prime-mapped dynamic accumulators across epochs and spatial shards. Yields constant $O(1)$ size non-revocation witnesses and allows instant "time-travel" historical proof verification for credentials at any past epoch.
+        </p>
+      </div>
+
+      {/* 15. Autonomous AI Agent Action Attestation & Guardrails */}
+      <div className="glass-card p-6 sm:p-8 rounded-2xl border border-gray-800 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center">
+            <ShieldCheck className="w-4 h-4" />
+          </div>
+          <h3 className="text-lg font-bold text-white">15. Autonomous AI Agent Action Attestation & Guardrails</h3>
+        </div>
+        <p className="text-sm text-gray-300 leading-relaxed">
+          Cryptographically binds autonomous AI agent tool executions and decisions to model card metadata fingerprints, Merkle hash-chained execution traces, committed output artifacts, and strict deterministic safety guardrail compliance evaluation.
+        </p>
+      </div>
     </div>
   );
 }

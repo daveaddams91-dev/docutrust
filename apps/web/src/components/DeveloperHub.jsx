@@ -99,10 +99,18 @@ $ docutrust jsonld-sign --doc credential.jsonld --key issuer_key.json --out sign
 $ docutrust trustchain-issue --issuer "did:key:z6MkuRoot" --delegatee "did:key:z6MkuBoard" --out token1.json
 $ docutrust trustchain-verify --chain "token1.json,token2.json" --cred signed.jsonld --roots "did:key:z6MkuRoot"
 
-# 4. Post-Quantum Dual Hybrid KEM (NIST FIPS 203 ML-KEM-768 Kyber)
-$ docutrust quantum-armor-keygen --out kem_keys.json
-$ docutrust quantum-armor-seal --key kem_keys.json --payload sensitive_vc.json --out sealed.envelope
-$ docutrust quantum-armor-unseal --key kem_keys.json --envelope sealed.envelope`
+# 4. Recursive Zero-Knowledge Proof Aggregation
+$ docutrust zk-aggregate --proofs "proof1.json,proof2.json" --depth 4 --out recursive_proof.json
+$ docutrust zk-verify-recursive --proof recursive_proof.json
+
+# 5. 2D Temporal-Spatial Revocation Lattice
+$ docutrust lattice-init --epochs 10 --shards 4 --out lattice.json
+$ docutrust lattice-prove --lattice lattice.json --id "did:key:alice" --epoch 0 --shard 0 --out witness.json
+$ docutrust lattice-verify --lattice lattice.json --proof witness.json
+
+# 6. Autonomous AI Agent Action Attestation
+$ docutrust agent-attest --agent "did:key:agent-42" --action "SETTLEMENT" --params '{"usd":100}' --out attestation.json
+$ docutrust agent-verify --attestation attestation.json`
   };
 
   const copyCode = () => {
@@ -117,13 +125,13 @@ $ docutrust quantum-armor-unseal --key kem_keys.json --envelope sealed.envelope`
       <div className="mb-10">
         <div className="flex items-center gap-2 text-xs font-mono text-blue-400 mb-2 uppercase tracking-widest">
           <Terminal className="w-3.5 h-3.5" />
-          <span>Developer SDKs & OpenAPI Specification (v8.0.0)</span>
+          <span>Developer SDKs & OpenAPI Specification (v13.0.0)</span>
         </div>
         <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
           Developer Hub & Quickstart
         </h2>
         <p className="text-sm text-gray-400 mt-2">
-          Integrate programmatic confidential homomorphic arithmetic, W3C URDNA2015 JSON-LD signatures, hierarchical trust chains, and post-quantum dual hybrid KEM armor directly into your stack.
+          Integrate recursive ZK proof folding, 2D temporal revocation lattices, autonomous AI agent attestations, and post-quantum dual hybrid armor directly into your stack.
         </p>
       </div>
 

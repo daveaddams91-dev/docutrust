@@ -1,5 +1,42 @@
 # 📝 DocuTrust Changelog & Release Notes
 
+## [v13.0.0] - Sovereign Trust Mesh Evolution, Recursive ZK Aggregation, Temporal Revocation Lattices & AI Agent Provenance - 2026-08-31
+
+### 🌟 Release Overview (v13.0.0 - Major Milestone Release)
+DocuTrust 13.0.0 marks a monumental leap in decentralized trust architecture, introducing recursive zero-knowledge proof aggregation with Fiat-Shamir folding, 2D multi-epoch temporal-spatial revocation lattices with $O(1)$ constant-size witnesses, and autonomous AI Agent action attestation with model card fingerprinting and deterministic guardrail compliance verification:
+
+1. **Recursive Zero-Knowledge Proof Aggregation (`@docutrust/core/zk-recursive`, `docutrust.zk_recursive`)**:
+   - Implemented `ZKRecursiveEngine` enabling the compression and folding of heterogeneous ZK sub-proof statements (range predicates, set membership, credit tiers, KYC assertions) into a single constant-size recursive proof (`DocuTrustRecursiveZKProof2026`).
+   - Implements Fiat-Shamir heuristic accumulator folding with multi-point non-interactive commitments.
+   - Generates compact EVM Solidity calldata hex for gas-efficient on-chain smart contract verification.
+   - Validates linear public input commitments and cryptographic aggregator DID signatures.
+
+2. **2D Temporal-Spatial Multi-Epoch Revocation Lattice (`@docutrust/core/revocation-lattice`, `docutrust.revocation_lattice`)**:
+   - Implemented `RevocationLatticeEngine` providing a 2D matrix structure spanning discrete temporal epochs and spatial shards.
+   - Computes dynamic prime-mapped RSA accumulators per slice with $O(1)$ constant-size non-revocation and revocation witness proofs.
+   - Enables historical time-travel proof evaluation, allowing verifiers to authenticate credential status at any past epoch without re-scanning full ledger history.
+   - Issues signed `DocuTrustLatticeProof2026` cryptographic witness receipts.
+
+3. **Autonomous AI Agent Action Attestation & Guardrails (`@docutrust/core/agent-provenance`, `docutrust.agent_provenance`)**:
+   - Implemented `AgentProvenanceEngine` establishing cryptographic provenance and unforgeable audit trails for autonomous AI agent actions.
+   - Binds agent DID signatures to model card metadata fingerprints (weights digest, temperature, version).
+   - Generates Merkle hash chain commitments over step-by-step tool execution traces and context snapshots.
+   - Issues cryptographically verifiable `DocuTrustAgentAttestation2026` attestations with deterministic guardrail safety policy verification.
+
+4. **Interactive Web Studios (`ZKRecursiveStudio.jsx`, `RevocationLatticeStudio.jsx`, `AgentProvenanceStudio.jsx`, `Navbar.jsx`)**:
+   - Built `ZKRecursiveStudio.jsx`: Interactive heterogeneous proof queue builder, Fiat-Shamir folding depth selector, EVM calldata viewer, and recursive proof verification.
+   - Built `RevocationLatticeStudio.jsx`: 2D multi-epoch spatial shard visualizer, dynamic accumulator updater, epoch advance controls, and $O(1)$ witness proof evaluator.
+   - Built `AgentProvenanceStudio.jsx`: Autonomous agent model card certifier, execution trace step logger, output artifact committer, and safety guardrail verification banner.
+   - Upgraded `Navbar.jsx`: Added mobile drawer modal navigation for all 30+ interactive studios across all screen resolutions.
+
+5. **Full-Stack CLI, REST API & SDK Parity**:
+   - CLI: Added `zk-aggregate`, `zk-verify-recursive`, `lattice-init`, `lattice-accumulate`, `lattice-prove`, `lattice-verify`, `agent-attest`, `agent-verify`.
+   - REST API: Added `/api/v1/zk/recursive/*`, `/api/v1/revocation/lattice/*`, `/api/v1/agent/*`.
+   - Python SDK (`docutrust`): Added `ZKRecursiveEngine`, `RevocationLatticeEngine`, `AgentProvenanceEngine`, client wrapper methods, and 81/81 passing unit tests.
+   - TypeScript SDK (`@docutrust/sdk`): Re-exported v13 engines and types, added `DocuTrustClient` wrapper methods, with 100% test coverage.
+
+---
+
 ## [v12.0.0] - Autonomous Sovereign Trust Mesh, Quantitative Risk Scoring, Verifiable Compute & Ephemeral Credentials - 2026-08-31
 
 ### 🌟 Release Overview (v12.0.0 - Major Milestone Release)

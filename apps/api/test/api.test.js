@@ -1772,6 +1772,127 @@ test('API Server Suite', async (t) => {
     assert.ok(res.body.contractCode.includes('verifyBridgeAttestation'));
     assert.ok(res.body.contractCode.includes('verifyGroth16Proof'));
   });
+
+  await t.test('57. POST /api/v1/zk/recursive/aggregate and /verify', async () => {
+    const keyRes = await makeRequest('POST', '/api/v1/keys/generate');
+    const aggKp = keyRes.body.keyPair;
+
+    const subProofs = [
+      {
+        proofId: 'sub-p1',
+        proofType: 'RangeProof',
+        claim: 'income > 50000',
+        publicInputs: { min: 50000 },
+        proofData: { c: 'comm1' },
+        proverDid: 'did:key:alice'
+      },
+      {
+        proofId: 'sub-p2',
+        proofType: 'SetMembership',
+        claim: 'region in US',
+        publicInputs: { setHash: 'usSet' },
+        proofData: { c: 'comm2' },
+        proverDid: 'did:key:bob'
+      }
+    ];
+
+    const aggRes = await makeRequest('POST', '/api/v1/zk/recursive/aggregate', {
+      subProofs,
+      aggregatorKeyPair: aggKp,
+      depth: 1,
+      generateEvmCalldata: true
+    });
+    assert.equal(aggRes.status, 200);
+    assert.equal(aggRes.body.success, true);
+    assert.ok(aggRes.body.proof.evmCalldataHex);
+    assert.equal(aggRes.body.proof.subProofCount, 2);
+
+    const verifyRes = await makeRequest('POST', '/api/v1/zk/recursive/verify', {
+      proof: aggRes.body.proof,
+      aggregatorPublicKeyHex: aggKp.publicKeyHex
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.success, true);
+    assert.equal(verifyRes.body.valid, true);
+  });
+
+  await t.test('58. POST /api/v1/revocation/lattice (Init, Accumulate, Prove, Verify)', async () => {
+    const keyRes = await makeRequest('POST', '/api/v1/keys/generate');
+    const issuerKp = keyRes.body.keyPair;
+
+    const initRes = await makeRequest('POST', '/api/v1/revocation/lattice/init', {
+      latticeId: 'lattice-api-01',
+      issuerDid: issuerKp.did,
+      shardsCount: 4
+    });
+    assert.equal(initRes.status, 200);
+    assert.equal(initRes.body.success, true);
+    assert.ok(initRes.body.state.globalLatticeRoot);
+
+    const accRes = await makeRequest('POST', '/api/v1/revocation/lattice/accumulate', {
+      state: initRes.body.state,
+      revokedCredentialIds: ['cred-1', 'cred-2'],
+      advanceEpoch: true
+    });
+    assert.equal(accRes.status, 200);
+    assert.equal(accRes.body.success, true);
+    assert.equal(accRes.body.state.currentEpoch, 1);
+
+    const proveRes = await makeRequest('POST', '/api/v1/revocation/lattice/prove', {
+      state: accRes.body.state,
+      credentialId: 'cred-1',
+      issuerKeyPair: issuerKp
+    });
+    assert.equal(proveRes.status, 200);
+    assert.equal(proveRes.body.success, true);
+    assert.equal(proveRes.body.proof.isRevoked, true);
+
+    const verifyRes = await makeRequest('POST', '/api/v1/revocation/lattice/verify', {
+      proof: proveRes.body.proof,
+      issuerPublicKeyHex: issuerKp.publicKeyHex
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.success, true);
+    assert.equal(verifyRes.body.valid, true);
+    assert.equal(verifyRes.body.isRevoked, true);
+  });
+
+  await t.test('59. POST /api/v1/agent (Attest and Verify)', async () => {
+    const keyRes = await makeRequest('POST', '/api/v1/keys/generate');
+    const agentKp = keyRes.body.keyPair;
+
+    const payload = {
+      modelCard: {
+        modelName: 'GPT-5-DocuTrust',
+        modelVersion: '5.0',
+        provider: 'OpenAI'
+      },
+      promptText: 'Authorize invoice payment #4410',
+      executionTrace: [
+        { toolName: 'verify_invoice', toolArguments: { id: '4410' }, observationDigest: 'obs-hash-1' }
+      ],
+      outputArtifact: { approved: true, amount: 1500 },
+      guardrailPolicyId: 'finance-guard-v1',
+      guardrailPassed: true
+    };
+
+    const attestRes = await makeRequest('POST', '/api/v1/agent/attest', {
+      payload,
+      agentKeyPair: agentKp
+    });
+    assert.equal(attestRes.status, 200);
+    assert.equal(attestRes.body.success, true);
+    assert.ok(attestRes.body.attestation.attestationId);
+
+    const verifyRes = await makeRequest('POST', '/api/v1/agent/verify', {
+      attestation: attestRes.body.attestation,
+      agentPublicKeyHex: agentKp.publicKeyHex,
+      expectedOutput: payload.outputArtifact
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.success, true);
+    assert.equal(verifyRes.body.valid, true);
+  });
 });
 
 

@@ -213,7 +213,21 @@ const command = args[0];
 
 function printHelp() {
   console.log(`
-\x1b[1m\x1b[36m🛡️ DocuTrust CLI v12.0.0\x1b[0m — Trust Scoring, Verifiable Compute, Ephemeral Vanish Creds & StateSync
+\x1b[1m\x1b[36m🛡️ DocuTrust CLI v13.0.0\x1b[0m — Sovereign Trust Mesh Evolution: Recursive ZK, Revocation Lattice & AI Agent Provenance
+
+\x1b[1mRECURSIVE ZERO-KNOWLEDGE PROOF AGGREGATION (v13.0.0):\x1b[0m
+  \x1b[32mzk-aggregate\x1b[0m --proofs <f> --key <k> [--depth <d>] [--evm] [--out <f>] Aggregate heterogeneous ZK sub-proofs via Fiat-Shamir folding
+  \x1b[32mzk-verify-recursive\x1b[0m --proof <f> --key <k|pubHex>                     Verify recursively folded zero-knowledge proof
+
+\x1b[1mTEMPORAL-SPATIAL REVOCATION LATTICE (v13.0.0):\x1b[0m
+  \x1b[32mlattice-init\x1b[0m --id <id> --issuer <did> [--shards <s>] [--out <f>]      Initialize 2D multi-epoch revocation lattice
+  \x1b[32mlattice-accumulate\x1b[0m --state <s> --revocations <r> [--advance] [--out <f>] Accumulate credential revocations and advance epoch
+  \x1b[32mlattice-prove\x1b[0m --state <s> --credential <id> --key <k> [--epoch <e>] [--out <f>] Generate O(1) non-revocation / revocation witness
+  \x1b[32mlattice-verify\x1b[0m --proof <p> --key <k|pubHex> [--root <r>]           Verify lattice non-revocation / revocation witness proof
+
+\x1b[1mAUTONOMOUS AI AGENT PROVENANCE & GUARDRAILS (v13.0.0):\x1b[0m
+  \x1b[32magent-attest\x1b[0m --payload <f> --key <k> [--out <f>]                    Issue AI agent action attestation with model card & trace commitment
+  \x1b[32magent-verify\x1b[0m --attestation <f> --key <k|pubHex> [--output <f|txt>]   Verify AI agent action attestation & guardrail compliance
 
 \x1b[1mSOVEREIGN TRUST SCORING & RISK RECEIPT ENGINE (v12.0.0):\x1b[0m
   \x1b[32mtrustscore-eval\x1b[0m --credential <f> [--min-score <n>] [--key <k>] [--out <f>] Evaluate trust vector & issue signed risk receipt
@@ -3287,7 +3301,7 @@ async function main() {
     if (result.valid) {
       console.log(`\x1b[32m✔\x1b[0m Verifiable Compute Receipt is \x1b[1m\x1b[32mCRYPTOGRAPHICALLY VALID\x1b[0m`);
       console.log(`  Program:      ${receipt.programId} v${receipt.programVersion}`);
-      console.log(`  Trace Root:   ${receipt.traceMerkleRoot}`);
+      console.log(`  Trace Digest: ${receipt.executionTraceHash || receipt.traceMerkleRoot}`);
       console.log(`  Output Root:  ${receipt.outputStateHash}`);
       console.log(`  Step Count:   ${receipt.executionStepCount}`);
     } else {
@@ -3431,6 +3445,237 @@ async function main() {
     const code = core.generateUniversalVerifierContract({ contractName: name, solidityVersion: version });
     safeWriteFileSync(outFile, code);
     console.log(`\x1b[32m✔\x1b[0m Master Universal EVM Solidity Smart Contract exported to \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  // 6. v13.0.0 Recursive Zero-Knowledge Proof Aggregation
+  if (command === 'zk-aggregate') {
+    const proofsFile = getArgValue('--proofs') || getArgValue('-p');
+    const keyFile = getArgValue('--key') || getArgValue('-k');
+    const depth = Number(getArgValue('--depth') || 1);
+    const generateEvm = args.includes('--evm');
+    const outFile = getArgValue('--out') || getArgValue('-o') || 'recursive-zk-proof.json';
+
+    if (!proofsFile || !keyFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --proofs <proofs.json> or --key <aggregator-key.json>');
+      process.exit(1);
+    }
+
+    const subProofs = JSON.parse(fs.readFileSync(proofsFile, 'utf-8'));
+    const aggKp = JSON.parse(fs.readFileSync(keyFile, 'utf-8'));
+
+    const recProof = core.ZKRecursiveEngine.aggregateProofs(subProofs, {
+      aggregatorKeyPair: aggKp,
+      depth,
+      generateEvmCalldata: generateEvm
+    });
+
+    safeWriteFileSync(outFile, JSON.stringify(recProof, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m Recursive ZK Aggregated Proof generated successfully!`);
+    console.log(`  Proof ID:           ${recProof.recursiveProofId}`);
+    console.log(`  Sub-Proof Count:    ${recProof.subProofCount}`);
+    console.log(`  Aggregation Depth:  ${recProof.depth}`);
+    console.log(`  Inputs Commitment:  ${recProof.linearizedPublicInputsCommitment}`);
+    if (recProof.evmCalldataHex) {
+      console.log(`  EVM Calldata:       ${recProof.evmCalldataHex.slice(0, 32)}...`);
+    }
+    console.log(`  Saved to:           \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'zk-verify-recursive') {
+    const proofFile = getArgValue('--proof') || getArgValue('-p');
+    const keyArg = getArgValue('--key') || getArgValue('-k');
+
+    if (!proofFile || !keyArg) {
+      console.error('\x1b[31mError:\x1b[0m Missing --proof <proof.json> or --key <key.json|pubHex>');
+      process.exit(1);
+    }
+
+    const proof = JSON.parse(fs.readFileSync(proofFile, 'utf-8'));
+    let aggPub = keyArg;
+    if (fs.existsSync(keyArg)) {
+      const kd = JSON.parse(fs.readFileSync(keyArg, 'utf-8'));
+      aggPub = kd.publicKeyHex || kd.publicKeyPem || kd;
+    }
+
+    const result = core.ZKRecursiveEngine.verifyRecursiveProof(proof, aggPub);
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m Recursive ZK Proof is \x1b[1m\x1b[32mCRYPTOGRAPHICALLY VALID\x1b[0m`);
+      console.log(`  Proof ID:         ${result.recursiveProofId}`);
+      console.log(`  Sub-Proofs:       ${result.subProofCount}`);
+      console.log(`  Folding Depth:    ${result.depth}`);
+      console.log(`  Inputs Digest:    ${result.linearizedPublicInputsCommitment}`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m Recursive ZK verification \x1b[1m\x1b[31mFAILED\x1b[0m:`, result.errors.join(', '));
+      process.exit(1);
+    }
+    return;
+  }
+
+  // 7. v13.0.0 Temporal-Spatial Revocation Lattice Engine
+  if (command === 'lattice-init') {
+    const latticeId = getArgValue('--id') || `lattice-${Date.now()}`;
+    const issuerDid = getArgValue('--issuer') || getArgValue('-i');
+    const shards = Number(getArgValue('--shards') || 4);
+    const outFile = getArgValue('--out') || getArgValue('-o') || 'revocation-lattice.json';
+
+    if (!issuerDid) {
+      console.error('\x1b[31mError:\x1b[0m Missing --issuer <did>');
+      process.exit(1);
+    }
+
+    const state = core.RevocationLatticeEngine.initializeLattice(latticeId, issuerDid, shards);
+    safeWriteFileSync(outFile, JSON.stringify(state, null, 2));
+
+    console.log(`\x1b[32m✔\x1b[0m Revocation Lattice initialized successfully!`);
+    console.log(`  Lattice ID:    ${state.latticeId}`);
+    console.log(`  Issuer DID:    ${state.issuerDid}`);
+    console.log(`  Shards:        ${state.shardsCount}`);
+    console.log(`  Lattice Root:  ${state.globalLatticeRoot}`);
+    console.log(`  Saved to:      \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'lattice-accumulate') {
+    const stateFile = getArgValue('--state') || getArgValue('-s');
+    const revocationsFile = getArgValue('--revocations') || getArgValue('-r');
+    const advanceEpoch = args.includes('--advance');
+    const outFile = getArgValue('--out') || getArgValue('-o') || stateFile;
+
+    if (!stateFile || !revocationsFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --state <lattice.json> or --revocations <ids.json>');
+      process.exit(1);
+    }
+
+    const state = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
+    const revList = JSON.parse(fs.readFileSync(revocationsFile, 'utf-8'));
+    const revokedIds = Array.isArray(revList) ? revList : revList.revokedCredentialIds || [];
+
+    const nextState = core.RevocationLatticeEngine.accumulateRevocations(state, revokedIds, advanceEpoch);
+    safeWriteFileSync(outFile, JSON.stringify(nextState, null, 2));
+
+    console.log(`\x1b[32m✔\x1b[0m Revocation Lattice updated successfully!`);
+    console.log(`  Current Epoch:  ${nextState.currentEpoch}`);
+    console.log(`  Lattice Root:   ${nextState.globalLatticeRoot}`);
+    console.log(`  Accumulated:    ${revokedIds.length} revocation(s)`);
+    console.log(`  Saved to:       \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'lattice-prove') {
+    const stateFile = getArgValue('--state') || getArgValue('-s');
+    const credId = getArgValue('--credential') || getArgValue('-c');
+    const keyFile = getArgValue('--key') || getArgValue('-k');
+    const epochArg = getArgValue('--epoch');
+    const outFile = getArgValue('--out') || getArgValue('-o') || `lattice-proof-${Date.now()}.json`;
+
+    if (!stateFile || !credId || !keyFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --state <lattice.json>, --credential <id>, or --key <issuer-key.json>');
+      process.exit(1);
+    }
+
+    const state = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
+    const issuerKp = JSON.parse(fs.readFileSync(keyFile, 'utf-8'));
+    const targetEpoch = epochArg !== undefined ? Number(epochArg) : undefined;
+
+    const proof = core.RevocationLatticeEngine.generateLatticeProof(state, credId, issuerKp, targetEpoch);
+    safeWriteFileSync(outFile, JSON.stringify(proof, null, 2));
+
+    console.log(`\x1b[32m✔\x1b[0m Revocation Lattice Proof generated!`);
+    console.log(`  Credential ID:   ${proof.credentialId}`);
+    console.log(`  Status:          ${proof.isRevoked ? '\x1b[31mREVOKED\x1b[0m' : '\x1b[32mACTIVE (VALID)\x1b[0m'}`);
+    console.log(`  Epoch:           ${proof.targetEpoch}`);
+    console.log(`  Shard Index:     ${proof.targetShard}`);
+    console.log(`  Saved to:        \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'lattice-verify') {
+    const proofFile = getArgValue('--proof') || getArgValue('-p');
+    const keyArg = getArgValue('--key') || getArgValue('-k');
+    const expectedRoot = getArgValue('--root') || getArgValue('-r');
+
+    if (!proofFile || !keyArg) {
+      console.error('\x1b[31mError:\x1b[0m Missing --proof <proof.json> or --key <key.json|pubHex>');
+      process.exit(1);
+    }
+
+    const proof = JSON.parse(fs.readFileSync(proofFile, 'utf-8'));
+    let issuerPub = keyArg;
+    if (fs.existsSync(keyArg)) {
+      const kd = JSON.parse(fs.readFileSync(keyArg, 'utf-8'));
+      issuerPub = kd.publicKeyHex || kd.publicKeyPem || kd;
+    }
+
+    const result = core.RevocationLatticeEngine.verifyLatticeProof(proof, issuerPub, expectedRoot);
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m Revocation Lattice Proof is \x1b[1m\x1b[32mCRYPTOGRAPHICALLY AUTHENTIC\x1b[0m`);
+      console.log(`  Credential Status: ${result.isRevoked ? '\x1b[31mREVOKED\x1b[0m' : '\x1b[32mNOT REVOKED (VALID)\x1b[0m'}`);
+      console.log(`  Epoch:             ${proof.targetEpoch}`);
+      console.log(`  Lattice Root:      ${proof.latticeRoot}`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m Lattice proof verification \x1b[1m\x1b[31mFAILED\x1b[0m:`, result.errors.join(', '));
+      process.exit(1);
+    }
+    return;
+  }
+
+  // 8. v13.0.0 Autonomous AI Agent Provenance & Guardrails
+  if (command === 'agent-attest') {
+    const payloadFile = getArgValue('--payload') || getArgValue('-p');
+    const keyFile = getArgValue('--key') || getArgValue('-k');
+    const outFile = getArgValue('--out') || getArgValue('-o') || 'agent-attestation.json';
+
+    if (!payloadFile || !keyFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --payload <payload.json> or --key <agent-key.json>');
+      process.exit(1);
+    }
+
+    const payload = JSON.parse(fs.readFileSync(payloadFile, 'utf-8'));
+    const agentKp = JSON.parse(fs.readFileSync(keyFile, 'utf-8'));
+
+    const attestation = core.AgentProvenanceEngine.issueAttestation(payload, agentKp);
+    safeWriteFileSync(outFile, JSON.stringify(attestation, null, 2));
+
+    console.log(`\x1b[32m✔\x1b[0m AI Agent Action Attestation issued successfully!`);
+    console.log(`  Attestation ID:  ${attestation.attestationId}`);
+    console.log(`  Agent DID:       ${attestation.agentDid}`);
+    console.log(`  Model Fingerprint: ${attestation.modelFingerprint}`);
+    console.log(`  Trace Steps:     ${attestation.stepCount}`);
+    console.log(`  Guardrails:      ${attestation.guardrailPassed ? '\x1b[32mPASSED\x1b[0m' : '\x1b[31mVIOLATED\x1b[0m'}`);
+    console.log(`  Saved to:        \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'agent-verify') {
+    const attestFile = getArgValue('--attestation') || getArgValue('-a');
+    const keyArg = getArgValue('--key') || getArgValue('-k');
+    const outputFile = getArgValue('--output');
+
+    if (!attestFile || !keyArg) {
+      console.error('\x1b[31mError:\x1b[0m Missing --attestation <attestation.json> or --key <key.json|pubHex>');
+      process.exit(1);
+    }
+
+    const attestation = JSON.parse(fs.readFileSync(attestFile, 'utf-8'));
+    let agentPub = keyArg;
+    if (fs.existsSync(keyArg)) {
+      const kd = JSON.parse(fs.readFileSync(keyArg, 'utf-8'));
+      agentPub = kd.publicKeyHex || kd.publicKeyPem || kd;
+    }
+    const expectedOutput = outputFile ? (fs.existsSync(outputFile) ? JSON.parse(fs.readFileSync(outputFile, 'utf-8')) : outputFile) : undefined;
+
+    const result = core.AgentProvenanceEngine.verifyAttestation(attestation, agentPub, expectedOutput);
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m AI Agent Attestation is \x1b[1m\x1b[32mVERIFIED & TAMPER-FREE\x1b[0m`);
+      console.log(`  Agent DID:       ${result.agentDid}`);
+      console.log(`  Execution Steps: ${result.stepCount}`);
+      console.log(`  Guardrail State: ${result.guardrailPassed ? '\x1b[32mCOMPLIANT\x1b[0m' : '\x1b[31mNON-COMPLIANT\x1b[0m'}`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m Agent attestation verification \x1b[1m\x1b[31mFAILED\x1b[0m:`, result.errors.join(', '));
+      process.exit(1);
+    }
     return;
   }
 

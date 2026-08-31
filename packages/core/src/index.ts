@@ -161,6 +161,15 @@ export * from './vanish-cred';
 // Export Cross-Ledger Sovereign Registry StateSync & Delta Proof Engine (DocuTrust v12.0.0)
 export * from './state-sync';
 
+// ========================================================
+// DocuTrust v13.0.0 Sovereign Trust Mesh Evolution
+// ========================================================
 
+// Export Recursive ZK Proof Composition & SNARK Folding Aggregator (DocuTrust v13.0.0)
+export * from './zk-recursive';
 
+// Export 2D Multi-Epoch Revocation Lattice & Dynamic Accumulator Engine (DocuTrust v13.0.0)
+export * from './revocation-lattice';
 
+// Export Autonomous AI Agent Action Attestation & Policy Guardrail Engine (DocuTrust v13.0.0)
+export * from './agent-provenance';

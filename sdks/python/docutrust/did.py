@@ -105,6 +105,52 @@ class DIDResolver:
                 "assertionMethod": [vm_id]
             }
 
+        if method == "webauthn":
+            raw_str = parts[2].split("#")[0]
+            multibase = raw_str[1:] if raw_str.startswith("z") else raw_str
+            raw = decode_base58(multibase)
+            pub_hex = raw[2:].hex()
+            vm_id = f"{did}#passkey-1"
+            return {
+                "@context": [
+                    "https://www.w3.org/ns/did/v1",
+                    "https://w3id.org/security/suites/jws-2020/v1"
+                ],
+                "id": did,
+                "verificationMethod": [{
+                    "id": vm_id,
+                    "type": "JsonWebKey2020",
+                    "controller": did,
+                    "publicKeyMultibase": f"z{multibase}",
+                    "publicKeyHex": pub_hex
+                }],
+                "authentication": [vm_id],
+                "assertionMethod": [vm_id]
+            }
+
+        if method == "slh":
+            raw_str = parts[2].split("#")[0]
+            multibase = raw_str[1:] if raw_str.startswith("z") else raw_str
+            raw = decode_base58(multibase)
+            pub_hex = raw[2:].hex()
+            vm_id = f"{did}#slh-dsa-1"
+            return {
+                "@context": [
+                    "https://www.w3.org/ns/did/v1",
+                    "https://w3id.org/security/data-integrity/v1"
+                ],
+                "id": did,
+                "verificationMethod": [{
+                    "id": vm_id,
+                    "type": "SLHDSAVerificationKey2026",
+                    "controller": did,
+                    "publicKeyMultibase": f"z{multibase}",
+                    "publicKeyHex": pub_hex
+                }],
+                "authentication": [vm_id],
+                "assertionMethod": [vm_id]
+            }
+
         if method == "pkh":
             address = parts[-1]
             vm_id = f"{did}#blockchainAccountId"

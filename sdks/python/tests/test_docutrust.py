@@ -1551,6 +1551,160 @@ class TestDocuTrustPython(unittest.TestCase):
         self.assertIn("function verifyCrossChainQuorum", universal_code)
         self.assertIn("function verifyGroth16SNARK", universal_code)
 
+    # ==========================================
+    # v13.0.0 Sovereign Trust Mesh Evolution Tests
+    # ==========================================
+
+    def test_did_webauthn_and_slh_resolution(self):
+        from docutrust.did import DIDResolver
+        from docutrust.crypto import encode_base58
+        import os
+
+        # test did:webauthn
+        fake_pk = b"\x00\x01" + os.urandom(32)
+        mb = encode_base58(fake_pk)
+        did_w = f"did:webauthn:z{mb}#passkey-1"
+        doc_w = DIDResolver.resolve(did_w)
+        self.assertEqual(doc_w["id"], did_w)
+        self.assertEqual(doc_w["verificationMethod"][0]["type"], "JsonWebKey2020")
+
+        # test did:slh
+        did_s = f"did:slh:z{mb}#slh-dsa-1"
+        doc_s = DIDResolver.resolve(did_s)
+        self.assertEqual(doc_s["id"], did_s)
+        self.assertEqual(doc_s["verificationMethod"][0]["type"], "SLHDSAVerificationKey2026")
+
+    def test_verifiable_compute_set_contains(self):
+        from docutrust.verifiable_compute import VerifiableComputeEngine
+        from docutrust.crypto import generate_key_pair
+
+        prover_kp = generate_key_pair()
+        program = {
+            "programId": "KycWhitelistChecker",
+            "instructions": [
+                {"op": "SET_CONTAINS", "args": ["$userCountry", ["US", "CA", "GB", "DE"]], "outputVar": "isAllowed"}
+            ]
+        }
+        res1 = VerifiableComputeEngine.execute_program(program, {"userCountry": "CA"}, prover_kp)
+        self.assertTrue(res1["finalOutputs"]["isAllowed"])
+
+        res2 = VerifiableComputeEngine.execute_program(program, {"userCountry": "KP"}, prover_kp)
+        self.assertFalse(res2["finalOutputs"]["isAllowed"])
+
+    def test_zk_recursive_engine(self):
+        from docutrust.zk_recursive import ZKRecursiveEngine
+        from docutrust.crypto import generate_key_pair
+
+        aggregator_kp = generate_key_pair()
+        sub_proofs = [
+            {
+                "proofId": "p-1",
+                "proofType": "RangeProof",
+                "claim": "age >= 21",
+                "publicInputs": {"minAge": 21},
+                "proofData": {"commitment": "comm1", "response": "resp1"},
+                "proverDid": "did:key:alice"
+            },
+            {
+                "proofId": "p-2",
+                "proofType": "SetMembership",
+                "claim": "country in EU",
+                "publicInputs": {"setHash": "hashEU"},
+                "proofData": {"root": "merkleRootEU"},
+                "proverDid": "did:key:bob"
+            }
+        ]
+
+        rec_proof = ZKRecursiveEngine.aggregate_proofs(
+            sub_proofs,
+            aggregator_kp,
+            depth=1,
+            generate_evm_calldata=True
+        )
+
+        self.assertEqual(rec_proof["type"], "DocuTrustRecursiveZKProof2026")
+        self.assertEqual(rec_proof["subProofCount"], 2)
+        self.assertTrue(rec_proof["evmCalldataHex"].startswith("0x"))
+
+        verify_res = ZKRecursiveEngine.verify_recursive_proof(rec_proof, aggregator_kp["publicKeyHex"])
+        self.assertTrue(verify_res["valid"])
+        self.assertEqual(len(verify_res["errors"]), 0)
+
+    def test_revocation_lattice_engine(self):
+        from docutrust.revocation_lattice import RevocationLatticeEngine
+        from docutrust.crypto import generate_key_pair
+
+        issuer_kp = generate_key_pair()
+        lattice = RevocationLatticeEngine.initialize_lattice("lattice-alpha", issuer_kp["did"], shards_count=4)
+        self.assertEqual(lattice["currentEpoch"], 0)
+
+        # Accumulate revocations
+        updated_lattice = RevocationLatticeEngine.accumulate_revocations(
+            lattice,
+            ["cred-001", "cred-002"],
+            advance_epoch=True
+        )
+        self.assertEqual(updated_lattice["currentEpoch"], 1)
+
+        # Prove revoked credential
+        proof_revoked = RevocationLatticeEngine.generate_lattice_proof(
+            updated_lattice,
+            "cred-001",
+            issuer_kp
+        )
+        self.assertTrue(proof_revoked["isRevoked"])
+        verify_rev = RevocationLatticeEngine.verify_lattice_proof(proof_revoked, issuer_kp["publicKeyHex"])
+        self.assertTrue(verify_rev["valid"])
+        self.assertTrue(verify_rev["isRevoked"])
+
+        # Prove active credential
+        proof_active = RevocationLatticeEngine.generate_lattice_proof(
+            updated_lattice,
+            "cred-999-active",
+            issuer_kp
+        )
+        self.assertFalse(proof_active["isRevoked"])
+        verify_act = RevocationLatticeEngine.verify_lattice_proof(proof_active, issuer_kp["publicKeyHex"])
+        self.assertTrue(verify_act["valid"])
+        self.assertFalse(verify_act["isRevoked"])
+
+    def test_agent_provenance_engine(self):
+        from docutrust.agent_provenance import AgentProvenanceEngine
+        from docutrust.crypto import generate_key_pair
+
+        agent_kp = generate_key_pair()
+        model_card = {
+            "modelName": "Claude-4-DocuTrust",
+            "modelVersion": "2026.1",
+            "provider": "Anthropic",
+            "weightsFingerprintHex": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+        trace = [
+            {"toolName": "fetch_policy", "toolArguments": {"id": "POL-99"}, "observationDigest": "obs-digest-1"},
+            {"toolName": "execute_transfer", "toolArguments": {"amount": 500}, "observationDigest": "obs-digest-2"}
+        ]
+        output = {"status": "SUCCESS", "txId": "0xabc123"}
+
+        attestation = AgentProvenanceEngine.issue_attestation(
+            {
+                "modelCard": model_card,
+                "promptText": "Execute authorized transfer of $500",
+                "executionTrace": trace,
+                "outputArtifact": output,
+                "guardrailPolicyId": "strict-financial-guardrail",
+                "guardrailPassed": True
+            },
+            agent_kp
+        )
+
+        self.assertEqual(attestation["type"], "DocuTrustAgentAttestation2026")
+        self.assertEqual(attestation["stepCount"], 2)
+        self.assertTrue(attestation["guardrailPassed"])
+
+        verify_res = AgentProvenanceEngine.verify_attestation(attestation, agent_kp["publicKeyHex"], expected_output=output)
+        self.assertTrue(verify_res["valid"])
+        self.assertEqual(len(verify_res["errors"]), 0)
+
 if __name__ == '__main__':
     unittest.main()
 

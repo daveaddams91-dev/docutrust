@@ -1,4 +1,5 @@
 from __future__ import annotations
+__version__ = "13.0.0"
 from .client import DocuTrustClient
 from .crypto import canonicalize_json, sha256_hex, MerkleTree, encode_base58, decode_base58
 from .pqc import generate_pqc_hybrid_keys
@@ -65,8 +66,11 @@ from .trust_score import TrustScoreEngine
 from .verifiable_compute import VerifiableComputeEngine
 from .vanish_cred import VanishCredEngine
 from .state_sync import StateSyncEngine
+from .zk_recursive import ZKRecursiveEngine
+from .revocation_lattice import RevocationLatticeEngine
+from .agent_provenance import AgentProvenanceEngine
 
-__version__ = "12.0.0"
+__version__ = "13.0.0"
 __all__ = [
     "DocuTrustClient",
     "canonicalize_json",
@@ -146,6 +150,9 @@ __all__ = [
     "TrustScoreEngine",
     "VerifiableComputeEngine",
     "VanishCredEngine",
-    "StateSyncEngine"
+    "StateSyncEngine",
+    "ZKRecursiveEngine",
+    "RevocationLatticeEngine",
+    "AgentProvenanceEngine"
 ]
 

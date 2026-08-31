@@ -1530,6 +1530,91 @@ class DocuTrustClient:
         from .solidity import SolidityEngine
         return SolidityEngine.generate_universal_verifier_contract(contract_name, solidity_version)
 
+    # ==========================================
+    # v13.0.0 Sovereign Trust Mesh Evolution Methods
+    # ==========================================
+
+    def aggregate_recursive_zk_proofs(
+        self,
+        sub_proofs: List[Dict[str, Any]],
+        aggregator_key_pair: Dict[str, Any],
+        depth: int = 1,
+        generate_evm_calldata: bool = False
+    ) -> Dict[str, Any]:
+        """Aggregates multiple heterogeneous ZK sub-proofs via Fiat-Shamir recursive folding."""
+        from .zk_recursive import ZKRecursiveEngine
+        return ZKRecursiveEngine.aggregate_proofs(sub_proofs, aggregator_key_pair, depth, generate_evm_calldata)
+
+    def verify_recursive_zk_proof(
+        self,
+        proof: Dict[str, Any],
+        aggregator_public_key_hex: str
+    ) -> Dict[str, Any]:
+        """Verifies a recursive ZK aggregated proof."""
+        from .zk_recursive import ZKRecursiveEngine
+        return ZKRecursiveEngine.verify_recursive_proof(proof, aggregator_public_key_hex)
+
+    def initialize_revocation_lattice(
+        self,
+        lattice_id: str,
+        issuer_did: str,
+        shards_count: int = 4
+    ) -> Dict[str, Any]:
+        """Initializes a 2D multi-epoch temporal-spatial revocation lattice."""
+        from .revocation_lattice import RevocationLatticeEngine
+        return RevocationLatticeEngine.initialize_lattice(lattice_id, issuer_did, shards_count)
+
+    def accumulate_revocation_lattice(
+        self,
+        state: Dict[str, Any],
+        revoked_credential_ids: List[str],
+        advance_epoch: bool = False
+    ) -> Dict[str, Any]:
+        """Accumulates credential revocations into lattice slices and advances epochs."""
+        from .revocation_lattice import RevocationLatticeEngine
+        return RevocationLatticeEngine.accumulate_revocations(state, revoked_credential_ids, advance_epoch)
+
+    def generate_revocation_lattice_proof(
+        self,
+        state: Dict[str, Any],
+        credential_id: str,
+        issuer_key_pair: Dict[str, Any],
+        target_epoch: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Generates an O(1) non-revocation / revocation witness proof across lattice slices."""
+        from .revocation_lattice import RevocationLatticeEngine
+        return RevocationLatticeEngine.generate_lattice_proof(state, credential_id, issuer_key_pair, target_epoch)
+
+    def verify_revocation_lattice_proof(
+        self,
+        proof: Dict[str, Any],
+        issuer_public_key_hex: str,
+        expected_lattice_root: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Cryptographically verifies a lattice revocation proof."""
+        from .revocation_lattice import RevocationLatticeEngine
+        return RevocationLatticeEngine.verify_lattice_proof(proof, issuer_public_key_hex, expected_lattice_root)
+
+    def issue_agent_attestation(
+        self,
+        payload: Dict[str, Any],
+        agent_key_pair: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Issues an autonomous AI agent action attestation with model card fingerprinting and trace commitment."""
+        from .agent_provenance import AgentProvenanceEngine
+        return AgentProvenanceEngine.issue_attestation(payload, agent_key_pair)
+
+    def verify_agent_attestation(
+        self,
+        attestation: Dict[str, Any],
+        agent_public_key_hex: str,
+        expected_output: Optional[Union[Dict[str, Any], str]] = None
+    ) -> Dict[str, Any]:
+        """Verifies an AI agent action attestation and guardrail compliance."""
+        from .agent_provenance import AgentProvenanceEngine
+        return AgentProvenanceEngine.verify_attestation(attestation, agent_public_key_hex, expected_output)
+
+
 
 
 

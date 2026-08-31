@@ -98,7 +98,10 @@ const {
   VerifiableComputeEngine,
   VanishCredEngine,
   StateSyncEngine,
-  generateUniversalVerifierContract
+  generateUniversalVerifierContract,
+  ZKRecursiveEngine,
+  RevocationLatticeEngine,
+  AgentProvenanceEngine
 } = require('@docutrust/core');
 
 const PORT = process.env.PORT || 4000;
@@ -2520,13 +2523,14 @@ const server = http.createServer(async (req, res) => {
 
     if (pathname === '/api/v1/compute/verify' && req.method === 'POST') {
       const body = await readJsonBody();
-      const { receipt, proverPublicKey, expectedInputs } = body;
+      const { receipt, proverPublicKey, expectedInputs, inputs } = body;
       if (!receipt || !proverPublicKey) {
         return jsonResponse(400, { error: 'Missing receipt or proverPublicKey.' });
       }
 
       try {
-        const result = VerifiableComputeEngine.verifyReceipt(receipt, proverPublicKey, expectedInputs);
+        const targetInputs = expectedInputs !== undefined ? expectedInputs : inputs;
+        const result = VerifiableComputeEngine.verifyReceipt(receipt, proverPublicKey, targetInputs);
         return jsonResponse(200, { success: true, ...result });
       } catch (e) {
         return jsonResponse(400, { error: e.message });
@@ -2607,6 +2611,121 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // 6. v13.0.0 ZK Recursive Proof Composition
+    if (pathname === '/api/v1/zk/recursive/aggregate' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { subProofs, aggregatorKeyPair, depth = 1, generateEvmCalldata = false } = body;
+      if (!subProofs || !aggregatorKeyPair) {
+        return jsonResponse(400, { error: 'Missing subProofs array or aggregatorKeyPair.' });
+      }
+      try {
+        const result = ZKRecursiveEngine.aggregateProofs(subProofs, { aggregatorKeyPair, depth, generateEvmCalldata });
+        return jsonResponse(200, { success: true, proof: result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/zk/recursive/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { proof, aggregatorPublicKeyHex } = body;
+      if (!proof || !aggregatorPublicKeyHex) {
+        return jsonResponse(400, { error: 'Missing recursive proof or aggregatorPublicKeyHex.' });
+      }
+      try {
+        const result = ZKRecursiveEngine.verifyRecursiveProof(proof, aggregatorPublicKeyHex);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // 7. v13.0.0 Revocation Lattice Engine
+    if (pathname === '/api/v1/revocation/lattice/init' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { latticeId, issuerDid, shardsCount = 4 } = body;
+      if (!latticeId || !issuerDid) {
+        return jsonResponse(400, { error: 'Missing latticeId or issuerDid.' });
+      }
+      try {
+        const state = RevocationLatticeEngine.initializeLattice(latticeId, issuerDid, shardsCount);
+        return jsonResponse(200, { success: true, state });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/revocation/lattice/accumulate' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { state, revokedCredentialIds, advanceEpoch = false } = body;
+      if (!state || !revokedCredentialIds) {
+        return jsonResponse(400, { error: 'Missing lattice state or revokedCredentialIds array.' });
+      }
+      try {
+        const nextState = RevocationLatticeEngine.accumulateRevocations(state, revokedCredentialIds, advanceEpoch);
+        return jsonResponse(200, { success: true, state: nextState });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/revocation/lattice/prove' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { state, credentialId, issuerKeyPair, targetEpoch } = body;
+      if (!state || !credentialId || !issuerKeyPair) {
+        return jsonResponse(400, { error: 'Missing lattice state, credentialId, or issuerKeyPair.' });
+      }
+      try {
+        const proof = RevocationLatticeEngine.generateLatticeProof(state, credentialId, issuerKeyPair, targetEpoch);
+        return jsonResponse(200, { success: true, proof });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/revocation/lattice/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { proof, issuerPublicKeyHex, expectedLatticeRoot } = body;
+      if (!proof || !issuerPublicKeyHex) {
+        return jsonResponse(400, { error: 'Missing lattice proof or issuerPublicKeyHex.' });
+      }
+      try {
+        const result = RevocationLatticeEngine.verifyLatticeProof(proof, issuerPublicKeyHex, expectedLatticeRoot);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // 8. v13.0.0 Autonomous AI Agent Provenance Engine
+    if (pathname === '/api/v1/agent/attest' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { payload, agentKeyPair } = body;
+      if (!payload || !agentKeyPair) {
+        return jsonResponse(400, { error: 'Missing attestation payload or agentKeyPair.' });
+      }
+      try {
+        const attestation = AgentProvenanceEngine.issueAttestation(payload, agentKeyPair);
+        return jsonResponse(200, { success: true, attestation });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/agent/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { attestation, agentPublicKeyHex, expectedOutput } = body;
+      if (!attestation || !agentPublicKeyHex) {
+        return jsonResponse(400, { error: 'Missing attestation or agentPublicKeyHex.' });
+      }
+      try {
+        const result = AgentProvenanceEngine.verifyAttestation(attestation, agentPublicKeyHex, expectedOutput);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
     // Default 404
     jsonResponse(404, { error: 'Route not found' });
   } catch (err) {
@@ -2616,7 +2735,7 @@ const server = http.createServer(async (req, res) => {
 
 if (require.main === module) {
   server.listen(PORT, () => {
-    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v12.0.0 running on http://localhost:${PORT}`);
+    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v13.0.0 running on http://localhost:${PORT}`);
   });
 }
 

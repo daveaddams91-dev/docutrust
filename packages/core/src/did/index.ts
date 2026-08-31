@@ -98,7 +98,8 @@ export class DIDResolver {
    * Deterministically resolve a did:webauthn (NIST P-256 / ES256 Passkey).
    */
   public static resolveDidWebAuthn(did: string): DIDDocument {
-    const multibase = did.replace('did:webauthn:', '');
+    const cleanDid = did.split('#')[0];
+    const multibase = cleanDid.replace('did:webauthn:', '');
     if (!multibase.startsWith('z')) {
       throw new Error(`Invalid did:webauthn format. Expected multibase 'z' prefix.`);
     }
@@ -106,19 +107,19 @@ export class DIDResolver {
     const decoded = decodeBase58(multibase.substring(1));
     const rawPub = decoded.subarray(2);
     const publicKeyHex = rawPub.toString('hex');
-    const keyId = `${did}#passkey-1`;
+    const keyId = `${cleanDid}#passkey-1`;
 
     return {
       '@context': [
         'https://www.w3.org/ns/did/v1',
         'https://w3id.org/security/suites/jws-2020/v1'
       ],
-      id: did,
+      id: cleanDid,
       verificationMethod: [
         {
           id: keyId,
           type: 'JsonWebKey2020',
-          controller: did,
+          controller: cleanDid,
           publicKeyHex,
           publicKeyMultibase: multibase
         }
@@ -132,7 +133,8 @@ export class DIDResolver {
    * Deterministically resolve a did:slh (NIST FIPS 205 SLH-DSA-SHA2-128s).
    */
   public static resolveDidSLH(did: string): DIDDocument {
-    const multibase = did.replace('did:slh:', '');
+    const cleanDid = did.split('#')[0];
+    const multibase = cleanDid.replace('did:slh:', '');
     if (!multibase.startsWith('z')) {
       throw new Error(`Invalid did:slh format. Expected multibase 'z' prefix.`);
     }
@@ -140,19 +142,19 @@ export class DIDResolver {
     const decoded = decodeBase58(multibase.substring(1));
     const rawPub = decoded.subarray(2);
     const publicKeyHex = rawPub.toString('hex');
-    const keyId = `${did}#slh-dsa-1`;
+    const keyId = `${cleanDid}#slh-dsa-1`;
 
     return {
       '@context': [
         'https://www.w3.org/ns/did/v1',
         'https://w3id.org/security/data-integrity/v1'
       ],
-      id: did,
+      id: cleanDid,
       verificationMethod: [
         {
           id: keyId,
           type: 'SLHDSAVerificationKey2026',
-          controller: did,
+          controller: cleanDid,
           publicKeyHex,
           publicKeyMultibase: multibase
         }
@@ -166,7 +168,8 @@ export class DIDResolver {
    * Deterministically resolve a did:pqc (ML-DSA-65 + Ed25519) without network access.
    */
   public static resolveDidPqc(did: string): DIDDocument {
-    const multibase = did.replace('did:pqc:', '');
+    const cleanDid = did.split('#')[0];
+    const multibase = cleanDid.replace('did:pqc:', '');
     if (!multibase.startsWith('z')) {
       throw new Error(`Invalid did:pqc format. Expected multibase 'z' prefix.`);
     }
@@ -180,27 +183,27 @@ export class DIDResolver {
     const rawPqcPub = decoded.subarray(34, 66);
     const classicalPublicKeyHex = rawClassicalPub.toString('hex');
 
-    const keyId = `${did}#pqc-hybrid-1`;
-    const classicalKeyId = `${did}#classical-1`;
+    const keyId = `${cleanDid}#pqc-hybrid-1`;
+    const classicalKeyId = `${cleanDid}#classical-1`;
 
     const doc: DIDDocument = {
       '@context': [
         'https://www.w3.org/ns/did/v1',
         'https://w3id.org/security/suites/ed25519-2020/v1'
       ],
-      id: did,
+      id: cleanDid,
       verificationMethod: [
         {
           id: keyId,
           type: 'ML-DSA-65-Ed25519-Hybrid-2026',
-          controller: did,
+          controller: cleanDid,
           publicKeyMultibase: multibase,
           publicKeyHex: classicalPublicKeyHex
         },
         {
           id: classicalKeyId,
           type: 'Ed25519VerificationKey2020',
-          controller: did,
+          controller: cleanDid,
           publicKeyHex: classicalPublicKeyHex
         }
       ],
@@ -215,7 +218,8 @@ export class DIDResolver {
    * Deterministically resolve a did:key (Ed25519) without network access.
    */
   public static resolveDidKey(did: string): DIDDocument {
-    const multibase = did.replace('did:key:', '');
+    const cleanDid = did.split('#')[0];
+    const multibase = cleanDid.replace('did:key:', '');
     if (!multibase.startsWith('z')) {
       throw new Error(`Invalid did:key format. Expected multibase 'z' prefix.`);
     }
@@ -227,19 +231,19 @@ export class DIDResolver {
 
     const rawPubKey = decoded.subarray(2);
     const publicKeyHex = rawPubKey.toString('hex');
-    const keyId = `${did}#${multibase}`;
+    const keyId = `${cleanDid}#${multibase}`;
 
     const doc: DIDDocument = {
       '@context': [
         'https://www.w3.org/ns/did/v1',
         'https://w3id.org/security/suites/ed25519-2020/v1'
       ],
-      id: did,
+      id: cleanDid,
       verificationMethod: [
         {
           id: keyId,
           type: 'Ed25519VerificationKey2020',
-          controller: did,
+          controller: cleanDid,
           publicKeyMultibase: multibase,
           publicKeyHex
         }
@@ -255,7 +259,8 @@ export class DIDResolver {
    * Deterministically resolve a did:kem (ML-KEM-768 + X25519) without network access.
    */
   public static resolveDidKem(did: string): DIDDocument {
-    const multibase = did.replace('did:kem:', '');
+    const cleanDid = did.split('#')[0];
+    const multibase = cleanDid.replace('did:kem:', '');
     if (!multibase.startsWith('z')) {
       throw new Error(`Invalid did:kem format. Expected multibase 'z' prefix.`);
     }
@@ -266,19 +271,19 @@ export class DIDResolver {
     }
 
     const x25519PubHex = decoded.subarray(2, 34).toString('hex');
-    const keyId = `${did}#kem-hybrid-1`;
+    const keyId = `${cleanDid}#kem-hybrid-1`;
 
     const doc: DIDDocument = {
       '@context': [
         'https://www.w3.org/ns/did/v1',
         'https://w3id.org/security/suites/jws-2020/v1'
       ],
-      id: did,
+      id: cleanDid,
       verificationMethod: [
         {
           id: keyId,
           type: 'ML-KEM-768-X25519-Hybrid-2026',
-          controller: did,
+          controller: cleanDid,
           publicKeyMultibase: multibase,
           publicKeyHex: x25519PubHex
         }
@@ -295,7 +300,8 @@ export class DIDResolver {
    * Deterministically resolve a did:bbs (BBS+ BLS12-381) without network access.
    */
   public static resolveDidBbs(did: string): DIDDocument {
-    const multibase = did.replace('did:bbs:', '');
+    const cleanDid = did.split('#')[0];
+    const multibase = cleanDid.replace('did:bbs:', '');
     const keyId = `${did}#bbs-1`;
 
     const doc: DIDDocument = {

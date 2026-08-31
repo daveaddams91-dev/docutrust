@@ -248,7 +248,8 @@ export class PolicyEngine {
    * Resolves a nested field value by dot notation and array index notation (e.g. "credentialSubject.scores[0]").
    */
   public static resolveFieldValue(obj: any, path?: string): any {
-    if (!path || !obj) return undefined;
+    if (!path || path === '' || path === '.') return obj;
+    if (obj === null || obj === undefined) return undefined;
     const normalized = path.replace(/\[(\w+)\]/g, '.$1');
     const parts = normalized.split('.');
     let curr = obj;

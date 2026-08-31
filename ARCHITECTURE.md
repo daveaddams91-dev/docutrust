@@ -112,6 +112,31 @@ Constant-size zero-knowledge proof verification over elliptic curve BN254 (alt_b
 $$e(A, B) = e(\alpha, \beta) \cdot e\left(\sum_{i=0}^l x_i \cdot \text{IC}_i, \gamma\right) \cdot e(C, \delta)$$
 3. EVM precompile verification via `DocuTrustGroth16Verifier.sol` at address `0x08`.
 
+### 2.14 Recursive Zero-Knowledge Proof Aggregation & Fiat-Shamir Folding
+Compresses $K$ heterogeneous ZK sub-proof statements into a single constant-size recursive proof:
+1. Sub-proof commitments: $\vec{C} = [C_1, \dots, C_K]$
+2. Fiat-Shamir non-interactive challenge derivation:
+$$\alpha = \text{SHA-256}(\text{"DOCUTRUST_FS_FOLD_V13:"} \parallel \text{RootHash}(\vec{C})) \pmod q$$
+3. Folded accumulator evaluation:
+$$A_{\text{fold}} = \sum_{k=1}^K \alpha^k \cdot \text{Eval}(P_k)$$
+4. Produces `DocuTrustRecursiveZKProof2026` with EVM on-chain calldata hex.
+
+### 2.15 2D Temporal-Spatial Multi-Epoch Revocation Lattice
+Matrix lattice spanning temporal epochs $e \in [0, E-1]$ and spatial shards $s \in [0, S-1]$:
+1. Slice Prime Accumulator:
+$$V_{(e, s)} = g^{\prod_{id \in \text{Slice}(e, s)} \text{Prime}(id)} \pmod N$$
+2. $O(1)$ Constant-Size Witness generation:
+$$W_{x} = g^{\prod_{id \in \text{Slice}(e, s) \setminus \{x\}} \text{Prime}(id)} \pmod N$$
+3. Matrix Root: 2D Merkle commitment over all slice accumulators $V_{(e, s)}$ enabling time-travel audits without full history re-indexing.
+
+### 2.16 Autonomous AI Agent Action Attestation & Guardrails
+Cryptographic binding of autonomous AI agent actions to model card fingerprints:
+1. Model Card Fingerprint:
+$$F_{\text{model}} = \text{SHA-256}(\text{modelFamily} \parallel \text{weightsDigest} \parallel \text{temp} \parallel \text{version})$$
+2. Merkle Hash-Chained Execution Trace:
+$$H_t = \text{SHA-256}(H_{t-1} \parallel \text{Step}_t \parallel \text{ToolCall}_t \parallel \text{ResultHash}_t)$$
+3. Attestation Signature: Ed25519 signature over $(F_{\text{model}} \parallel H_{\text{trace}} \parallel \text{PayloadHash})$ validated against deterministic safety guardrail policies.
+
 ---
 
 ## 3. Directory Layout

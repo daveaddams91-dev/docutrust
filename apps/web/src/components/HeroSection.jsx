@@ -10,7 +10,9 @@ import {
   Sparkles, 
   FileCode, 
   Globe2,
-  Terminal
+  Terminal,
+  Grid,
+  Bot
 } from 'lucide-react';
 
 export default function HeroSection({ setActiveTab }) {
@@ -202,7 +204,55 @@ export default function HeroSection({ setActiveTab }) {
         </div>
 
         {/* Feature Grid Highlights */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 max-w-6xl mx-auto mt-20 text-left">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 max-w-6xl mx-auto mt-20 text-left">
+          <div 
+            onClick={() => setActiveTab('zk-recursive')}
+            className="glass-card p-5 rounded-2xl border border-gray-800/80 hover:border-cyan-500/50 hover:bg-gray-900/60 transition-all cursor-pointer group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 mb-3 group-hover:scale-105 transition-transform">
+              <Layers className="w-5 h-5" />
+            </div>
+            <h3 className="text-sm font-bold text-white mb-1.5 flex items-center gap-1">
+              Recursive ZK Folding
+              <Sparkles className="w-3 h-3 text-cyan-400" />
+            </h3>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              Fold heterogeneous zero-knowledge proofs into a single constant-size recursive proof with EVM on-chain calldata.
+            </p>
+          </div>
+
+          <div 
+            onClick={() => setActiveTab('lattice')}
+            className="glass-card p-5 rounded-2xl border border-gray-800/80 hover:border-emerald-500/50 hover:bg-gray-900/60 transition-all cursor-pointer group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-3 group-hover:scale-105 transition-transform">
+              <Grid className="w-5 h-5" />
+            </div>
+            <h3 className="text-sm font-bold text-white mb-1.5 flex items-center gap-1">
+              Revocation Lattice
+              <Sparkles className="w-3 h-3 text-emerald-400" />
+            </h3>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              2D multi-epoch temporal-spatial accumulator lattice with O(1) witness generation and historical time-travel proofs.
+            </p>
+          </div>
+
+          <div 
+            onClick={() => setActiveTab('agent-provenance')}
+            className="glass-card p-5 rounded-2xl border border-gray-800/80 hover:border-purple-500/50 hover:bg-gray-900/60 transition-all cursor-pointer group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 mb-3 group-hover:scale-105 transition-transform">
+              <Bot className="w-5 h-5" />
+            </div>
+            <h3 className="text-sm font-bold text-white mb-1.5 flex items-center gap-1">
+              AI Agent Provenance
+              <Sparkles className="w-3 h-3 text-purple-400" />
+            </h3>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              Cryptographically attest autonomous agent actions, model card fingerprints, execution traces, and safety guardrails.
+            </p>
+          </div>
+
           <div 
             onClick={() => setActiveTab('confidential')}
             className="glass-card p-5 rounded-2xl border border-gray-800/80 hover:border-purple-500/50 hover:bg-gray-900/60 transition-all cursor-pointer group"

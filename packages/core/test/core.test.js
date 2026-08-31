@@ -159,7 +159,11 @@ const {
   VerifiableComputeEngine,
   VanishCredEngine,
   StateSyncEngine,
-  generateUniversalVerifierContract
+  generateUniversalVerifierContract,
+  // v13.0.0 Engines
+  ZKRecursiveEngine,
+  RevocationLatticeEngine,
+  AgentProvenanceEngine
 } = require('../dist/index.js');
 
 // 1. Cryptography Tests
@@ -3044,7 +3048,192 @@ test('87. SolidityEngine: generateUniversalVerifierContract output verification'
   assert.ok(universalSol.includes('checkBitstringStatus'));
 });
 
+// 88. Recursive ZK Proof Composition & SNARK Folding Engine
+test('88. ZKRecursiveEngine: aggregateProofs, Fiat-Shamir folding, verifyRecursiveProof, EVM calldata', () => {
+  const aggregatorKp = generateKeyPair();
 
+  const subProofs = [
+    {
+      proofId: 'sub-zk-01',
+      proofType: 'Groth16SNARK',
+      claim: 'KYC_AGE_OVER_21',
+      publicInputs: { minAge: 21, jurisdiction: 'US' },
+      proofData: { pi_a: ['0x111', '0x222'], pi_b: [['0x333', '0x444'], ['0x555', '0x666']], pi_c: ['0x777', '0x888'] },
+      proverDid: 'did:key:z6MkuProverAlice'
+    },
+    {
+      proofId: 'sub-zk-02',
+      proofType: 'RangeProof',
+      claim: 'CREDIT_SCORE_RANGE',
+      publicInputs: { minScore: 700, maxScore: 850 },
+      proofData: { commitment: '0xabc123', rangeProofPoints: ['0xdef', '0x456'] },
+      proverDid: 'did:key:z6MkuProverAlice'
+    },
+    {
+      proofId: 'sub-zk-03',
+      proofType: 'SetMembership',
+      claim: 'ACCREDITED_INVESTOR_MEMBERSHIP',
+      publicInputs: { tier: 'TIER_1_QUALIFIED' },
+      proofData: { accumulatorWitness: '0xfeecba987' },
+      proverDid: 'did:key:z6MkuProverAlice'
+    }
+  ];
 
+  // Aggregate 3 heterogenous sub-proofs into 1 constant-size recursive proof
+  const recursiveProof = ZKRecursiveEngine.aggregateProofs(subProofs, {
+    aggregatorKeyPair: aggregatorKp,
+    depth: 1,
+    generateEvmCalldata: true
+  });
 
+  assert.equal(recursiveProof.type, 'DocuTrustRecursiveZKProof2026');
+  assert.equal(recursiveProof.subProofCount, 3);
+  assert.equal(recursiveProof.subProofDigests.length, 3);
+  assert.ok(recursiveProof.foldingRandomnessHex);
+  assert.ok(recursiveProof.linearizedPublicInputsCommitment);
+  assert.ok(recursiveProof.aggregatedWitnessCommitment);
+  assert.ok(recursiveProof.evmCalldataHex);
+  assert.ok(recursiveProof.evmCalldataHex.startsWith('0x'));
 
+  // Verify recursive proof
+  const verification = ZKRecursiveEngine.verifyRecursiveProof(recursiveProof, aggregatorKp.publicKeyHex);
+  assert.equal(verification.valid, true);
+  assert.equal(verification.errors.length, 0);
+  assert.equal(verification.subProofCount, 3);
+
+  // Tamper detection: mutate a public input
+  const tamperedProof = JSON.parse(JSON.stringify(recursiveProof));
+  tamperedProof.subProofStatements[0].publicInputs.minAge = 18;
+  const failResult = ZKRecursiveEngine.verifyRecursiveProof(tamperedProof, aggregatorKp.publicKeyHex);
+  assert.equal(failResult.valid, false);
+  assert.ok(failResult.errors.length > 0);
+});
+
+// 89. 2D Multi-Epoch Revocation Lattice & Dynamic Accumulator Engine
+test('89. RevocationLatticeEngine: initializeLattice, accumulateRevocations, O(1) witness generation & verification', () => {
+  const issuerKp = generateKeyPair();
+  const latticeId = 'lat-corp-treasury-2026';
+
+  // 1. Initialize 4-shard lattice at epoch 0
+  let state = RevocationLatticeEngine.initializeLattice(latticeId, issuerKp.did, 4);
+  assert.equal(state.currentEpoch, 0);
+  assert.equal(state.shardsCount, 4);
+  assert.ok(state.globalLatticeRoot);
+
+  const cred1 = 'did:docutrust:cred:treasury-001';
+  const cred2 = 'did:docutrust:cred:treasury-002';
+  const cred3 = 'did:docutrust:cred:treasury-003';
+
+  // 2. Generate active non-revocation proof for cred1 at epoch 0
+  const proofActive = RevocationLatticeEngine.generateLatticeProof(state, cred1, issuerKp);
+  assert.equal(proofActive.type, 'DocuTrustLatticeProof2026');
+  assert.equal(proofActive.isRevoked, false);
+  assert.ok(proofActive.witnessHash);
+
+  const verifyActive = RevocationLatticeEngine.verifyLatticeProof(proofActive, issuerKp.publicKeyHex);
+  assert.equal(verifyActive.valid, true);
+  assert.equal(verifyActive.isRevoked, false);
+
+  // 3. Accumulate revocation for cred1 and advance epoch to 1
+  state = RevocationLatticeEngine.accumulateRevocations(state, [cred1], true);
+  assert.equal(state.currentEpoch, 1);
+
+  // 4. Generate proof for revoked cred1 at epoch 1
+  const proofRevoked = RevocationLatticeEngine.generateLatticeProof(state, cred1, issuerKp);
+  assert.equal(proofRevoked.isRevoked, true);
+
+  const verifyRevoked = RevocationLatticeEngine.verifyLatticeProof(proofRevoked, issuerKp.publicKeyHex);
+  assert.equal(verifyRevoked.valid, true);
+  assert.equal(verifyRevoked.isRevoked, true);
+
+  // 5. cred2 remains active at epoch 1
+  const proofCred2 = RevocationLatticeEngine.generateLatticeProof(state, cred2, issuerKp);
+  assert.equal(proofCred2.isRevoked, false);
+  const verifyCred2 = RevocationLatticeEngine.verifyLatticeProof(proofCred2, issuerKp.publicKeyHex);
+  assert.equal(verifyCred2.valid, true);
+  assert.equal(verifyCred2.isRevoked, false);
+});
+
+// 90. Autonomous AI Agent Action Attestation & Policy Guardrail Engine
+test('90. AgentProvenanceEngine: issueAttestation, model fingerprinting, trace hashing, verifyAttestation', () => {
+  const agentKp = generateKeyPair();
+
+  const modelCard = {
+    modelName: 'DocuTrust-Autonomous-Agent',
+    modelVersion: 'v2.5-sovereign',
+    provider: 'DocuTrust-Decentralized-AI',
+    weightsFingerprintHex: sha256Hex('DOCUTRUST_MODEL_WEIGHTS_V2.5'),
+    quantization: 'int8',
+    systemPromptHash: sha256Hex('YOU_ARE_A_SOVEREIGN_VERIFICATION_AGENT')
+  };
+
+  const attestationPayload = {
+    agentDid: agentKp.did,
+    modelCard,
+    contextDigest: AgentProvenanceEngine.computeContextDigest({
+      task: 'AUDIT_CREDENTIAL_BATCH_AND_TRIGGER_PAYOUT',
+      sessionNonce: 'nonce-99210'
+    }),
+    promptText: 'Audit batch and verify KYC and AML proofs.',
+    executionTrace: [
+      {
+        stepIndex: 1,
+        toolName: 'verify_kyc_zk_proof',
+        toolArguments: { proofId: 'zk-kyc-882' },
+        observationDigest: sha256Hex('KYC_PROOF_VALID')
+      },
+      {
+        stepIndex: 2,
+        toolName: 'check_revocation_lattice',
+        toolArguments: { credentialId: 'cred-991', epoch: 1 },
+        observationDigest: sha256Hex('NOT_REVOKED')
+      }
+    ],
+    outputArtifact: {
+      action: 'APPROVE_SETTLEMENT',
+      payoutAmount: 25000,
+      currency: 'USDC',
+      recipient: '0x99A82B3F0231C9848123441991823'
+    },
+    guardrailPolicyId: 'policy-aml-payout-compliance',
+    guardrailPassed: true
+  };
+
+  const attestation = AgentProvenanceEngine.issueAttestation(attestationPayload, agentKp);
+  assert.equal(attestation.type, 'DocuTrustAgentAttestation2026');
+  assert.equal(attestation.stepCount, 2);
+  assert.equal(attestation.guardrailPassed, true);
+  assert.ok(attestation.modelFingerprint);
+  assert.ok(attestation.executionTraceHash);
+  assert.ok(attestation.outputCommitment);
+
+  // Cryptographic verification
+  const audit = AgentProvenanceEngine.verifyAttestation(attestation, agentKp.publicKeyHex, attestationPayload.outputArtifact);
+  assert.equal(audit.valid, true);
+  assert.equal(audit.errors.length, 0);
+  assert.equal(audit.guardrailPassed, true);
+
+  // Fails with tampered output artifact
+  const tamperedArtifact = { ...attestationPayload.outputArtifact, payoutAmount: 999999 };
+  const failAudit = AgentProvenanceEngine.verifyAttestation(attestation, agentKp.publicKeyHex, tamperedArtifact);
+  assert.equal(failAudit.valid, false);
+  assert.ok(failAudit.errors.length > 0);
+});
+
+// 91. PolicyEngine Primitive Array & Root Evaluation
+test('91. PolicyEngine: resolveFieldValue on primitive arrays & root paths', () => {
+  assert.deepEqual(PolicyEngine.resolveFieldValue(['a', 'b', 'c'], ''), ['a', 'b', 'c']);
+  assert.deepEqual(PolicyEngine.resolveFieldValue([1, 2, 3], ''), [1, 2, 3]);
+  assert.deepEqual(PolicyEngine.resolveFieldValue([1, 2, 3], '.'), [1, 2, 3]);
+  assert.equal(PolicyEngine.resolveFieldValue({ user: { role: 'admin' } }, 'user.role'), 'admin');
+});
+
+// 92. DIDResolver Deterministic Resolution with URL Fragment Handling
+test('92. DIDResolver: strip fragments in resolveDidKey, resolveDidPqc, resolveDidWebAuthn, resolveDidSLH', () => {
+  const kp = generateKeyPair();
+  const didWithFrag = `${kp.did}#my-custom-key`;
+
+  const doc = DIDResolver.resolveDidKey(didWithFrag);
+  assert.equal(doc.id, kp.did);
+  assert.ok(doc.verificationMethod[0].id.startsWith(kp.did));
+});

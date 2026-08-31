@@ -1730,6 +1730,100 @@ export class DocuTrustClient {
   ): Promise<{ success: boolean; soliditySource: string }> {
     return this.request('/solidity/export-universal', 'POST', options || {});
   }
+
+  /**
+   * Aggregates multiple heterogeneous zero-knowledge proofs into a recursively folded proof (v13.0.0).
+   */
+  public async aggregateRecursiveZKProofs(
+    subProofs: Array<any>,
+    options?: { aggregatorKeyPair?: any; depth?: number; generateEvmCalldata?: boolean; customMetadata?: Record<string, any> }
+  ): Promise<{ success: boolean; recursiveProof: any }> {
+    return this.request('/zk/recursive/aggregate', 'POST', { subProofs, options });
+  }
+
+  /**
+   * Verifies a recursively folded zero-knowledge proof (v13.0.0).
+   */
+  public async verifyRecursiveZKProof(
+    proof: any,
+    aggregatorPublicKey: string
+  ): Promise<{ success: boolean; valid: boolean; recursiveProofId?: string; subProofCount?: number; depth?: number; linearizedPublicInputsCommitment?: string; errors: string[] }> {
+    return this.request('/zk/recursive/verify', 'POST', { proof, aggregatorPublicKey });
+  }
+
+  /**
+   * Initializes a 2D temporal-spatial multi-epoch revocation lattice (v13.0.0).
+   */
+  public async initializeRevocationLattice(
+    latticeId: string,
+    issuerDid: string,
+    shardsCount?: number
+  ): Promise<{ success: boolean; latticeState: any }> {
+    return this.request('/revocation/lattice/init', 'POST', { latticeId, issuerDid, shardsCount });
+  }
+
+  /**
+   * Accumulates revoked credentials into the active lattice slice and optionally advances epoch (v13.0.0).
+   */
+  public async accumulateRevocationLattice(
+    state: any,
+    revokedCredentialIds: string[],
+    advanceEpoch?: boolean
+  ): Promise<{ success: boolean; latticeState: any }> {
+    return this.request('/revocation/lattice/accumulate', 'POST', { state, revokedCredentialIds, advanceEpoch });
+  }
+
+  /**
+   * Generates an O(1) non-revocation or revocation witness proof for a credential (v13.0.0).
+   */
+  public async generateRevocationLatticeProof(
+    state: any,
+    credentialId: string,
+    issuerKeyPair: any,
+    targetEpoch?: number
+  ): Promise<{ success: boolean; proof: any }> {
+    return this.request('/revocation/lattice/prove', 'POST', { state, credentialId, issuerKeyPair, targetEpoch });
+  }
+
+  /**
+   * Verifies a cryptographic revocation lattice proof (v13.0.0).
+   */
+  public async verifyRevocationLatticeProof(
+    proof: any,
+    issuerPublicKey: string,
+    expectedLatticeRoot?: string
+  ): Promise<{ success: boolean; valid: boolean; isRevoked?: boolean; targetEpoch?: number; latticeRoot?: string; errors: string[] }> {
+    return this.request('/revocation/lattice/verify', 'POST', { proof, issuerPublicKey, expectedLatticeRoot });
+  }
+
+  /**
+   * Issues an autonomous AI Agent Action Attestation with model card fingerprinting and trace commitment (v13.0.0).
+   */
+  public async issueAgentAttestation(
+    payload: {
+      modelCard: any;
+      promptText?: string;
+      contextSnapshot?: Record<string, any> | string;
+      executionTrace?: Array<any>;
+      outputArtifact: Record<string, any> | string;
+      guardrailPolicyId?: string;
+      guardrailPassed?: boolean;
+    },
+    agentKeyPair: any
+  ): Promise<{ success: boolean; attestation: any }> {
+    return this.request('/agent/attest', 'POST', { payload, agentKeyPair });
+  }
+
+  /**
+   * Verifies an autonomous AI Agent Action Attestation and guardrail compliance (v13.0.0).
+   */
+  public async verifyAgentAttestation(
+    attestation: any,
+    agentPublicKey: string,
+    expectedOutput?: Record<string, any> | string
+  ): Promise<{ success: boolean; valid: boolean; attestationId?: string; agentDid?: string; modelFingerprint?: string; stepCount?: number; guardrailPassed?: boolean; outputCommitment?: string; errors: string[] }> {
+    return this.request('/agent/verify', 'POST', { attestation, agentPublicKey, expectedOutput });
+  }
 }
 
 

@@ -2,14 +2,16 @@
 
 # 🛡️ DocuTrust
 
-### The Open-Source Sovereign Trust Fabric for Verifiable Credentials, Quantitative Trust Scoring, Verifiable Compute VM, Ephemeral Vanish Tokens & Universal EVM Verifiers
+### The Open-Source Sovereign Trust Fabric for Verifiable Credentials, Recursive ZK Proofs, 2D Revocation Lattices & AI Agent Provenance
 
-[![Version](https://img.shields.io/badge/Version-v12.0.0-cyan.svg)]()
+[![Version](https://img.shields.io/badge/Version-v13.0.0-cyan.svg)]()
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CI Status](https://img.shields.io/badge/CI-100%25%20Passing-brightgreen.svg)]()
+[![Recursive ZK](https://img.shields.io/badge/ZK-Recursive%20Proof%20Folding-cyan.svg)]()
+[![Revocation Lattice](https://img.shields.io/badge/Lattice-2D%20Temporal%20Accumulator-emerald.svg)]()
+[![AI Provenance](https://img.shields.io/badge/AI-Agent%20Action%20Attestation-purple.svg)]()
 [![Trust Score Engine](https://img.shields.io/badge/Risk--Engine-Quantitative%20Trust%200--1000-emerald.svg)]()
 [![Verifiable Compute](https://img.shields.io/badge/VM-Verifiable%20Off--Chain%20Compute-indigo.svg)]()
-[![Vanish Tokens](https://img.shields.io/badge/Ephemeral-Time--Decayed%20Forward--Secret-rose.svg)]()
 [![Universal Verifier](https://img.shields.io/badge/EVM-Master%20Universal%20Verifier-amber.svg)]()
 [![NIST FIPS 205](https://img.shields.io/badge/Post--Quantum-NIST%20FIPS%20205%20SLH--DSA-purple.svg)]()
 [![WebAuthn Passkeys](https://img.shields.io/badge/Hardware-FIDO2%20WebAuthn%20Passkeys-blue.svg)]()
@@ -17,7 +19,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)]()
 
 <p align="center">
-  <b>DocuTrust</b> enables universities, enterprises, and governments to issue tamper-proof academic degrees, employment certificates, and licenses with <b>sub-50ms instant verification</b>, <b>Quantitative Multi-Vector Trust & Risk Scoring (0-1000 rating, AAA-F risk tiers, Ed25519 Signed Risk Receipts)</b>, <b>Verifiable Off-Chain Deterministic Compute VM with execution step hashing, Merkle trace roots & compute receipts</b>, <b>Ephemeral Forward-Secret Vanish Credentials with time-decay window commitments & AES-256-GCM</b>, <b>Compact O(Δ) Cross-Ledger State Synchronization and Reconciliation</b>, <b>Master Universal EVM Verifier Smart Contracts (Binary Merkle, SMT-256, Cross-Chain Quorum & BN254 Groth16 pairings)</b>, <b>NIST FIPS 205 Stateless Hash-Based Signatures (SLH-DSA-SHA2-128s) & did:slh:z...</b>, <b>WebAuthn / FIDO2 Hardware Passkeys with Secure Enclave P-256 attestation</b>, <b>Multi-Chain Verifiable Attestation Bridges</b>, <b>BN254 Groth16 Zero-Knowledge SNARKs</b>, and <b>1-of-N Linkable Ring Signatures (LSAG)</b>.
+  <b>DocuTrust</b> enables universities, enterprises, AI systems, and governments to issue tamper-proof academic degrees, credentials, and autonomous agent attestations with <b>sub-50ms instant verification</b>, <b>Recursive Zero-Knowledge Proof Aggregation with Fiat-Shamir folding & EVM calldata</b>, <b>2D Temporal-Spatial Revocation Lattices with O(1) constant-size witnesses & time-travel proofs</b>, <b>Autonomous AI Agent Action Attestation with model card fingerprinting & safety guardrail verification</b>, <b>Quantitative Multi-Vector Trust & Risk Scoring (0-1000 rating, AAA-F risk tiers)</b>, <b>Verifiable Off-Chain Compute VM with execution step hashing</b>, <b>Ephemeral Forward-Secret Vanish Credentials</b>, <b>Compact O(Δ) Cross-Ledger State Synchronization</b>, and <b>Master Universal EVM Verifier Smart Contracts</b>.
 </p>
 
 [Quickstart Demo](#-10-second-quickstart-demo) • [Architecture](#-system-architecture--workflow) • [Security Hardening](#-defense-in-depth-security-hardening-uncrackable-guarantee) • [CLI Toolkit](#-cli-toolkit) • [Python SDK](#-python-sdk-docutrust) • [REST API](#-rest-api-endpoints)
@@ -155,20 +157,24 @@ node packages/cli/bin/docutrust.js batch \
 # 5. Verify cryptographic authenticity offline
 node packages/cli/bin/docutrust.js verify --vc issued-degree.json
 
-# 6. Generate 1-of-N Linkable Ring Signature (LSAG)
-node packages/cli/bin/docutrust.js ringsig-sign \
-  --message '{"action":"ANONYMOUS_BALLOT","vote":"YES"}' \
-  --ring "did:key:alice,did:key:bob,did:key:carol" \
-  --privkey 4a6f8b9c... \
-  --pubkey did:key:alice \
-  --out ring-signature.json
+# 6. Recursive Zero-Knowledge Proof Aggregation
+node packages/cli/bin/docutrust.js zk-aggregate \
+  --proofs proof1.json,proof2.json \
+  --depth 4 \
+  --out recursive-proof.json
 
-# 7. Query and Verify 256-Bit Sparse Merkle Tree (SMT) Proof
-node packages/cli/bin/docutrust.js smt-prove --key "did:key:alice" --out smt-proof.json
-node packages/cli/bin/docutrust.js smt-verify --proof smt-proof.json
+# 7. 2D Temporal-Spatial Revocation Lattice
+node packages/cli/bin/docutrust.js lattice-init --epochs 10 --shards 4 --out lattice.json
+node packages/cli/bin/docutrust.js lattice-prove --lattice lattice.json --id "did:key:alice" --epoch 0 --shard 0 --out witness.json
+node packages/cli/bin/docutrust.js lattice-verify --lattice lattice.json --proof witness.json
 
-# 8. Export EVM Solidity SMT Verifier Smart Contract
-node packages/cli/bin/docutrust.js solidity-export-smt --out contracts/DocuTrustSMTVerifier.sol
+# 8. Autonomous AI Agent Action Attestation
+node packages/cli/bin/docutrust.js agent-attest \
+  --agent "did:key:agent-42" \
+  --action "FINANCIAL_SETTLEMENT" \
+  --params '{"amount":1000,"currency":"USD"}' \
+  --out agent-attestation.json
+node packages/cli/bin/docutrust.js agent-verify --attestation agent-attestation.json
 ```
 
 ---
@@ -180,24 +186,28 @@ import docutrust
 
 client = docutrust.DocuTrustClient(api_url="http://localhost:4000/api/v1")
 
-# 1. Issue with Post-Quantum Lattice Security
-credential = client.issue_credential(
-    credential_subject={
-        "name": "Elena Rostova",
-        "degree": "Ph.D. in Artificial Intelligence",
-        "graduationYear": 2026,
-        "gpa": "3.98"
-    },
-    credential_type="UniversityDegreeCredential",
-    enable_selective_disclosure=True,
-    enable_pqc=True
+# 1. Recursive ZK Proof Folding
+recursive_proof = client.aggregate_recursive_zk_proofs(
+    sub_proofs=[{"type": "ZKRangeProof", "claim": "age >= 21"}],
+    folding_depth=3
 )
 
-# 2. Extract and verify any PDF diploma directly
-with open("diploma.pdf", "rb") as f:
-    audit = client.verify_pdf(f.read())
-    print("Is PDF Authentic?", audit["valid"])
-    print("Recipient:", audit["recipientName"])
+# 2. 2D Revocation Lattice O(1) Witness
+lattice = client.initialize_revocation_lattice(epoch_count=12, shard_count=4)
+witness = client.generate_revocation_lattice_proof(
+    lattice=lattice,
+    credential_id="cred-9876",
+    target_epoch=0,
+    target_shard=0
+)
+
+# 3. AI Agent Action Attestation
+attestation = client.issue_agent_attestation(
+    agent_did="did:key:agent-007",
+    action_type="EXECUTE_TRANSACTION",
+    action_payload={"txId": "0x123..."},
+    model_card={"model": "claude-3-5-sonnet", "weightsDigest": "sha256:abc..."}
+)
 ```
 
 ---
@@ -207,17 +217,19 @@ with open("diploma.pdf", "rb") as f:
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
 | `GET` | `/api/v1/health` | Service status, DID authority, and system feature list |
-| `POST` | `/api/v1/keys/generate` | Generates classical Ed25519 KeyPair and `did:key` |
-| `POST` | `/api/v1/keys/generate-pqc` | Generates NIST ML-DSA Post-Quantum Hybrid KeyPair (`did:pqc`) |
-| `POST` | `/api/v1/credentials/issue` | Issues signed W3C Verifiable Credential with optional PQC |
-| `POST` | `/api/v1/credentials/verify` | Sub-50ms verification of signature, Merkle proof, and anchor |
-| `POST` | `/api/v1/credentials/render-pdf` | Generates official PDF with embedded `/DocuTrustProof` |
-| `POST` | `/api/v1/credentials/multisig/draft` | Generates M-of-N MultiSig draft and canonical hash |
-| `POST` | `/api/v1/credentials/multisig/sign` | Signs draft as an authorized institutional authority |
-| `POST` | `/api/v1/credentials/multisig/assemble` | Assembles collected authority signatures into finalized VC |
-| `POST` | `/api/v1/credentials/multisig/verify` | Cryptographically verifies M-of-N threshold signatures |
-| `GET/POST` | `/api/v1/did/resolve` | Universal DID resolver (did:key, did:pqc, did:kem, did:bbs, did:pkh, did:web) |
-| `GET` | `/api/v1/trust/registry` | Queries accredited issuers and authorized schema policies |
+| `POST` | `/api/v1/zk/recursive/aggregate` | Aggregates heterogeneous ZK sub-proofs via Fiat-Shamir folding |
+| `POST` | `/api/v1/zk/recursive/verify` | Verifies constant-size recursive ZK proof and calldata |
+| `POST` | `/api/v1/revocation/lattice/init` | Initializes 2D temporal-spatial revocation lattice |
+| `POST` | `/api/v1/revocation/lattice/accumulate`| Updates dynamic prime accumulator on specific slice |
+| `POST` | `/api/v1/revocation/lattice/prove` | Generates O(1) witness proof for non-revocation / revocation |
+| `POST` | `/api/v1/revocation/lattice/verify` | Verifies O(1) lattice witness against root commitments |
+| `POST` | `/api/v1/agent/attest` | Issues cryptographic action attestation for autonomous AI agents |
+| `POST` | `/api/v1/agent/verify` | Verifies agent provenance, model card fingerprint & guardrails |
+| `POST` | `/api/v1/trustscore/evaluate` | Evaluates 0-1000 quantitative risk score & AAA-F tier |
+| `POST` | `/api/v1/compute/run` | Executes deterministic AST opcode program and returns compute receipt |
+| `POST` | `/api/v1/vanish/issue` | Issues time-decaying ephemeral forward-secret token |
+| `POST` | `/api/v1/statesync/delta` | Generates compact O(Δ) cross-ledger state delta proof |
+| `POST` | `/api/v1/solidity/export-universal`| Generates Master Universal EVM Verifier Solidity contract |
 | `GET` | `/api/v1/vault/credentials` | Searchable persistent credential registry with status filters |
 | `GET` | `/api/v1/vault/metrics` | Real-time institutional telemetry (latency, gas savings, PQC) |
 | `POST` | `/api/v1/vault/auto-anchor` | Triggers background Merkle batch worker |

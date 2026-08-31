@@ -1039,7 +1039,82 @@ test('CLI Suite', async (t) => {
     assert.ok(uOut.includes('Master Universal EVM Solidity Smart Contract exported'));
     assert.ok(fs.existsSync(universalSol));
   });
+
+  await t.test('43. docutrust zk-aggregate & zk-verify-recursive', () => {
+    const aggKeyFile = path.join(tempDir, 'agg-keys.json');
+    const proofsFile = path.join(tempDir, 'zk-subproofs.json');
+    const recProofFile = path.join(tempDir, 'zk-rec-proof.json');
+
+    execSync(`node "${cliPath}" keygen --out "${aggKeyFile}"`);
+    const subProofs = [
+      { proofId: 'sub-1', proofType: 'Range', claim: 'salary', publicInputs: { min: 50000 }, proofData: {}, proverDid: 'did:key:z1' },
+      { proofId: 'sub-2', proofType: 'Set', claim: 'role', publicInputs: { role: 'admin' }, proofData: {}, proverDid: 'did:key:z2' }
+    ];
+    fs.writeFileSync(proofsFile, JSON.stringify(subProofs, null, 2), 'utf-8');
+
+    const aggOut = execSync(`node "${cliPath}" zk-aggregate --proofs "${proofsFile}" --key "${aggKeyFile}" --depth 1 --evm --out "${recProofFile}"`).toString();
+    assert.ok(aggOut.includes('Recursive ZK Aggregated Proof generated successfully'));
+    assert.ok(fs.existsSync(recProofFile));
+
+    const verifyOut = execSync(`node "${cliPath}" zk-verify-recursive --proof "${recProofFile}" --key "${aggKeyFile}"`).toString();
+    assert.ok(verifyOut.includes('Recursive ZK Proof is'));
+    assert.ok(verifyOut.includes('CRYPTOGRAPHICALLY VALID'));
+  });
+
+  await t.test('44. docutrust lattice-init, lattice-accumulate, lattice-prove & lattice-verify', () => {
+    const issuerKeyFile = path.join(tempDir, 'lattice-issuer-keys.json');
+    const latticeStateFile = path.join(tempDir, 'lattice-state.json');
+    const revsFile = path.join(tempDir, 'lattice-revs.json');
+    const proofFile = path.join(tempDir, 'lattice-proof.json');
+
+    execSync(`node "${cliPath}" keygen --out "${issuerKeyFile}"`);
+    const issuerData = JSON.parse(fs.readFileSync(issuerKeyFile, 'utf-8'));
+
+    const initOut = execSync(`node "${cliPath}" lattice-init --id lat-cli-101 --issuer "${issuerData.did}" --shards 4 --out "${latticeStateFile}"`).toString();
+    assert.ok(initOut.includes('Revocation Lattice initialized successfully'));
+    assert.ok(fs.existsSync(latticeStateFile));
+
+    fs.writeFileSync(revsFile, JSON.stringify(['cred-revoked-001', 'cred-revoked-002']), 'utf-8');
+    const accOut = execSync(`node "${cliPath}" lattice-accumulate --state "${latticeStateFile}" --revocations "${revsFile}" --advance`).toString();
+    assert.ok(accOut.includes('Revocation Lattice updated successfully'));
+
+    // Prove active credential
+    const proveActiveOut = execSync(`node "${cliPath}" lattice-prove --state "${latticeStateFile}" --credential "cred-active-999" --key "${issuerKeyFile}" --out "${proofFile}"`).toString();
+    assert.ok(proveActiveOut.includes('Revocation Lattice Proof generated'));
+    assert.ok(proveActiveOut.includes('ACTIVE'));
+
+    const verifyOut = execSync(`node "${cliPath}" lattice-verify --proof "${proofFile}" --key "${issuerKeyFile}"`).toString();
+    assert.ok(verifyOut.includes('CRYPTOGRAPHICALLY AUTHENTIC'));
+    assert.ok(verifyOut.includes('NOT REVOKED (VALID)'));
+  });
+
+  await t.test('45. docutrust agent-attest & agent-verify', () => {
+    const agentKeyFile = path.join(tempDir, 'agent-keys.json');
+    const payloadFile = path.join(tempDir, 'agent-payload.json');
+    const attestationFile = path.join(tempDir, 'agent-attestation.json');
+
+    execSync(`node "${cliPath}" keygen --out "${agentKeyFile}"`);
+    const payload = {
+      modelCard: { modelName: 'DocuTrust-Autonomous-Auditor', modelVersion: '1.0.0', weightsDigest: 'sha256:abc' },
+      promptText: 'Audit the smart contract and check compliance',
+      executionTrace: [{ step: 1, tool: 'scanVulnerabilities', result: '0 issues found' }],
+      outputArtifact: { approved: true, riskScore: 0.05 },
+      guardrailPolicyId: 'sovereign-ai-safety-v1',
+      guardrailPassed: true
+    };
+    fs.writeFileSync(payloadFile, JSON.stringify(payload, null, 2), 'utf-8');
+
+    const attestOut = execSync(`node "${cliPath}" agent-attest --payload "${payloadFile}" --key "${agentKeyFile}" --out "${attestationFile}"`).toString();
+    assert.ok(attestOut.includes('AI Agent Action Attestation issued successfully'));
+    assert.ok(fs.existsSync(attestationFile));
+
+    const verifyOut = execSync(`node "${cliPath}" agent-verify --attestation "${attestationFile}" --key "${agentKeyFile}"`).toString();
+    assert.ok(verifyOut.includes('AI Agent Attestation is'));
+    assert.ok(verifyOut.includes('VERIFIED & TAMPER-FREE'));
+    assert.ok(verifyOut.includes('COMPLIANT'));
+  });
 });
+
 
 
 
