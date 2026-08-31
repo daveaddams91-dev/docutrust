@@ -247,6 +247,7 @@ export class ZKDSLEngine {
     let current = obj;
     for (const p of parts) {
       if (current === undefined || current === null) return undefined;
+      if (p === '__proto__' || p === 'constructor' || p === 'prototype') return undefined;
       current = current[p];
     }
     return current;

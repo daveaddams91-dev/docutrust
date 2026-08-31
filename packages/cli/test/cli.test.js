@@ -800,15 +800,15 @@ test('CLI Suite', async (t) => {
     assert.ok(aggOut.includes('Status List Multi-Partition Root matches'));
   });
 
-  await t.test('29. docutrust version displays v14.0.0', () => {
+  await t.test('29. docutrust version displays v15.0.0', () => {
     const out1 = execSync(`node "${cliPath}" version`).toString().trim();
-    assert.equal(out1, '14.0.0');
+    assert.equal(out1, '15.0.0');
 
     const out2 = execSync(`node "${cliPath}" --version`).toString().trim();
-    assert.equal(out2, '14.0.0');
+    assert.equal(out2, '15.0.0');
 
     const out3 = execSync(`node "${cliPath}" -v`).toString().trim();
-    assert.equal(out3, '14.0.0');
+    assert.equal(out3, '15.0.0');
   });
 
   await t.test('30. docutrust ringsig-sign and ringsig-verify (Linkable Ring Signatures)', () => {
@@ -1234,7 +1234,124 @@ test('CLI Suite', async (t) => {
     assert.ok(verifyOut.includes('Falcon Signature is'));
     assert.ok(verifyOut.includes('VALID'));
   });
+
+  await t.test('50. docutrust pq-ratchet-keygen, init, encrypt & decrypt', () => {
+    const bobKeyFile = path.join(tempDir, 'bob-ratchet-key.json');
+    const aliceSessionFile = path.join(tempDir, 'alice-session.json');
+    const bobSessionFile = path.join(tempDir, 'bob-session.json');
+    const msgFile = path.join(tempDir, 'ratchet-msg.json');
+    const decryptedFile = path.join(tempDir, 'ratchet-decrypted.json');
+
+    // 1. Keygen
+    const keygenOut = execSync(`node "${cliPath}" pq-ratchet-keygen --out "${bobKeyFile}"`).toString();
+    assert.ok(keygenOut.includes('PQ Ratchet KeyPair saved'));
+    assert.ok(fs.existsSync(bobKeyFile));
+
+    // 2. Init Initiator & Responder
+    const aliceInitOut = execSync(`node "${cliPath}" pq-ratchet-init --bob "${bobKeyFile}" --out "${aliceSessionFile}"`).toString();
+    assert.ok(aliceInitOut.includes('Initiator Session saved'));
+
+    const bobInitOut = execSync(`node "${cliPath}" pq-ratchet-init --key "${bobKeyFile}" --out "${bobSessionFile}"`).toString();
+    assert.ok(bobInitOut.includes('Responder Session saved'));
+
+    // 3. Encrypt
+    const dataFile = path.join(tempDir, 'ratchet-input.json');
+    fs.writeFileSync(dataFile, JSON.stringify({ secretDoc: 'doc-7749', clearance: 'Level-5' }), 'utf-8');
+    const encOut = execSync(`node "${cliPath}" pq-ratchet-encrypt --session "${aliceSessionFile}" --data "${dataFile}" --out "${msgFile}"`).toString();
+    assert.ok(encOut.includes('Encrypted message saved'));
+    assert.ok(fs.existsSync(msgFile));
+
+    // 4. Decrypt
+    const decOut = execSync(`node "${cliPath}" pq-ratchet-decrypt --session "${bobSessionFile}" --message "${msgFile}" --out "${decryptedFile}"`).toString();
+    assert.ok(decOut.includes('Decrypted payload saved'));
+    assert.ok(fs.existsSync(decryptedFile));
+
+    const plain = JSON.parse(fs.readFileSync(decryptedFile, 'utf-8'));
+    assert.equal(plain.secretDoc, 'doc-7749');
+  });
+
+  await t.test('51. docutrust poly-srs, poly-commit, poly-prove & poly-verify', () => {
+    const srsFile = path.join(tempDir, 'poly-srs.json');
+    const commitFile = path.join(tempDir, 'poly-commit.json');
+    const proofFile = path.join(tempDir, 'poly-proof.json');
+
+    // 1. SRS
+    const srsOut = execSync(`node "${cliPath}" poly-srs --degree 16 --out "${srsFile}"`).toString();
+    assert.ok(srsOut.includes('Structured Reference String'));
+    assert.ok(fs.existsSync(srsFile));
+
+    // 2. Commit: P(x) = 3 + 2x + 5x^2
+    const commitOut = execSync(`node "${cliPath}" poly-commit --srs "${srsFile}" --coeffs "[3,2,5]" --out "${commitFile}"`).toString();
+    assert.ok(commitOut.includes('Polynomial commitment saved'));
+    assert.ok(fs.existsSync(commitFile));
+
+    // 3. Prove: point = 4
+    const proveOut = execSync(`node "${cliPath}" poly-prove --srs "${srsFile}" --coeffs "[3,2,5]" --point 4 --out "${proofFile}"`).toString();
+    assert.ok(proveOut.includes('evaluation proof saved'));
+    assert.ok(fs.existsSync(proofFile));
+
+    // 4. Verify
+    const verifyOut = execSync(`node "${cliPath}" poly-verify --srs "${srsFile}" --commit "${commitFile}" --proof "${proofFile}"`).toString();
+    assert.ok(verifyOut.includes('VALID'));
+  });
+
+  await t.test('52. docutrust tee-quote & tee-verify', () => {
+    const measFile = path.join(tempDir, 'tee-meas.json');
+    const quoteFile = path.join(tempDir, 'tee-quote.json');
+
+    const measurements = {
+      mrEnclave: 'b1c2d3e4f5061728394a5b6c7d8e9f00112233445566778899aabbccddeeff01',
+      mrSigner: '223344556677889900aabbccddeeff11223344556677889900aabbccddeeff22',
+      isvProdId: 1,
+      isvSvn: 2
+    };
+    fs.writeFileSync(measFile, JSON.stringify(measurements, null, 2), 'utf-8');
+
+    // 1. Generate Quote
+    const quoteOut = execSync(`node "${cliPath}" tee-quote --measurements "${measFile}" --data "DocuTrust-TEE-Workload" --out "${quoteFile}"`).toString();
+    assert.ok(quoteOut.includes('Attestation Quote saved'));
+    assert.ok(fs.existsSync(quoteFile));
+
+    // 2. Verify Quote
+    const verifyOut = execSync(`node "${cliPath}" tee-verify --quote "${quoteFile}" --mr-enclave "${measurements.mrEnclave}"`).toString();
+    assert.ok(verifyOut.includes('AUTHENTIC & ENCLAVE-VERIFIED'));
+  });
+
+  await t.test('53. docutrust ibc-packet-commit, ibc-merkle-proof & ibc-verify-proof', () => {
+    const packetFile = path.join(tempDir, 'ibc-packet.json');
+    const commitFile = path.join(tempDir, 'ibc-commit.json');
+    const proofFile = path.join(tempDir, 'ibc-proof.json');
+
+    const packet = {
+      sequence: 1,
+      sourcePort: 'transfer',
+      sourceChannel: 'channel-0',
+      destinationPort: 'transfer',
+      destinationChannel: 'channel-1',
+      data: { token: 'TRUST', amount: 5000 },
+      timeoutHeight: { revisionNumber: 1, revisionHeight: 1000 },
+      timeoutTimestamp: Math.floor(Date.now() / 1000) + 3600
+    };
+    fs.writeFileSync(packetFile, JSON.stringify(packet, null, 2), 'utf-8');
+
+    // 1. Packet Commit
+    const commitOut = execSync(`node "${cliPath}" ibc-packet-commit --packet "${packetFile}" --out "${commitFile}"`).toString();
+    assert.ok(commitOut.includes('Packet Commitment saved'));
+    assert.ok(fs.existsSync(commitFile));
+
+    const commitData = JSON.parse(fs.readFileSync(commitFile, 'utf-8'));
+
+    // 2. Merkle Proof
+    const proofOut = execSync(`node "${cliPath}" ibc-merkle-proof --key "${commitData.commitmentPath}" --value "${commitData.commitmentBytesHex}" --out "${proofFile}"`).toString();
+    assert.ok(proofOut.includes('Merkle Multi-Store Proof saved'));
+    assert.ok(fs.existsSync(proofFile));
+
+    // 3. Verify Proof
+    const verifyOut = execSync(`node "${cliPath}" ibc-verify-proof --proof "${proofFile}"`).toString();
+    assert.ok(verifyOut.includes('VALID'));
+  });
 });
+
 
 
 

@@ -181,3 +181,13 @@ class MerkleTree:
                 current_hash = hashlib.sha256(b"\x01" + curr_buf + step_buf).hexdigest()
 
         return current_hash.lower() == root.lower()
+
+def encrypt_with_password(plaintext: str, password_hex: str) -> str:
+    from .encryption import encrypt_aes_gcm
+    res = encrypt_aes_gcm(plaintext, password_hex)
+    return canonicalize_json(res)
+
+def decrypt_with_password(ciphertext_json: str, password_hex: str) -> str:
+    from .encryption import decrypt_aes_gcm
+    payload = json.loads(ciphertext_json)
+    return decrypt_aes_gcm(payload, password_hex).decode('utf-8')

@@ -5,6 +5,7 @@ import sys
 import os
 import json
 import hashlib
+import time
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from docutrust.crypto import canonicalize_json, sha256_hex, MerkleTree, encode_base58, decode_base58
@@ -1813,8 +1814,151 @@ class TestDocuTrustPython(unittest.TestCase):
         verify_res = PQCFalconEngine.verify(message, sig_res["signatureHex"], kp["publicKeyHex"])
         self.assertTrue(verify_res["valid"])
 
+    def test_pq_ratchet_engine(self):
+        from docutrust.pq_ratchet import PQRatchetEngine
+
+        bob_keys = PQRatchetEngine.generate_ratchet_key_pair()
+        self.assertTrue(bob_keys["combinedPublicKey"].startswith("z"))
+
+        alice_init = PQRatchetEngine.init_initiator_session(bob_keys["combinedPublicKey"])
+        alice_session = alice_init["session"]
+        bob_session = PQRatchetEngine.init_responder_session(bob_keys)
+
+        # Alice sends first message to Bob
+        enc1 = PQRatchetEngine.encrypt(alice_session, {"secret": "DocuTrust PQRatchet Handshake"})
+        alice_session = enc1["updatedSession"]
+
+        dec1 = PQRatchetEngine.decrypt(bob_session, enc1["message"])
+        bob_session = dec1["updatedSession"]
+        self.assertEqual(dec1["parsed"]["secret"], "DocuTrust PQRatchet Handshake")
+
+        # Bob replies to Alice
+        enc2 = PQRatchetEngine.encrypt(bob_session, {"reply": "Handshake Ack from Bob"})
+        bob_session = enc2["updatedSession"]
+
+        dec2 = PQRatchetEngine.decrypt(alice_session, enc2["message"])
+        alice_session = dec2["updatedSession"]
+        self.assertEqual(dec2["parsed"]["reply"], "Handshake Ack from Bob")
+
+    def test_polynomial_commitments_engine(self):
+        from docutrust.polynomial_commitments import PolynomialCommitmentEngine
+
+        srs = PolynomialCommitmentEngine.generate_srs(max_degree=16)
+        self.assertEqual(srs["degree"], 16)
+        self.assertEqual(len(srs["g1Powers"]), 17)
+
+        # P(x) = 3 + 2x + 5x^2
+        coeffs = [3, 2, 5]
+        commit = PolynomialCommitmentEngine.commit(coeffs, srs)
+        self.assertEqual(commit["degree"], 2)
+        self.assertTrue(commit["commitmentMultibase"].startswith("z"))
+
+        # Evaluate at z = 4: 3 + 2(4) + 5(16) = 3 + 8 + 80 = 91
+        z = 4
+        eval_val = PolynomialCommitmentEngine.evaluate_polynomial(coeffs, z)
+        self.assertEqual(eval_val, 91)
+
+        proof = PolynomialCommitmentEngine.create_evaluation_proof(coeffs, z, srs)
+        verify_res = PolynomialCommitmentEngine.verify_evaluation_proof(commit, proof, srs)
+        self.assertTrue(verify_res["valid"])
+
+        # Multi-point evaluation
+        multi_proof = PolynomialCommitmentEngine.create_multi_point_proof(coeffs, [1, 2, 3], srs)
+        self.assertEqual(len(multi_proof["points"]), 3)
+
+        # Batch proof aggregation
+        agg = PolynomialCommitmentEngine.aggregate_proofs([commit], [proof])
+        self.assertEqual(agg["proofsCount"], 1)
+        self.assertTrue(agg["evmCalldata"].startswith("0x"))
+
+    def test_tee_attestation_engine(self):
+        from docutrust.tee_attestation import TEEAttestationEngine
+        from docutrust.crypto import generate_key_pair
+
+        measurements = {
+            "mrEnclave": "e1f2a3b4c5d6e7f800112233445566778899aabbccddeeff0011223344556677",
+            "mrSigner": "99887766554433221100ffeeddccbbaa99887766554433221100ffeeddccbbaa",
+            "isvProdId": 1,
+            "isvSvn": 3
+        }
+
+        quote = TEEAttestationEngine.generate_attestation_quote(
+            tee_platform="Intel-SGX-DCAP",
+            measurements=measurements,
+            report_data_payload={"workload": "DocuTrust-TEE-Enclave"}
+        )
+        self.assertEqual(quote["body"]["teePlatform"], "Intel-SGX-DCAP")
+
+        verify_quote = TEEAttestationEngine.verify_attestation_quote(
+            quote,
+            expected_report_data_payload={"workload": "DocuTrust-TEE-Enclave"},
+            allowed_mr_enclaves=[measurements["mrEnclave"]],
+            min_isv_svn=2
+        )
+        self.assertTrue(verify_quote["valid"])
+
+        # Issue TEE-bound VC
+        enclave_kp = generate_key_pair()
+        issuer_kp = generate_key_pair()
+        claims = {"verifiedSubject": "did:key:zEnclaveUser", "attestationLevel": "HardwareSecured"}
+
+        tee_vc = TEEAttestationEngine.issue_tee_bound_credential(
+            claims=claims,
+            enclave_key_pair=enclave_kp,
+            quote=quote,
+            issuer_key_pair=issuer_kp
+        )
+        self.assertIn("TEEHardwareBoundCredential", tee_vc["type"])
+
+        verify_vc = TEEAttestationEngine.verify_tee_bound_credential(
+            tee_vc,
+            issuer_public_key_hex=issuer_kp["publicKeyHex"],
+            allowed_mr_enclaves=[measurements["mrEnclave"]]
+        )
+        self.assertTrue(verify_vc["valid"])
+        self.assertTrue(verify_vc["quoteValid"])
+        self.assertTrue(verify_vc["signatureValid"])
+
+    def test_ibc_relayer_engine(self):
+        from docutrust.ibc_relayer import IBCRelayerEngine
+
+        packet = {
+            "sequence": 1,
+            "sourcePort": "transfer",
+            "sourceChannel": "channel-0",
+            "destinationPort": "transfer",
+            "destinationChannel": "channel-1",
+            "data": {"token": "TRUST", "amount": 1000000, "sender": "cosmos1alice", "receiver": "eth1bob"},
+            "timeoutHeight": {"revisionNumber": 1, "revisionHeight": 1000},
+            "timeoutTimestamp": int(time.time()) + 3600
+        }
+
+        commitment = IBCRelayerEngine.compute_packet_commitment(packet)
+        self.assertIn("commitments/ports/transfer", commitment["commitmentPath"])
+
+        proof = IBCRelayerEngine.generate_merkle_proof(commitment["commitmentPath"], commitment["commitmentBytesHex"])
+        self.assertTrue(IBCRelayerEngine.verify_merkle_proof(proof, proof["rootAppHash"]))
+
+        light_client = IBCRelayerEngine.create_light_client(
+            chain_id="cosmoshub-4",
+            client_type="07-tendermint",
+            initial_height={"revisionNumber": 1, "revisionHeight": 500},
+            initial_app_hash=proof["rootAppHash"]
+        )
+        self.assertEqual(light_client["chainId"], "cosmoshub-4")
+
+        relayed = IBCRelayerEngine.relay_packet(
+            packet=packet,
+            proof=proof,
+            source_client_on_dest=light_client,
+            proof_height={"revisionNumber": 1, "revisionHeight": 500}
+        )
+        self.assertEqual(relayed["status"], "RELAYED")
+        self.assertIn("acknowledgementHex", relayed)
+
 if __name__ == '__main__':
     unittest.main()
+
 
 
 

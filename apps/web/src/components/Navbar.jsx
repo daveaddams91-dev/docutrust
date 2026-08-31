@@ -37,6 +37,10 @@ export default function Navbar({ activeTab, setActiveTab }) {
 
   const navItems = [
     { id: 'hero', label: 'Overview', icon: ShieldCheck, cat: 'Core' },
+    { id: 'pq-ratchet', label: 'PQ Ratchet', icon: ArrowRightLeft, cat: 'v15' },
+    { id: 'poly-commit', label: 'Polynomial KZG', icon: Cpu, cat: 'v15' },
+    { id: 'tee-attest', label: 'TEE Attestation', icon: ShieldAlert, cat: 'v15' },
+    { id: 'ibc-relayer', label: 'IBC Relayer', icon: Network, cat: 'v15' },
     { id: 'vrf-oracle', label: 'VRF & Oracles', icon: Dices, cat: 'v14' },
     { id: 'zk-dsl', label: 'ZK-DSL Compiler', icon: Code2, cat: 'v14' },
     { id: 'ai-bom', label: 'AI-BOM Registry', icon: Cpu, cat: 'v14' },
@@ -85,7 +89,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
           <div>
             <div className="flex items-center gap-1.5">
               <span className="font-bold text-lg tracking-tight text-white font-sans">DocuTrust</span>
-              <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono font-semibold">v14.0.0</span>
+              <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono font-semibold">v15.0.0</span>
             </div>
             <span className="text-[10px] text-gray-400 tracking-wide block font-mono">Autonomous Sovereign Trust Mesh</span>
           </div>

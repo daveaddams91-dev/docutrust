@@ -255,6 +255,7 @@ export class PolicyEngine {
     let curr = obj;
     for (const part of parts) {
       if (curr === null || curr === undefined) return undefined;
+      if (part === '__proto__' || part === 'constructor' || part === 'prototype') return undefined;
       curr = curr[part];
     }
     return curr;

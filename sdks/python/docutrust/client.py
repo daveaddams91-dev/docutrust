@@ -1780,6 +1780,206 @@ class DocuTrustClient:
         from .pqc_falcon import PQCFalconEngine
         return PQCFalconEngine.verify(message, signature_hex, public_key_hex)
 
+    # ========================================================
+    # v15.0.0 Post-Quantum Double Ratchet Protocol Methods
+    # ========================================================
+
+    def pq_ratchet_generate_keys(self) -> Dict[str, Any]:
+        """Generates a hybrid classical + post-quantum ratchet key pair."""
+        from .pq_ratchet import PQRatchetEngine
+        return PQRatchetEngine.generate_ratchet_key_pair()
+
+    def pq_ratchet_init_initiator(
+        self,
+        bob_combined_public_key: str,
+        initial_shared_secret_hex: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Initializes a Double Ratchet session for the Initiator."""
+        from .pq_ratchet import PQRatchetEngine
+        return PQRatchetEngine.init_initiator_session(bob_combined_public_key, initial_shared_secret_hex)
+
+    def pq_ratchet_init_responder(
+        self,
+        bob_key_pair: Dict[str, Any],
+        initial_shared_secret_hex: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Initializes a Double Ratchet session for the Responder."""
+        from .pq_ratchet import PQRatchetEngine
+        return PQRatchetEngine.init_responder_session(bob_key_pair, initial_shared_secret_hex)
+
+    def pq_ratchet_encrypt(
+        self,
+        session: Dict[str, Any],
+        payload: Union[str, Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Encrypts payload with current sending chain message key."""
+        from .pq_ratchet import PQRatchetEngine
+        return PQRatchetEngine.encrypt(session, payload)
+
+    def pq_ratchet_decrypt(
+        self,
+        session: Dict[str, Any],
+        message: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Decrypts message, advancing ratchet if new ratchet key received."""
+        from .pq_ratchet import PQRatchetEngine
+        return PQRatchetEngine.decrypt(session, message)
+
+    # ========================================================
+    # v15.0.0 Polynomial Commitments & Multi-Proof Batching Methods
+    # ========================================================
+
+    def poly_generate_srs(self, max_degree: int = 64, secret_seed: str = 'DOCUTRUST_POLYNOMIAL_SRS_SEED_V15') -> Dict[str, Any]:
+        """Generates a Structured Reference String (SRS) for polynomial commitments."""
+        from .polynomial_commitments import PolynomialCommitmentEngine
+        return PolynomialCommitmentEngine.generate_srs(max_degree, secret_seed)
+
+    def poly_commit(self, coefficients: List[Union[int, str]], srs: Dict[str, Any]) -> Dict[str, Any]:
+        """Commits to a polynomial represented by coefficients."""
+        from .polynomial_commitments import PolynomialCommitmentEngine
+        return PolynomialCommitmentEngine.commit(coefficients, srs)
+
+    def poly_evaluate(self, coefficients: List[Union[int, str]], point_z: Union[int, str]) -> int:
+        """Evaluates polynomial P(z) at point z modulo BN254 prime."""
+        from .polynomial_commitments import PolynomialCommitmentEngine
+        return PolynomialCommitmentEngine.evaluate_polynomial(coefficients, point_z)
+
+    def poly_create_proof(self, coefficients: List[Union[int, str]], point_z: Union[int, str], srs: Dict[str, Any]) -> Dict[str, Any]:
+        """Creates an opening proof for polynomial P(x) at point z."""
+        from .polynomial_commitments import PolynomialCommitmentEngine
+        return PolynomialCommitmentEngine.create_evaluation_proof(coefficients, point_z, srs)
+
+    def poly_verify_proof(self, commitment: Dict[str, Any], proof: Dict[str, Any], srs: Dict[str, Any]) -> Dict[str, Any]:
+        """Verifies an opening proof against a polynomial commitment."""
+        from .polynomial_commitments import PolynomialCommitmentEngine
+        return PolynomialCommitmentEngine.verify_evaluation_proof(commitment, proof, srs)
+
+    def poly_multi_proof(self, coefficients: List[Union[int, str]], points: List[Union[int, str]], srs: Dict[str, Any]) -> Dict[str, Any]:
+        """Creates a multi-point evaluation proof."""
+        from .polynomial_commitments import PolynomialCommitmentEngine
+        return PolynomialCommitmentEngine.create_multi_point_proof(coefficients, points, srs)
+
+    def poly_aggregate_proofs(self, commitments: List[Dict[str, Any]], proofs: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Aggregates multiple evaluation proofs into a batch proof with EVM calldata."""
+        from .polynomial_commitments import PolynomialCommitmentEngine
+        return PolynomialCommitmentEngine.aggregate_proofs(commitments, proofs)
+
+    # ========================================================
+    # v15.0.0 Hardware-Enforced TEE Remote Attestation Methods
+    # ========================================================
+
+    def tee_generate_quote(
+        self,
+        tee_platform: str,
+        measurements: Dict[str, Any],
+        report_data_payload: Union[str, Dict[str, Any]],
+        hardware_key_pair: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Generates a hardware-modeled TEE remote attestation quote."""
+        from .tee_attestation import TEEAttestationEngine
+        return TEEAttestationEngine.generate_attestation_quote(tee_platform, measurements, report_data_payload, hardware_key_pair)
+
+    def tee_verify_quote(
+        self,
+        quote: Dict[str, Any],
+        expected_report_data: Optional[Union[str, Dict[str, Any]]] = None,
+        allowed_mr_enclaves: Optional[List[str]] = None,
+        allowed_mr_signers: Optional[List[str]] = None,
+        min_isv_svn: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Validates a TEE remote attestation quote."""
+        from .tee_attestation import TEEAttestationEngine
+        return TEEAttestationEngine.verify_attestation_quote(
+            quote,
+            expected_report_data_payload=expected_report_data,
+            allowed_mr_enclaves=allowed_mr_enclaves,
+            allowed_mr_signers=allowed_mr_signers,
+            min_isv_svn=min_isv_svn
+        )
+
+    def tee_issue_credential(
+        self,
+        claims: Dict[str, Any],
+        enclave_key_pair: Dict[str, Any],
+        quote: Dict[str, Any],
+        issuer_key_pair: Dict[str, Any],
+        credential_id: Optional[str] = None,
+        credential_type: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """Issues a W3C Verifiable Credential cryptographically bound to a TEE quote."""
+        from .tee_attestation import TEEAttestationEngine
+        return TEEAttestationEngine.issue_tee_bound_credential(
+            claims, enclave_key_pair, quote, issuer_key_pair, credential_id, credential_type
+        )
+
+    def tee_verify_credential(
+        self,
+        credential: Dict[str, Any],
+        issuer_public_key_hex: Optional[str] = None,
+        allowed_mr_enclaves: Optional[List[str]] = None,
+        allowed_mr_signers: Optional[List[str]] = None,
+        min_isv_svn: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Verifies a TEE-bound Verifiable Credential."""
+        from .tee_attestation import TEEAttestationEngine
+        return TEEAttestationEngine.verify_tee_bound_credential(
+            credential, issuer_public_key_hex, allowed_mr_enclaves, allowed_mr_signers, min_isv_svn
+        )
+
+    # ========================================================
+    # v15.0.0 Inter-Blockchain Communication (IBC) Relayer Methods
+    # ========================================================
+
+    def ibc_compute_packet_commitment(self, packet: Dict[str, Any]) -> Dict[str, Any]:
+        """Computes deterministic ICS-04 packet commitment hash."""
+        from .ibc_relayer import IBCRelayerEngine
+        return IBCRelayerEngine.compute_packet_commitment(packet)
+
+    def ibc_generate_merkle_proof(self, key: str, value_hex: str, depth: int = 4) -> Dict[str, Any]:
+        """Creates a synthetic Merkle proof for an IBC state key-value pair."""
+        from .ibc_relayer import IBCRelayerEngine
+        return IBCRelayerEngine.generate_merkle_proof(key, value_hex, depth)
+
+    def ibc_verify_merkle_proof(self, proof: Dict[str, Any], expected_root_app_hash: str) -> bool:
+        """Verifies an IBC Merkle state proof against light-client AppHash."""
+        from .ibc_relayer import IBCRelayerEngine
+        return IBCRelayerEngine.verify_merkle_proof(proof, expected_root_app_hash)
+
+    def ibc_create_light_client(
+        self,
+        chain_id: str,
+        client_type: str,
+        initial_height: Dict[str, int],
+        initial_app_hash: str
+    ) -> Dict[str, Any]:
+        """Creates and initializes a light-client tracking state."""
+        from .ibc_relayer import IBCRelayerEngine
+        return IBCRelayerEngine.create_light_client(chain_id, client_type, initial_height, initial_app_hash)
+
+    def ibc_update_light_client(
+        self,
+        client: Dict[str, Any],
+        new_height: Dict[str, int],
+        new_app_hash: str,
+        validator_signatures: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """Updates light-client state with a new header."""
+        from .ibc_relayer import IBCRelayerEngine
+        return IBCRelayerEngine.update_light_client(client, new_height, new_app_hash, validator_signatures)
+
+    def ibc_relay_packet(
+        self,
+        packet: Dict[str, Any],
+        proof: Dict[str, Any],
+        source_client_on_dest: Dict[str, Any],
+        proof_height: Dict[str, int],
+        relayer_key_pair: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Relays an IBC packet across heterogeneous chains."""
+        from .ibc_relayer import IBCRelayerEngine
+        return IBCRelayerEngine.relay_packet(packet, proof, source_client_on_dest, proof_height, relayer_key_pair)
+
+
 
 
 

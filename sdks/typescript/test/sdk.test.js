@@ -322,6 +322,54 @@ describe('DocuTrust TypeScript SDK (@docutrust/sdk)', () => {
     // 57. v12.0.0 Universal Solidity Verifier
     await client.generateUniversalSolidityVerifier();
     assert.strictEqual(mockCalls[75].url, 'https://test-api.docutrust.org/api/v1/solidity/export-universal');
+
+    // 58. v15.0.0 Post-Quantum Ratchet
+    await client.generateRatchetKeyPair();
+    assert.strictEqual(mockCalls[76].url, 'https://test-api.docutrust.org/api/v1/ratchet/keygen');
+    await client.initInitiatorRatchetSession('pk_bob');
+    assert.strictEqual(mockCalls[77].url, 'https://test-api.docutrust.org/api/v1/ratchet/init/initiator');
+    await client.initResponderRatchetSession({});
+    assert.strictEqual(mockCalls[78].url, 'https://test-api.docutrust.org/api/v1/ratchet/init/responder');
+    await client.encryptRatchet({}, { hello: 'world' });
+    assert.strictEqual(mockCalls[79].url, 'https://test-api.docutrust.org/api/v1/ratchet/encrypt');
+    await client.decryptRatchet({}, {});
+    assert.strictEqual(mockCalls[80].url, 'https://test-api.docutrust.org/api/v1/ratchet/decrypt');
+
+    // 59. v15.0.0 Polynomial Commitments
+    await client.generatePolySRS(16);
+    assert.strictEqual(mockCalls[81].url, 'https://test-api.docutrust.org/api/v1/zk/poly/srs');
+    await client.commitPolynomial([1, 2, 3], {});
+    assert.strictEqual(mockCalls[82].url, 'https://test-api.docutrust.org/api/v1/zk/poly/commit');
+    await client.evaluatePolynomial([1, 2, 3], 5);
+    assert.strictEqual(mockCalls[83].url, 'https://test-api.docutrust.org/api/v1/zk/poly/evaluate');
+    await client.createPolyEvaluationProof([1, 2, 3], 5, {});
+    assert.strictEqual(mockCalls[84].url, 'https://test-api.docutrust.org/api/v1/zk/poly/prove');
+    await client.verifyPolyEvaluationProof({}, {}, {});
+    assert.strictEqual(mockCalls[85].url, 'https://test-api.docutrust.org/api/v1/zk/poly/verify');
+
+    // 60. v15.0.0 TEE Remote Attestation
+    await client.generateTEEAttestationQuote('Intel-SGX-DCAP', {}, {});
+    assert.strictEqual(mockCalls[86].url, 'https://test-api.docutrust.org/api/v1/tee/quote/generate');
+    await client.verifyTEEAttestationQuote({});
+    assert.strictEqual(mockCalls[87].url, 'https://test-api.docutrust.org/api/v1/tee/quote/verify');
+    await client.issueTEEBoundCredential({}, {}, {}, '0x123');
+    assert.strictEqual(mockCalls[88].url, 'https://test-api.docutrust.org/api/v1/tee/vc/issue');
+    await client.verifyTEEBoundCredential({});
+    assert.strictEqual(mockCalls[89].url, 'https://test-api.docutrust.org/api/v1/tee/vc/verify');
+
+    // 61. v15.0.0 IBC Relayer
+    await client.computeIBCPacketCommitment({});
+    assert.strictEqual(mockCalls[90].url, 'https://test-api.docutrust.org/api/v1/ibc/packet/commit');
+    await client.generateIBCMerkleProof('key', '0x123');
+    assert.strictEqual(mockCalls[91].url, 'https://test-api.docutrust.org/api/v1/ibc/proof/generate');
+    await client.verifyIBCMerkleProof({});
+    assert.strictEqual(mockCalls[92].url, 'https://test-api.docutrust.org/api/v1/ibc/proof/verify');
+    await client.createIBCLightClient('chain-1', {});
+    assert.strictEqual(mockCalls[93].url, 'https://test-api.docutrust.org/api/v1/ibc/client/create');
+    await client.updateIBCLightClient({}, {});
+    assert.strictEqual(mockCalls[94].url, 'https://test-api.docutrust.org/api/v1/ibc/client/update');
+    await client.relayIBCPacket({}, {}, {});
+    assert.strictEqual(mockCalls[95].url, 'https://test-api.docutrust.org/api/v1/ibc/packet/relay');
   });
 
   test('DocuTrustClient handles HTTP error responses gracefully', async () => {

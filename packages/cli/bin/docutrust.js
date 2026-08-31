@@ -411,6 +411,28 @@ function printHelp() {
   \x1b[32mpqc-falcon-sign\x1b[0m --data <text|file> --key <k> [--out <f>] Sign message using Falcon lattice signature
   \x1b[32mpqc-falcon-verify\x1b[0m --data <t> --sig <hex> --key <pub>  Verify Falcon lattice digital signature
 
+\x1b[1mPOST-QUANTUM DOUBLE RATCHET (v15.0.0):\x1b[0m
+  \x1b[32mpq-ratchet-keygen\x1b[0m [--out <f>]                         Generate combined ML-KEM + X25519 ratchet keypair
+  \x1b[32mpq-ratchet-init\x1b[0m --bob <pubKey|file> [--out <f>]        Initialize initiator ratchet session with recipient
+  \x1b[32mpq-ratchet-init\x1b[0m --key <keyFile> [--out <f>]            Initialize responder ratchet session from local key
+  \x1b[32mpq-ratchet-encrypt\x1b[0m --session <f> --data <t|f> [--out <f>] Encrypt message payload and advance forward ratchet
+  \x1b[32mpq-ratchet-decrypt\x1b[0m --session <f> --message <f> [--out <f>] Decrypt ratchet ciphertext and update session
+
+\x1b[1mPOLYNOMIAL COMMITMENTS & KZG EVALUATIONS (v15.0.0):\x1b[0m
+  \x1b[32mpoly-srs\x1b[0m [--degree <16>] [--out <f>]                  Generate KZG Structured Reference String on BN254
+  \x1b[32mpoly-commit\x1b[0m --srs <f> --coeffs <json|1,2,3> [--out <f>] Commit to polynomial coefficients
+  \x1b[32mpoly-prove\x1b[0m --srs <f> --coeffs <c> --point <z> [--out <f>] Generate synthetic division evaluation proof
+  \x1b[32mpoly-verify\x1b[0m --srs <f> --commit <f> --proof <f>          Verify evaluation proof against polynomial commitment
+
+\x1b[1mHARDWARE TEE REMOTE ATTESTATION (v15.0.0):\x1b[0m
+  \x1b[32mtee-quote\x1b[0m --measurements <f> --data <payload> [--out <f>] Generate Intel SGX / AMD SEV hardware quote
+  \x1b[32mtee-verify\x1b[0m --quote <f> [--mr-enclave <hex>]             Verify remote hardware enclave measurements
+
+\x1b[1mIBC CROSS-CHAIN INTEROPERABILITY & RELAYER (v15.0.0):\x1b[0m
+  \x1b[32mibc-packet-commit\x1b[0m --packet <f> [--out <f>]            Compute ICS-04 packet commitment hash
+  \x1b[32mibc-merkle-proof\x1b[0m --key <path> --value <hex> [--out <f>] Generate Merkle multi-store proof
+  \x1b[32mibc-verify-proof\x1b[0m --proof <f> [--root <appHash>]        Verify Merkle proof against consensus AppHash
+
 \x1b[1mQUICKSTART:\x1b[0m
   $ docutrust demo
   $ docutrust keygen --out keys.json
@@ -488,7 +510,7 @@ async function runDemoWizard() {
 
 async function main() {
   if (command === 'version' || command === '--version' || command === '-v') {
-    console.log('14.0.0');
+    console.log('15.0.0');
     return;
   }
 
@@ -4065,6 +4087,328 @@ async function main() {
     return;
   }
 
+  // ========================================================
+  // v15.0.0 Post-Quantum Double Ratchet CLI
+  // ========================================================
+
+  if (command === 'pq-ratchet-keygen') {
+    const outFile = getArgValue('--out') || getArgValue('-o');
+    const kp = core.PQRatchetEngine.generateRatchetKeyPair();
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(kp, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m PQ Ratchet KeyPair saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(kp, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'pq-ratchet-init') {
+    const bobArg = getArgValue('--bob') || getArgValue('-b');
+    const keyArg = getArgValue('--key') || getArgValue('-k');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (bobArg) {
+      let bobPub = bobArg;
+      if (fs.existsSync(bobArg)) {
+        const kd = JSON.parse(fs.readFileSync(bobArg, 'utf-8'));
+        bobPub = kd.combinedPublicKey || kd;
+      }
+      const res = core.PQRatchetEngine.initInitiatorSession(bobPub);
+      if (outFile) {
+        fs.writeFileSync(outFile, JSON.stringify(res, null, 2));
+        console.log(`\x1b[32m✔\x1b[0m Initiator Session saved to \x1b[1m${outFile}\x1b[0m`);
+      } else {
+        console.log(JSON.stringify(res, null, 2));
+      }
+      return;
+    }
+
+    if (keyArg) {
+      const kd = JSON.parse(fs.readFileSync(keyArg, 'utf-8'));
+      const session = core.PQRatchetEngine.initResponderSession(kd);
+      if (outFile) {
+        fs.writeFileSync(outFile, JSON.stringify(session, null, 2));
+        console.log(`\x1b[32m✔\x1b[0m Responder Session saved to \x1b[1m${outFile}\x1b[0m`);
+      } else {
+        console.log(JSON.stringify(session, null, 2));
+      }
+      return;
+    }
+
+    console.error('\x1b[31mError:\x1b[0m Specify --bob <pubKey> for initiator or --key <keyFile> for responder');
+    process.exit(1);
+  }
+
+  if (command === 'pq-ratchet-encrypt') {
+    const sessionFile = getArgValue('--session') || getArgValue('-s');
+    const dataArg = getArgValue('--data') || getArgValue('-d');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!sessionFile || !dataArg) {
+      console.error('\x1b[31mError:\x1b[0m Missing --session <session.json> or --data <data>');
+      process.exit(1);
+    }
+
+    const sessionObj = JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
+    const session = sessionObj.session || sessionObj;
+    let payload = dataArg;
+    if (fs.existsSync(dataArg)) {
+      try { payload = JSON.parse(fs.readFileSync(dataArg, 'utf-8')); } catch (e) { payload = fs.readFileSync(dataArg, 'utf-8'); }
+    } else {
+      try { payload = JSON.parse(dataArg); } catch (e) {}
+    }
+
+    const encRes = core.PQRatchetEngine.encrypt(session, payload);
+    fs.writeFileSync(sessionFile, JSON.stringify(encRes.updatedSession, null, 2));
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(encRes.message, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Encrypted message saved to \x1b[1m${outFile}\x1b[0m (session updated in ${sessionFile})`);
+    } else {
+      console.log(JSON.stringify(encRes.message, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'pq-ratchet-decrypt') {
+    const sessionFile = getArgValue('--session') || getArgValue('-s');
+    const msgFile = getArgValue('--message') || getArgValue('-m');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!sessionFile || !msgFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --session <session.json> or --message <msg.json>');
+      process.exit(1);
+    }
+
+    const sessionObj = JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
+    const session = sessionObj.session || sessionObj;
+    const msg = JSON.parse(fs.readFileSync(msgFile, 'utf-8'));
+
+    const decRes = core.PQRatchetEngine.decrypt(session, msg);
+    fs.writeFileSync(sessionFile, JSON.stringify(decRes.updatedSession, null, 2));
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(decRes.parsed, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Decrypted payload saved to \x1b[1m${outFile}\x1b[0m (session updated in ${sessionFile})`);
+    } else {
+      console.log(JSON.stringify(decRes.parsed, null, 2));
+    }
+    return;
+  }
+
+  // ========================================================
+  // v15.0.0 Polynomial Commitments CLI
+  // ========================================================
+
+  if (command === 'poly-srs') {
+    const degreeArg = parseInt(getArgValue('--degree') || '16', 10);
+    const outFile = getArgValue('--out') || getArgValue('-o');
+    const srs = core.PolynomialCommitmentEngine.generateSRS(degreeArg);
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(srs, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m KZG Structured Reference String (degree ${degreeArg}) saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(srs, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'poly-commit') {
+    const srsFile = getArgValue('--srs');
+    const coeffsArg = getArgValue('--coeffs') || getArgValue('-c');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!srsFile || !coeffsArg) {
+      console.error('\x1b[31mError:\x1b[0m Missing --srs <srs.json> or --coeffs <1,2,3>');
+      process.exit(1);
+    }
+
+    const srs = JSON.parse(fs.readFileSync(srsFile, 'utf-8'));
+    const coeffs = coeffsArg.includes('[') ? JSON.parse(coeffsArg) : coeffsArg.split(',').map(Number);
+    const commit = core.PolynomialCommitmentEngine.commit(coeffs, srs);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(commit, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Polynomial commitment saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(commit, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'poly-prove') {
+    const srsFile = getArgValue('--srs');
+    const coeffsArg = getArgValue('--coeffs') || getArgValue('-c');
+    const pointArg = parseInt(getArgValue('--point') || getArgValue('-z') || '0', 10);
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!srsFile || !coeffsArg) {
+      console.error('\x1b[31mError:\x1b[0m Missing --srs <srs.json> or --coeffs <1,2,3>');
+      process.exit(1);
+    }
+
+    const srs = JSON.parse(fs.readFileSync(srsFile, 'utf-8'));
+    const coeffs = coeffsArg.includes('[') ? JSON.parse(coeffsArg) : coeffsArg.split(',').map(Number);
+    const proof = core.PolynomialCommitmentEngine.createEvaluationProof(coeffs, pointArg, srs);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(proof, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Polynomial evaluation proof saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(proof, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'poly-verify') {
+    const srsFile = getArgValue('--srs');
+    const commitFile = getArgValue('--commit');
+    const proofFile = getArgValue('--proof');
+
+    if (!srsFile || !commitFile || !proofFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --srs <srs.json>, --commit <commit.json>, or --proof <proof.json>');
+      process.exit(1);
+    }
+
+    const srs = JSON.parse(fs.readFileSync(srsFile, 'utf-8'));
+    const commit = JSON.parse(fs.readFileSync(commitFile, 'utf-8'));
+    const proof = JSON.parse(fs.readFileSync(proofFile, 'utf-8'));
+
+    const res = core.PolynomialCommitmentEngine.verifyEvaluationProof(commit, proof, srs);
+    if (res.valid) {
+      console.log(`\x1b[32m✔\x1b[0m Polynomial Evaluation Proof is \x1b[1m\x1b[32mVALID\x1b[0m`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m Polynomial Evaluation Proof is \x1b[1m\x1b[31mINVALID\x1b[0m:`, res.errors?.join(', '));
+      process.exit(1);
+    }
+    return;
+  }
+
+  // ========================================================
+  // v15.0.0 Hardware TEE Remote Attestation CLI
+  // ========================================================
+
+  if (command === 'tee-quote') {
+    const measFile = getArgValue('--measurements') || getArgValue('-m');
+    const dataArg = getArgValue('--data') || getArgValue('-d');
+    const platform = getArgValue('--platform') || 'Intel-SGX-DCAP';
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!measFile || !dataArg) {
+      console.error('\x1b[31mError:\x1b[0m Missing --measurements <meas.json> or --data <payload>');
+      process.exit(1);
+    }
+
+    const measurements = JSON.parse(fs.readFileSync(measFile, 'utf-8'));
+    let payload = dataArg;
+    if (fs.existsSync(dataArg)) {
+      try { payload = JSON.parse(fs.readFileSync(dataArg, 'utf-8')); } catch (e) {}
+    } else {
+      try { payload = JSON.parse(dataArg); } catch (e) {}
+    }
+
+    const quote = core.TEEAttestationEngine.generateAttestationQuote(platform, measurements, payload);
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(quote, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m TEE Attestation Quote saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(quote, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'tee-verify') {
+    const quoteFile = getArgValue('--quote') || getArgValue('-q');
+    const mrEnclave = getArgValue('--mr-enclave');
+    const minSvn = parseInt(getArgValue('--min-svn') || '1', 10);
+
+    if (!quoteFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --quote <quote.json>');
+      process.exit(1);
+    }
+
+    const quote = JSON.parse(fs.readFileSync(quoteFile, 'utf-8'));
+    const options = { minIsvSvn: minSvn };
+    if (mrEnclave) options.allowedMrEnclaves = [mrEnclave];
+
+    const res = core.TEEAttestationEngine.verifyAttestationQuote(quote, options);
+    if (res.valid) {
+      console.log(`\x1b[32m✔\x1b[0m TEE Quote is \x1b[1m\x1b[32mAUTHENTIC & ENCLAVE-VERIFIED\x1b[0m`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m TEE Quote verification \x1b[1m\x1b[31mFAILED\x1b[0m:`, res.errors?.join(', '));
+      process.exit(1);
+    }
+    return;
+  }
+
+  // ========================================================
+  // v15.0.0 IBC Relayer CLI
+  // ========================================================
+
+  if (command === 'ibc-packet-commit') {
+    const packetFile = getArgValue('--packet') || getArgValue('-p');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!packetFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --packet <packet.json>');
+      process.exit(1);
+    }
+
+    const packet = JSON.parse(fs.readFileSync(packetFile, 'utf-8'));
+    const commitment = core.IBCRelayerEngine.computePacketCommitment(packet);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(commitment, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m IBC Packet Commitment saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(commitment, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'ibc-merkle-proof') {
+    const keyArg = getArgValue('--key') || getArgValue('-k');
+    const valueArg = getArgValue('--value') || getArgValue('-v');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!keyArg || !valueArg) {
+      console.error('\x1b[31mError:\x1b[0m Missing --key <path> or --value <valueHex>');
+      process.exit(1);
+    }
+
+    const proof = core.IBCRelayerEngine.generateMerkleProof(keyArg, valueArg);
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(proof, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m IBC Merkle Multi-Store Proof saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(proof, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'ibc-verify-proof') {
+    const proofFile = getArgValue('--proof');
+    const rootArg = getArgValue('--root');
+
+    if (!proofFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --proof <proof.json>');
+      process.exit(1);
+    }
+
+    const proof = JSON.parse(fs.readFileSync(proofFile, 'utf-8'));
+    const expectedRoot = rootArg || proof.rootAppHash;
+    const isValid = core.IBCRelayerEngine.verifyMerkleProof(proof, expectedRoot);
+
+    if (isValid) {
+      console.log(`\x1b[32m✔\x1b[0m IBC Merkle Proof is \x1b[1m\x1b[32mVALID against Root AppHash\x1b[0m`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m IBC Merkle Proof is \x1b[1m\x1b[31mINVALID\x1b[0m`);
+      process.exit(1);
+    }
+    return;
+  }
+
   console.log(`Unknown command: ${command}. Run 'docutrust help' for usage.`);
 }
 
@@ -4072,3 +4416,4 @@ main().catch(err => {
   console.error('\x1b[31mError:\x1b[0m', err.message);
   process.exit(1);
 });
+

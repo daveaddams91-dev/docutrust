@@ -190,3 +190,20 @@ export * from './ai-bom';
 // Export Post-Quantum Falcon & ML-DSA-87 Dual-Lattice Digital Signatures (DocuTrust v14.0.0)
 export * from './pqc-falcon';
 
+// ========================================================
+// DocuTrust v15.0.0 Sovereign Trust Mesh Evolution
+// ========================================================
+
+// Export Post-Quantum Double Ratchet Protocol Engine (DocuTrust v15.0.0)
+export * from './pq-ratchet';
+
+// Export Verifiable Polynomial Commitments & Multi-Proof Batching (DocuTrust v15.0.0)
+export * from './polynomial-commitments';
+
+// Export Hardware-Enforced TEE Remote Attestation Engine (DocuTrust v15.0.0)
+export * from './tee-attestation';
+
+// Export Inter-Blockchain Communication (IBC) & Light-Client Relayer Mesh (DocuTrust v15.0.0)
+export * from './ibc-relayer';
+
+

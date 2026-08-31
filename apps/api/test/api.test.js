@@ -61,7 +61,7 @@ test('API Server Suite', async (t) => {
     const res = await makeRequest('GET', '/api/v1/health');
     assert.equal(res.status, 200);
     assert.equal(res.body.status, 'healthy');
-    assert.equal(res.body.version, '12.0.0');
+    assert.equal(res.body.version, '15.0.0');
     assert.ok(Array.isArray(res.body.features));
     assert.ok(res.body.systemDid.startsWith('did:key:z6M'));
   });
@@ -2103,7 +2103,206 @@ test('API Server Suite', async (t) => {
     assert.equal(verifyAttestRes.status, 200);
     assert.equal(verifyAttestRes.body.valid, true);
   });
+
+  await t.test('65. POST /api/v1/ratchet (Keygen, Init, Encrypt, Decrypt)', async () => {
+    // 1. Bob generates ratchet keys
+    const bobKeysRes = await makeRequest('POST', '/api/v1/ratchet/keygen', {});
+    assert.equal(bobKeysRes.status, 200);
+    const bobKeys = bobKeysRes.body.keyPair;
+    assert.ok(bobKeys.combinedPublicKey.startsWith('z'));
+
+    // 2. Alice initializes initiator session
+    const aliceInitRes = await makeRequest('POST', '/api/v1/ratchet/init/initiator', {
+      bobCombinedPublicKey: bobKeys.combinedPublicKey
+    });
+    assert.equal(aliceInitRes.status, 200);
+    let aliceSession = aliceInitRes.body.session;
+
+    // 3. Bob initializes responder session
+    const bobInitRes = await makeRequest('POST', '/api/v1/ratchet/init/responder', {
+      bobKeyPair: bobKeys
+    });
+    assert.equal(bobInitRes.status, 200);
+    let bobSession = bobInitRes.body.session;
+
+    // 4. Alice encrypts payload
+    const encRes = await makeRequest('POST', '/api/v1/ratchet/encrypt', {
+      session: aliceSession,
+      payload: { documentId: 'doc-secure-991', confidentialValue: 500000 }
+    });
+    assert.equal(encRes.status, 200);
+    aliceSession = encRes.body.updatedSession;
+    const ratchetMessage = encRes.body.message;
+
+    // 5. Bob decrypts payload
+    const decRes = await makeRequest('POST', '/api/v1/ratchet/decrypt', {
+      session: bobSession,
+      message: ratchetMessage
+    });
+    assert.equal(decRes.status, 200);
+    bobSession = decRes.body.updatedSession;
+    assert.equal(decRes.body.parsed.documentId, 'doc-secure-991');
+  });
+
+  await t.test('66. POST /api/v1/zk/poly (SRS, Commit, Evaluate, Prove, Verify, Aggregate)', async () => {
+    // 1. SRS
+    const srsRes = await makeRequest('POST', '/api/v1/zk/poly/srs', { maxDegree: 16 });
+    assert.equal(srsRes.status, 200);
+    const srs = srsRes.body.srs;
+    assert.equal(srs.degree, 16);
+
+    // 2. Commit: P(x) = 3 + 2x + 5x^2
+    const coeffs = [3, 2, 5];
+    const commitRes = await makeRequest('POST', '/api/v1/zk/poly/commit', {
+      coefficients: coeffs,
+      srs
+    });
+    assert.equal(commitRes.status, 200);
+    const commitment = commitRes.body.commitment;
+
+    // 3. Evaluate: P(4) = 91
+    const evalRes = await makeRequest('POST', '/api/v1/zk/poly/evaluate', {
+      coefficients: coeffs,
+      pointZ: 4
+    });
+    assert.equal(evalRes.status, 200);
+    assert.equal(evalRes.body.valueY, '91');
+
+    // 4. Prove
+    const proveRes = await makeRequest('POST', '/api/v1/zk/poly/prove', {
+      coefficients: coeffs,
+      pointZ: 4,
+      srs
+    });
+    assert.equal(proveRes.status, 200);
+    const proof = proveRes.body.proof;
+
+    // 5. Verify
+    const verifyRes = await makeRequest('POST', '/api/v1/zk/poly/verify', {
+      commitment,
+      proof,
+      srs
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.valid, true);
+
+    // 6. Aggregate
+    const aggRes = await makeRequest('POST', '/api/v1/zk/poly/aggregate', {
+      commitments: [commitment],
+      proofs: [proof]
+    });
+    assert.equal(aggRes.status, 200);
+    assert.equal(aggRes.body.batchProof.proofsCount, 1);
+    assert.ok(aggRes.body.batchProof.evmCalldata.startsWith('0x'));
+  });
+
+  await t.test('67. POST /api/v1/tee (Quote Generate & Verify, TEE VC Issue & Verify)', async () => {
+    const measurements = {
+      mrEnclave: 'a1b2c3d4e5f60718293a4b5c6d7e8f900112233445566778899aabbccddeeff0',
+      mrSigner: '11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff',
+      isvProdId: 1,
+      isvSvn: 2
+    };
+
+    // 1. Generate Quote
+    const quoteRes = await makeRequest('POST', '/api/v1/tee/quote/generate', {
+      teePlatform: 'Intel-SGX-DCAP',
+      measurements,
+      reportDataPayload: { workload: 'DocuTrust-Secure-VM' }
+    });
+    assert.equal(quoteRes.status, 200);
+    const quote = quoteRes.body.quote;
+
+    // 2. Verify Quote
+    const verifyQuoteRes = await makeRequest('POST', '/api/v1/tee/quote/verify', {
+      quote,
+      expectedReportDataPayload: { workload: 'DocuTrust-Secure-VM' },
+      allowedMrEnclaves: [measurements.mrEnclave]
+    });
+    assert.equal(verifyQuoteRes.status, 200);
+    assert.equal(verifyQuoteRes.body.valid, true);
+
+    // 3. Issue TEE-bound VC
+    const { generateKeyPair } = require('@docutrust/core');
+    const enclaveKp = generateKeyPair();
+    const issuerKp = generateKeyPair();
+
+    const issueVcRes = await makeRequest('POST', '/api/v1/tee/vc/issue', {
+      claims: { subject: 'did:key:zEnclaveNode', clearance: 'TopSecret' },
+      enclaveKeyPair: enclaveKp,
+      quote,
+      issuerKeyPair: issuerKp
+    });
+    assert.equal(issueVcRes.status, 200);
+    const vc = issueVcRes.body.credential;
+    assert.ok(vc.type.includes('TEEHardwareBoundCredential'));
+
+    // 4. Verify TEE-bound VC
+    const verifyVcRes = await makeRequest('POST', '/api/v1/tee/vc/verify', {
+      credential: vc,
+      issuerPublicKeyHex: issuerKp.publicKeyHex,
+      allowedMrEnclaves: [measurements.mrEnclave]
+    });
+    assert.equal(verifyVcRes.status, 200);
+    assert.equal(verifyVcRes.body.valid, true);
+  });
+
+  await t.test('68. POST /api/v1/ibc (Packet Commit, Proof Generate & Verify, Client Create & Update, Relay)', async () => {
+    const packet = {
+      sequence: 1,
+      sourcePort: 'transfer',
+      sourceChannel: 'channel-0',
+      destinationPort: 'transfer',
+      destinationChannel: 'channel-1',
+      data: { token: 'TRUST', amount: 1000000, sender: 'cosmos1alice', receiver: 'eth1bob' },
+      timeoutHeight: { revisionNumber: 1, revisionHeight: 1000 },
+      timeoutTimestamp: Math.floor(Date.now() / 1000) + 3600
+    };
+
+    // 1. Packet Commit
+    const commitRes = await makeRequest('POST', '/api/v1/ibc/packet/commit', { packet });
+    assert.equal(commitRes.status, 200);
+    const commitment = commitRes.body.commitment;
+
+    // 2. Merkle Proof Generate
+    const proofRes = await makeRequest('POST', '/api/v1/ibc/proof/generate', {
+      key: commitment.commitmentPath,
+      valueHex: commitment.commitmentBytesHex,
+      depth: 4
+    });
+    assert.equal(proofRes.status, 200);
+    const proof = proofRes.body.proof;
+
+    // 3. Merkle Proof Verify
+    const verifyProofRes = await makeRequest('POST', '/api/v1/ibc/proof/verify', {
+      proof,
+      expectedRootAppHash: proof.rootAppHash
+    });
+    assert.equal(verifyProofRes.status, 200);
+    assert.equal(verifyProofRes.body.valid, true);
+
+    // 4. Light Client Create
+    const clientRes = await makeRequest('POST', '/api/v1/ibc/client/create', {
+      chainId: 'cosmoshub-4',
+      clientType: '07-tendermint',
+      initialHeight: { revisionNumber: 1, revisionHeight: 500 },
+      initialAppHash: proof.rootAppHash
+    });
+    assert.equal(clientRes.status, 200);
+    const lightClient = clientRes.body.lightClient;
+
+    // 5. Relay Packet
+    const relayRes = await makeRequest('POST', '/api/v1/ibc/packet/relay', {
+      packet,
+      proof,
+      sourceClientOnDest: lightClient,
+      proofHeight: { revisionNumber: 1, revisionHeight: 500 }
+    });
+    assert.equal(relayRes.status, 200);
+    assert.equal(relayRes.body.relayReceipt.status, 'RELAYED');
+  });
 });
+
 
 
 

@@ -105,7 +105,11 @@ const {
   VRFOracleEngine,
   ZKDSLEngine,
   AIBOMRegistryEngine,
-  PQCFalconEngine
+  PQCFalconEngine,
+  PQRatchetEngine,
+  PolynomialCommitmentEngine,
+  TEEAttestationEngine,
+  IBCRelayerEngine
 } = require('@docutrust/core');
 
 const PORT = process.env.PORT || 4000;
@@ -202,7 +206,7 @@ const server = http.createServer(async (req, res) => {
       return jsonResponse(200, {
         status: 'healthy',
         service: 'DocuTrust Sovereign Verifiable Credentials Engine',
-        version: '12.0.0',
+        version: '15.0.0',
         features: [
           'W3C VC 2.0',
           'DID Key Ed25519',
@@ -2988,6 +2992,337 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // ========================================================
+    // v15.0.0 Post-Quantum Double Ratchet Protocol Routes
+    // ========================================================
+
+    if (pathname === '/api/v1/ratchet/keygen' && req.method === 'POST') {
+      try {
+        const keyPair = PQRatchetEngine.generateRatchetKeyPair();
+        return jsonResponse(200, { success: true, keyPair });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/ratchet/init/initiator' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { bobCombinedPublicKey, initialSharedSecretHex } = body;
+      if (!bobCombinedPublicKey) {
+        return jsonResponse(400, { error: 'Missing bobCombinedPublicKey.' });
+      }
+      try {
+        const result = PQRatchetEngine.initInitiatorSession(bobCombinedPublicKey, initialSharedSecretHex);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/ratchet/init/responder' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { bobKeyPair, initialSharedSecretHex } = body;
+      if (!bobKeyPair) {
+        return jsonResponse(400, { error: 'Missing bobKeyPair.' });
+      }
+      try {
+        const session = PQRatchetEngine.initResponderSession(bobKeyPair, initialSharedSecretHex);
+        return jsonResponse(200, { success: true, session });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/ratchet/encrypt' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { session, payload } = body;
+      if (!session || payload === undefined) {
+        return jsonResponse(400, { error: 'Missing session or payload.' });
+      }
+      try {
+        const result = PQRatchetEngine.encrypt(session, payload);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/ratchet/decrypt' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { session, message } = body;
+      if (!session || !message) {
+        return jsonResponse(400, { error: 'Missing session or message.' });
+      }
+      try {
+        const result = PQRatchetEngine.decrypt(session, message);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ========================================================
+    // v15.0.0 Polynomial Commitments & Multi-Proof Batching Routes
+    // ========================================================
+
+    if (pathname === '/api/v1/zk/poly/srs' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { maxDegree = 64, secretSeed } = body;
+      try {
+        const srs = PolynomialCommitmentEngine.generateSRS(maxDegree, secretSeed);
+        return jsonResponse(200, { success: true, srs });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/zk/poly/commit' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { coefficients, srs } = body;
+      if (!coefficients || !srs) {
+        return jsonResponse(400, { error: 'Missing coefficients or srs.' });
+      }
+      try {
+        const commitment = PolynomialCommitmentEngine.commit(coefficients, srs);
+        return jsonResponse(200, { success: true, commitment });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/zk/poly/evaluate' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { coefficients, pointZ } = body;
+      if (!coefficients || pointZ === undefined) {
+        return jsonResponse(400, { error: 'Missing coefficients or pointZ.' });
+      }
+      try {
+        const valueY = PolynomialCommitmentEngine.evaluatePolynomial(coefficients, pointZ);
+        return jsonResponse(200, { success: true, valueY: valueY.toString() });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/zk/poly/prove' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { coefficients, pointZ, srs } = body;
+      if (!coefficients || pointZ === undefined || !srs) {
+        return jsonResponse(400, { error: 'Missing coefficients, pointZ, or srs.' });
+      }
+      try {
+        const proof = PolynomialCommitmentEngine.createEvaluationProof(coefficients, pointZ, srs);
+        return jsonResponse(200, { success: true, proof });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/zk/poly/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { commitment, proof, srs } = body;
+      if (!commitment || !proof || !srs) {
+        return jsonResponse(400, { error: 'Missing commitment, proof, or srs.' });
+      }
+      try {
+        const result = PolynomialCommitmentEngine.verifyEvaluationProof(commitment, proof, srs);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/zk/poly/multi-prove' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { coefficients, points, srs } = body;
+      if (!coefficients || !points || !srs) {
+        return jsonResponse(400, { error: 'Missing coefficients, points, or srs.' });
+      }
+      try {
+        const proof = PolynomialCommitmentEngine.createMultiPointProof(coefficients, points, srs);
+        return jsonResponse(200, { success: true, proof });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/zk/poly/aggregate' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { commitments, proofs } = body;
+      if (!commitments || !proofs) {
+        return jsonResponse(400, { error: 'Missing commitments or proofs.' });
+      }
+      try {
+        const batchProof = PolynomialCommitmentEngine.aggregateProofs(commitments, proofs);
+        return jsonResponse(200, { success: true, batchProof });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ========================================================
+    // v15.0.0 Hardware-Enforced TEE Remote Attestation Routes
+    // ========================================================
+
+    if (pathname === '/api/v1/tee/quote/generate' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { teePlatform = 'Intel-SGX-DCAP', measurements, reportDataPayload, hardwareKeyPair } = body;
+      if (!measurements || !reportDataPayload) {
+        return jsonResponse(400, { error: 'Missing measurements or reportDataPayload.' });
+      }
+      try {
+        const quote = TEEAttestationEngine.generateAttestationQuote(teePlatform, measurements, reportDataPayload, hardwareKeyPair);
+        return jsonResponse(200, { success: true, quote });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/tee/quote/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { quote, expectedReportDataPayload, allowedMrEnclaves, allowedMrSigners, minIsvSvn, hardwareAttestationPublicKeyHex } = body;
+      if (!quote) {
+        return jsonResponse(400, { error: 'Missing quote.' });
+      }
+      try {
+        const result = TEEAttestationEngine.verifyAttestationQuote(quote, {
+          expectedReportDataPayload,
+          allowedMrEnclaves,
+          allowedMrSigners,
+          minIsvSvn,
+          hardwareAttestationPublicKeyHex
+        });
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/tee/vc/issue' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { claims, enclaveKeyPair, quote, issuerKeyPair, credentialId, credentialType } = body;
+      if (!claims || !enclaveKeyPair || !quote || !issuerKeyPair) {
+        return jsonResponse(400, { error: 'Missing claims, enclaveKeyPair, quote, or issuerKeyPair.' });
+      }
+      try {
+        const credential = TEEAttestationEngine.issueTEEBoundCredential(
+          claims, enclaveKeyPair, quote, issuerKeyPair, credentialId, credentialType
+        );
+        return jsonResponse(200, { success: true, credential });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/tee/vc/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { credential, issuerPublicKeyHex, allowedMrEnclaves, allowedMrSigners, minIsvSvn } = body;
+      if (!credential) {
+        return jsonResponse(400, { error: 'Missing credential.' });
+      }
+      try {
+        const result = TEEAttestationEngine.verifyTEEBoundCredential(credential, {
+          issuerPublicKeyHex,
+          allowedMrEnclaves,
+          allowedMrSigners,
+          minIsvSvn
+        });
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ========================================================
+    // v15.0.0 Inter-Blockchain Communication (IBC) Relayer Routes
+    // ========================================================
+
+    if (pathname === '/api/v1/ibc/packet/commit' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { packet } = body;
+      if (!packet) {
+        return jsonResponse(400, { error: 'Missing packet.' });
+      }
+      try {
+        const commitment = IBCRelayerEngine.computePacketCommitment(packet);
+        return jsonResponse(200, { success: true, commitment });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/ibc/proof/generate' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { key, valueHex, depth = 4 } = body;
+      if (!key || !valueHex) {
+        return jsonResponse(400, { error: 'Missing key or valueHex.' });
+      }
+      try {
+        const proof = IBCRelayerEngine.generateMerkleProof(key, valueHex, depth);
+        return jsonResponse(200, { success: true, proof });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/ibc/proof/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { proof, expectedRootAppHash } = body;
+      if (!proof || !expectedRootAppHash) {
+        return jsonResponse(400, { error: 'Missing proof or expectedRootAppHash.' });
+      }
+      try {
+        const valid = IBCRelayerEngine.verifyMerkleProof(proof, expectedRootAppHash);
+        return jsonResponse(200, { success: true, valid });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/ibc/client/create' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { chainId, clientType, initialHeight, initialAppHash, trustingPeriodSeconds, unbondingPeriodSeconds } = body;
+      if (!chainId || !clientType || !initialHeight || !initialAppHash) {
+        return jsonResponse(400, { error: 'Missing chainId, clientType, initialHeight, or initialAppHash.' });
+      }
+      try {
+        const lightClient = IBCRelayerEngine.createLightClient(
+          chainId, clientType, initialHeight, initialAppHash, trustingPeriodSeconds, unbondingPeriodSeconds
+        );
+        return jsonResponse(200, { success: true, lightClient });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/ibc/client/update' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { client, newHeight, newAppHash, validatorSignatures } = body;
+      if (!client || !newHeight || !newAppHash) {
+        return jsonResponse(400, { error: 'Missing client, newHeight, or newAppHash.' });
+      }
+      try {
+        const updatedClient = IBCRelayerEngine.updateLightClient(client, newHeight, newAppHash, validatorSignatures);
+        return jsonResponse(200, { success: true, updatedClient });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/ibc/packet/relay' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { packet, proof, sourceClientOnDest, proofHeight, relayerKeyPair } = body;
+      if (!packet || !proof || !sourceClientOnDest || !proofHeight) {
+        return jsonResponse(400, { error: 'Missing packet, proof, sourceClientOnDest, or proofHeight.' });
+      }
+      try {
+        const relayReceipt = IBCRelayerEngine.relayPacket(packet, proof, sourceClientOnDest, proofHeight, relayerKeyPair);
+        return jsonResponse(200, { success: true, relayReceipt });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
     // Default 404
     jsonResponse(404, { error: 'Route not found' });
   } catch (err) {
@@ -2997,11 +3332,12 @@ const server = http.createServer(async (req, res) => {
 
 if (require.main === module) {
   server.listen(PORT, () => {
-    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v14.0.0 running on http://localhost:${PORT}`);
+    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v15.0.0 running on http://localhost:${PORT}`);
   });
 }
 
 module.exports = { server, generateKeyPair, generatePQCKeyPair, canonicalizeJson, sha256Hex, MerkleTree };
+
 
 
 

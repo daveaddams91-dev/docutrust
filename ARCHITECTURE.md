@@ -162,6 +162,32 @@ $$L_i = \text{SHA-256}(\text{"AI\_LAYER:"} \parallel \text{JCS}(\{\text{index}_i
 2. Compact signature and public key footprint with sub-millisecond on-chain / off-chain verification.
 3. Native W3C `did:falcon` DID method resolution.
 
+### 2.21 Post-Quantum Double Ratchet (ML-KEM-768 + X25519)
+1. Asynchronous continuous forward secrecy and post-compromise security:
+$$\text{DH}_{\text{hybrid}} = \text{X25519}(\text{Priv}_{\text{eph}}, \text{Pub}_{\text{their}}) \parallel \text{ML-KEM-Decaps}(\text{Priv}_{\text{kem}}, \text{Ciphertext}_{\text{kem}})$$
+2. Symmetric root chain, sending chain, and receiving chain key derivation:
+$$(\text{RootKey}_{i+1}, \text{ChainKey}_{i+1}) = \text{HKDF-SHA256}(\text{RootKey}_i, \text{DH}_{\text{hybrid}}, \text{"DT-PQR-RATCHET"})$$
+3. Per-message key derivation: $\text{MessageKey} = \text{HMAC-SHA256}(\text{ChainKey}, \text{"DT-MSG-KEY"})$ with AES-256-GCM AEAD encryption.
+
+### 2.22 Polynomial Commitments & KZG Evaluation on BN254
+1. KZG Structured Reference String (SRS) in pairing groups $\mathbb{G}_1, \mathbb{G}_2$:
+$$\text{SRS} = \left(\{ [s^i]_1 \}_{i=0}^{d}, \{ [s^j]_2 \}_{j=0}^{1} \right)$$
+2. Commitment to polynomial $P(x) = \sum_{i=0}^d c_i x^i$: $C = [P(s)]_1 = \sum_{i=0}^d c_i [s^i]_1$.
+3. Evaluation proof at point $z$: Quotient $Q(x) = \frac{P(x) - P(z)}{x - z}$, Proof $\pi = [Q(s)]_1$.
+4. Bilinear pairing verification check: $e(C - [P(z)]_1, [1]_2) \stackrel{?}{=} e(\pi, [s - z]_2)$.
+
+### 2.23 Hardware TEE Remote Attestation & Confidential Computing
+1. Cryptographic validation of Intel SGX DCAP, AMD SEV-SNP, and AWS Nitro Enclave hardware quotes.
+2. Verification of code measurement digests ($\text{MRENCLAVE}$), author authorities ($\text{MRSIGNER}$), and SVN levels.
+3. Issuance of hardware-bound Verifiable Credentials:
+$$\text{VC}_{\text{TEE}} = \text{Sign}_{\text{Issuer}}\left(\text{JCS}(\{\text{credentialSubject}, \text{enclaveKey}, \text{MRENCLAVE}, \text{ReportData}\})\right)$$
+
+### 2.24 Cosmos IBC ICS-04 / ICS-23 Cross-Chain Interoperability & Relayer
+1. ICS-04 Packet commitment hash over channel metadata, sequence, and payload:
+$$\text{Commitment} = \text{SHA-256}(\text{timeoutTimestamp} \parallel \text{timeoutHeight} \parallel \text{SHA-256}(\text{data}))$$
+2. ICS-23 Merkle multi-store state proof verification against Tendermint consensus `AppHash`.
+3. Trust period verification and automated cross-chain packet relay execution.
+
 ---
 
 ## 3. Directory Layout

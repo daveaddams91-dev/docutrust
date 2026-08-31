@@ -168,7 +168,12 @@ const {
   VRFOracleEngine,
   ZKDSLEngine,
   AIBOMRegistryEngine,
-  PQCFalconEngine
+  PQCFalconEngine,
+  // v15.0.0 Engines
+  PQRatchetEngine,
+  PolynomialCommitmentEngine,
+  TEEAttestationEngine,
+  IBCRelayerEngine
 } = require('../dist/index.js');
 
 // 1. Cryptography Tests
@@ -3468,4 +3473,268 @@ test('97. SolidityEngine: Generate v14 Universal Verifier contract containing VR
   assert.ok(contractCode.includes('verifyZKDSLProof'));
   assert.ok(contractCode.includes('verifyAIBOMWeights'));
 });
+
+// 98. PQRatchetEngine: Post-Quantum Double Ratchet Protocol
+test('98. PQRatchetEngine: Session initialization, ratchet turns, skipped message keys, and forward secrecy', () => {
+  // 1. Generate Bob's ratchet keypair
+  const bobKeys = PQRatchetEngine.generateRatchetKeyPair();
+  assert.ok(bobKeys.combinedPublicKey.startsWith('z'));
+  assert.equal(bobKeys.classicalPublicKeyHex.length, 130);
+
+  // 2. Initialize Alice (initiator) and Bob (responder)
+  const { session: aliceSession, initialMessageHeader } = PQRatchetEngine.initInitiatorSession(bobKeys.combinedPublicKey);
+  let bobSession = PQRatchetEngine.initResponderSession(bobKeys);
+
+  // 3. Alice encrypts initial message (msg 0)
+  const payload0 = { text: 'Hello Bob! Post-Quantum Double Ratchet secure channel established.', index: 0 };
+  const { message: encMsg0, updatedSession: aliceAfter0 } = PQRatchetEngine.encrypt(aliceSession, payload0);
+  assert.equal(encMsg0.protocol, 'DocuTrust-PQRatchet-v15');
+  assert.equal(encMsg0.header.sequenceNumber, 0);
+
+  // 4. Bob receives and decrypts initial message with Alice's header
+  const encMsg0WithInitHeader = {
+    ...encMsg0,
+    header: {
+      ...encMsg0.header,
+      kemCiphertext: initialMessageHeader.kemCiphertext
+    }
+  };
+  const { plaintext: dec0, parsed: parsed0, updatedSession: bobAfter0 } = PQRatchetEngine.decrypt(bobSession, encMsg0WithInitHeader);
+  assert.deepEqual(parsed0, payload0);
+  assert.equal(dec0.includes('Hello Bob'), true);
+
+  // 5. Alice encrypts second message (msg 1)
+  const payload1 = { text: 'Second message from Alice in same chain.', index: 1 };
+  const { message: encMsg1, updatedSession: aliceAfter1 } = PQRatchetEngine.encrypt(aliceAfter0, payload1);
+
+  // 6. Alice encrypts third message (msg 2)
+  const payload2 = { text: 'Third message from Alice before Bob receives msg 1.', index: 2 };
+  const { message: encMsg2, updatedSession: aliceAfter2 } = PQRatchetEngine.encrypt(aliceAfter1, payload2);
+
+  // 7. Bob receives msg 2 out-of-order (skipping msg 1)
+  const { parsed: parsed2, updatedSession: bobAfter2 } = PQRatchetEngine.decrypt(bobAfter0, encMsg2);
+  assert.deepEqual(parsed2, payload2);
+  assert.equal(Object.keys(bobAfter2.skippedMessageKeys).length, 1);
+
+  // 8. Bob now receives delayed msg 1 and decrypts from skipped keys dictionary
+  const { parsed: parsed1, updatedSession: bobAfter1 } = PQRatchetEngine.decrypt(bobAfter2, encMsg1);
+  assert.deepEqual(parsed1, payload1);
+  assert.equal(Object.keys(bobAfter1.skippedMessageKeys).length, 0);
+
+  // 9. Bob replies (triggers ratchet turn on Bob's send side)
+  const bobReply = { text: 'Hello Alice, response received securely.', replyTo: 2 };
+  const { message: bobMsg, updatedSession: bobAfterReply } = PQRatchetEngine.encrypt(bobAfter1, bobReply);
+
+  // 10. Alice receives Bob's response and decrypts
+  const { parsed: aliceDecReply, updatedSession: aliceFinal } = PQRatchetEngine.decrypt(aliceAfter2, bobMsg);
+  assert.deepEqual(aliceDecReply, bobReply);
+  assert.ok(aliceFinal.lastActiveAt);
+});
+
+// 99. PolynomialCommitmentEngine: Succinct KZG/IPA Polynomial Commitments & Multi-Proof Batching
+test('99. PolynomialCommitmentEngine: Setup, commit, open, verify, multi-point evaluation and batch opening', () => {
+  // 1. Generate CRS / SRS of degree 16
+  const srs = PolynomialCommitmentEngine.generateSRS(16);
+  assert.equal(srs.g1Powers.length, 17);
+  assert.equal(srs.degree, 16);
+
+  // 2. Commit to polynomial P(x) = 3x^3 + 7x^2 - 5x + 42
+  // Coefficients in ascending order: [42, -5, 7, 3] -> modulo BN254 prime
+  const coeffs = [42n, -5n, 7n, 3n];
+  const commitment = PolynomialCommitmentEngine.commit(coeffs, srs);
+  assert.ok(commitment.commitmentHex);
+  assert.equal(commitment.degree, 3);
+  assert.ok(commitment.commitmentMultibase.startsWith('z'));
+
+  // 3. Evaluate at point z = 5: P(5) = 3*(125) + 7*(25) - 5*(5) + 42 = 375 + 175 - 25 + 42 = 567
+  const z = 5n;
+  const expectedY = PolynomialCommitmentEngine.evaluatePolynomial(coeffs, z);
+  assert.equal(expectedY, 567n);
+
+  // 4. Create opening proof at point z
+  const openingProof = PolynomialCommitmentEngine.createEvaluationProof(coeffs, z, srs);
+  assert.ok(openingProof.pointZ);
+  assert.ok(openingProof.valueY);
+  assert.ok(openingProof.quotientCommitmentHex);
+
+  // 5. Verify opening proof
+  const audit = PolynomialCommitmentEngine.verifyEvaluationProof(commitment, openingProof, srs);
+  assert.equal(audit.valid, true);
+  assert.equal(audit.errors.length, 0);
+
+  // Tampered opening proof fails
+  const tamperedProof = { ...openingProof, proofHash: 'bad'.repeat(21) + 'b' };
+  const tamperedAudit = PolynomialCommitmentEngine.verifyEvaluationProof(commitment, tamperedProof, srs);
+  assert.equal(tamperedAudit.valid, false);
+
+  // 6. Multi-point evaluation proof at points [2, 3, 5]
+  const multiPoints = [2n, 3n, 5n];
+  const multiProof = PolynomialCommitmentEngine.createMultiPointProof(coeffs, multiPoints, srs);
+  assert.equal(multiProof.points.length, 3);
+  assert.equal(multiProof.values.length, 3);
+  assert.ok(multiProof.quotientCommitmentHex);
+
+  // 7. Batch proof aggregation across multiple polynomials
+  const coeffs2 = [10n, 20n, 30n];
+  const comm2 = PolynomialCommitmentEngine.commit(coeffs2, srs);
+  const proof2 = PolynomialCommitmentEngine.createEvaluationProof(coeffs2, 5n, srs);
+
+  const batchProof = PolynomialCommitmentEngine.aggregateProofs(
+    [commitment, comm2],
+    [openingProof, proof2]
+  );
+  assert.equal(batchProof.proofsCount, 2);
+  assert.ok(batchProof.aggregatedCommitment);
+  assert.ok(batchProof.evmCalldata.startsWith('0x'));
+});
+
+// 100. TEEAttestationEngine: Intel SGX & AMD SEV-SNP Remote Attestation & VC Issuance
+test('100. TEEAttestationEngine: Quote creation, measurement verification, and TEE-bound VC issuance', () => {
+  const issuerKp = generateKeyPair();
+  const enclaveKp = generateKeyPair();
+
+  // 1. Create mock SGX DCAP quote
+  const enclaveMeasurement = sha256Hex('DOCUTRUST_SECURE_ENCLAVE_V15_BINARY');
+  const signerMeasurement = sha256Hex('DOCUTRUST_PLATFORM_AUTHORITY_KEY');
+  const reportData = {
+    signerPublicKeyHex: issuerKp.publicKeyHex,
+    sessionNonce: '0x123456789abcdef0',
+    appId: 'docutrust-confidential-notary'
+  };
+
+  const quote = TEEAttestationEngine.generateAttestationQuote(
+    'Intel-SGX-DCAP',
+    {
+      mrEnclave: enclaveMeasurement,
+      mrSigner: signerMeasurement,
+      isvProdId: 1,
+      isvSvn: 2
+    },
+    reportData
+  );
+
+  assert.equal(quote.header.teePlatform, 'Intel-SGX-DCAP');
+  assert.equal(quote.body.measurements.mrEnclave, enclaveMeasurement);
+  assert.ok(quote.quoteHash);
+
+  // 2. Verify attestation quote with expected measurements
+  const quoteAudit = TEEAttestationEngine.verifyAttestationQuote(quote, {
+    expectedReportDataPayload: reportData,
+    allowedMrEnclaves: [enclaveMeasurement],
+    allowedMrSigners: [signerMeasurement],
+    minIsvSvn: 1
+  });
+  assert.equal(quoteAudit.valid, true);
+  assert.equal(quoteAudit.measurements.mrEnclave, enclaveMeasurement);
+  assert.equal(quoteAudit.errors.length, 0);
+
+  // 3. Issue TEE-bound Verifiable Credential
+  const subjectPayload = {
+    notaryCertificateId: 'NOTARY-TEE-001',
+    executionEnvironment: 'Intel Xeon Scalable SGX Enclave',
+    attestationLevel: 'Hardware-Enforced-Level-4'
+  };
+
+  const teeVC = TEEAttestationEngine.issueTEEBoundCredential(
+    subjectPayload,
+    enclaveKp,
+    quote,
+    issuerKp
+  );
+
+  assert.equal(teeVC.type.includes('TEEHardwareBoundCredential'), true);
+  assert.equal(teeVC.teeAttestation.type, 'TEEAttestationProof2026');
+  assert.equal(teeVC.teeAttestation.quote.body.measurements.mrEnclave, enclaveMeasurement);
+
+  // 4. Verify TEE-bound Verifiable Credential
+  const vcAudit = TEEAttestationEngine.verifyTEEBoundCredential(teeVC, issuerKp.publicKeyHex, {
+    allowedMrEnclaves: [enclaveMeasurement]
+  });
+  assert.equal(vcAudit.valid, true);
+  assert.equal(vcAudit.quoteValid, true);
+  assert.equal(vcAudit.signatureValid, true);
+  assert.equal(vcAudit.errors.length, 0);
+});
+
+// 101. IBCRelayerEngine: ICS-04 Packet Commitments & Light-Client Relaying
+test('101. IBCRelayerEngine: ICS-04 packet commitment, light-client updates, and cross-chain packet relaying', () => {
+  // 1. Initialize Cosmos -> Ethereum light client
+  const clientState = IBCRelayerEngine.createLightClient(
+    'cosmoshub-4',
+    'TendermintLightClient',
+    { revisionNumber: 1, revisionHeight: 1000 },
+    sha256Hex('COSMOS_APP_HASH_BLOCK_1000')
+  );
+  assert.equal(clientState.chainId, 'cosmoshub-4');
+  assert.equal(clientState.latestHeight.revisionHeight, 1000);
+
+  // 2. Create cross-chain packet
+  const packetData = {
+    credentialId: 'urn:uuid:vc-crosschain-999',
+    issuerDid: 'did:key:z6MkuIssuerCosmos',
+    recipientDid: 'did:ethr:0x1111111111111111111111111111111111111111',
+    trustScore: 98.5
+  };
+
+  const packet = {
+    sequence: 1,
+    sourcePort: 'transfer',
+    sourceChannel: 'channel-0',
+    destinationPort: 'docutrust',
+    destinationChannel: 'channel-207',
+    data: packetData,
+    timeoutHeight: { revisionNumber: 1, revisionHeight: 2000 },
+    timeoutTimestamp: Math.floor(Date.now() / 1000) + 3600
+  };
+
+  const commitment = IBCRelayerEngine.computePacketCommitment(packet);
+  assert.equal(commitment.packet.sequence, 1);
+  assert.ok(commitment.commitmentBytesHex);
+  assert.ok(commitment.commitmentPath.includes('channel-0'));
+
+  // 3. Generate synthetic Merkle multi-store state proof for packet
+  const merkleProof = IBCRelayerEngine.generateMerkleProof(
+    commitment.commitmentPath,
+    commitment.commitmentBytesHex,
+    4
+  );
+  assert.equal(merkleProof.key, commitment.commitmentPath);
+  assert.ok(merkleProof.rootAppHash);
+
+  // 4. Advance light client state with new AppHash
+  const updatedClientState = IBCRelayerEngine.updateLightClient(
+    clientState,
+    { revisionNumber: 1, revisionHeight: 1005 },
+    merkleProof.rootAppHash
+  );
+  assert.equal(updatedClientState.latestHeight.revisionHeight, 1005);
+
+  // 5. Relay IBC packet against destination light client
+  const receipt = IBCRelayerEngine.relayPacket(
+    packet,
+    merkleProof,
+    updatedClientState,
+    { revisionNumber: 1, revisionHeight: 1005 }
+  );
+  assert.equal(receipt.status, 'RELAYED');
+  assert.equal(receipt.packetSequence, 1);
+  assert.ok(receipt.acknowledgementHex);
+
+  // 6. Verify Merkle proof directly
+  const isProofValid = IBCRelayerEngine.verifyMerkleProof(merkleProof, merkleProof.rootAppHash);
+  assert.equal(isProofValid, true);
+});
+
+// 102. SolidityEngine: v15 Universal Verifier contract generation
+test('102. SolidityEngine: Generate v15 Universal Verifier contract containing TEE, polynomial and IBC methods', () => {
+  const contractCode = SolidityEngine.generateUniversalVerifierContract({
+    contractName: 'DocuTrustUniversalVerifierV15'
+  });
+
+  assert.ok(contractCode.includes('contract DocuTrustUniversalVerifierV15'));
+  assert.ok(contractCode.includes('verifyTEEAttestationQuote'));
+  assert.ok(contractCode.includes('verifyPolynomialBatch'));
+  assert.ok(contractCode.includes('verifyIBCPacketCommitment'));
+});
+
 

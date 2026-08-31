@@ -378,21 +378,21 @@ export class DIDResolver {
    * Deterministically resolve a did:bbs (BBS+ BLS12-381) without network access.
    */
   public static resolveDidBbs(did: string): DIDDocument {
-    const cleanDid = did.split('#')[0];
-    const multibase = cleanDid.replace('did:bbs:', '');
-    const keyId = `${did}#bbs-1`;
+    const baseDid = did.split('#')[0].split('?')[0];
+    const multibase = baseDid.replace('did:bbs:', '');
+    const keyId = `${baseDid}#bbs-1`;
 
     const doc: DIDDocument = {
       '@context': [
         'https://www.w3.org/ns/did/v1',
         'https://w3id.org/security/suites/bbs-2023/v1'
       ],
-      id: did,
+      id: baseDid,
       verificationMethod: [
         {
           id: keyId,
           type: 'BBSPlusVerificationKey2026',
-          controller: did,
+          controller: baseDid,
           publicKeyMultibase: multibase
         }
       ],
@@ -408,21 +408,22 @@ export class DIDResolver {
    */
   public static resolveDidPkh(did: string): DIDDocument {
     // Format: did:pkh:eip155:1:0xab12...
-    const parts = did.split(':');
+    const baseDid = did.split('#')[0].split('?')[0];
+    const parts = baseDid.split(':');
     const ethAddress = parts[parts.length - 1];
-    const keyId = `${did}#key-1`;
+    const keyId = `${baseDid}#key-1`;
 
     return {
       '@context': [
         'https://www.w3.org/ns/did/v1',
         'https://w3id.org/security/suites/secp256k1recovery-2020/v1'
       ],
-      id: did,
+      id: baseDid,
       verificationMethod: [
         {
           id: keyId,
           type: 'EcdsaSecp256k1RecoveryMethod2020',
-          controller: did,
+          controller: baseDid,
           blockchainAccountId: parts.slice(2).join(':'),
           ethereumAddress: ethAddress
         }
@@ -437,20 +438,21 @@ export class DIDResolver {
    */
   public static resolveDidEthr(did: string): DIDDocument {
     // Format: did:ethr:0xab12...
-    const ethAddress = did.replace('did:ethr:', '');
-    const keyId = `${did}#controller`;
+    const baseDid = did.split('#')[0].split('?')[0];
+    const ethAddress = baseDid.replace('did:ethr:', '');
+    const keyId = `${baseDid}#controller`;
 
     return {
       '@context': [
         'https://www.w3.org/ns/did/v1',
         'https://w3id.org/security/suites/secp256k1recovery-2020/v1'
       ],
-      id: did,
+      id: baseDid,
       verificationMethod: [
         {
           id: keyId,
           type: 'EcdsaSecp256k1RecoveryMethod2020',
-          controller: did,
+          controller: baseDid,
           ethereumAddress: ethAddress
         }
       ],
@@ -463,22 +465,24 @@ export class DIDResolver {
    * Resolve a did:web method.
    */
   public static async resolveDidWeb(did: string): Promise<DIDDocument> {
-    const parts = did.replace('did:web:', '').split(':');
+    const baseDid = did.split('#')[0].split('?')[0];
+    const parts = baseDid.replace('did:web:', '').split(':');
     const domain = parts[0];
     const path = parts.length > 1 ? parts.slice(1).join('/') : '.well-known';
+    const keyId = `${baseDid}#owner`;
 
     return {
       '@context': ['https://www.w3.org/ns/did/v1'],
-      id: did,
+      id: baseDid,
       verificationMethod: [
         {
-          id: `${did}#owner`,
+          id: keyId,
           type: 'Ed25519VerificationKey2020',
-          controller: did
+          controller: baseDid
         }
       ],
-      authentication: [`${did}#owner`],
-      assertionMethod: [`${did}#owner`]
+      authentication: [keyId],
+      assertionMethod: [keyId]
     };
   }
 
@@ -486,7 +490,8 @@ export class DIDResolver {
    * Deterministically resolves a did:jwk (RFC 7517 JSON Web Key) without network access.
    */
   public static resolveDidJwk(did: string): DIDDocument {
-    const rawEncoded = did.replace('did:jwk:', '');
+    const baseDid = did.split('#')[0].split('?')[0];
+    const rawEncoded = baseDid.replace('did:jwk:', '');
     let jwk: Record<string, any>;
     try {
       const decodedJson = Buffer.from(rawEncoded, 'base64url').toString('utf8');
@@ -515,19 +520,19 @@ export class DIDResolver {
       } catch (_) {}
     }
 
-    const keyId = `${did}#0`;
+    const keyId = `${baseDid}#0`;
 
     return {
       '@context': [
         'https://www.w3.org/ns/did/v1',
         'https://w3id.org/security/suites/jws-2020/v1'
       ],
-      id: did,
+      id: baseDid,
       verificationMethod: [
         {
           id: keyId,
           type: vmType,
-          controller: did,
+          controller: baseDid,
           publicKeyJwk: jwk,
           ...(publicKeyHex ? { publicKeyHex } : {})
         }
@@ -544,15 +549,16 @@ export class DIDResolver {
    * Supports Method 0 (Inception Key) and Method 2 (Multiple Keys & Endpoints).
    */
   public static resolveDidPeer(did: string): DIDDocument {
-    if (!did || !did.startsWith('did:peer:')) {
+    const baseDid = did.split('#')[0].split('?')[0];
+    if (!baseDid || !baseDid.startsWith('did:peer:')) {
       throw new Error(`Invalid did:peer format: ${did}`);
     }
 
-    const methodNum = did.charAt(9);
+    const methodNum = baseDid.charAt(9);
 
     // Method 0: Inception key
     if (methodNum === '0') {
-      const multibase = did.substring(10); // e.g. z6Mku...
+      const multibase = baseDid.substring(10); // e.g. z6Mku...
       if (!multibase.startsWith('z')) {
         throw new Error(`Invalid did:peer:0 format: expected multibase 'z' prefix.`);
       }
@@ -564,19 +570,19 @@ export class DIDResolver {
 
       const rawPubKey = decoded.subarray(2);
       const publicKeyHex = rawPubKey.toString('hex');
-      const keyId = `${did}#${multibase}`;
+      const keyId = `${baseDid}#${multibase}`;
 
       return {
         '@context': [
           'https://www.w3.org/ns/did/v1',
           'https://w3id.org/security/suites/ed25519-2020/v1'
         ],
-        id: did,
+        id: baseDid,
         verificationMethod: [
           {
             id: keyId,
             type: 'Ed25519VerificationKey2020',
-            controller: did,
+            controller: baseDid,
             publicKeyMultibase: multibase,
             publicKeyHex
           }
@@ -588,7 +594,7 @@ export class DIDResolver {
 
     // Method 2: Multiple Keys & Services (.E, .V, .S)
     if (methodNum === '2') {
-      const parts = did.substring(11).split('.');
+      const parts = baseDid.substring(11).split('.');
       const verificationMethods: VerificationMethod[] = [];
       const authentications: string[] = [];
       const assertionMethods: string[] = [];
@@ -609,11 +615,11 @@ export class DIDResolver {
             const decoded = decodeBase58(val.substring(1));
             const raw = decoded.subarray(2);
             const pubHex = raw.toString('hex');
-            const keyId = `${did}#key-${++keyIndex}`;
+            const keyId = `${baseDid}#key-${++keyIndex}`;
             verificationMethods.push({
               id: keyId,
               type: 'Ed25519VerificationKey2020',
-              controller: did,
+              controller: baseDid,
               publicKeyMultibase: val,
               publicKeyHex: pubHex
             });
@@ -626,11 +632,11 @@ export class DIDResolver {
             const decoded = decodeBase58(val.substring(1));
             const raw = decoded.subarray(2);
             const pubHex = raw.toString('hex');
-            const keyId = `${did}#key-${++keyIndex}`;
+            const keyId = `${baseDid}#key-${++keyIndex}`;
             verificationMethods.push({
               id: keyId,
               type: 'X25519KeyAgreementKey2020',
-              controller: did,
+              controller: baseDid,
               publicKeyMultibase: val,
               publicKeyHex: pubHex
             });
@@ -642,7 +648,7 @@ export class DIDResolver {
             const serviceJson = Buffer.from(val, 'base64url').toString('utf8');
             const parsed = JSON.parse(serviceJson);
             services.push({
-              id: `${did}#service-${++serviceIndex}`,
+              id: `${baseDid}#service-${++serviceIndex}`,
               type: parsed.t || 'DIDCommMessaging',
               serviceEndpoint: parsed.s || parsed.serviceEndpoint || parsed
             });

@@ -1994,7 +1994,181 @@ export class DocuTrustClient {
   ): Promise<{ success: boolean; valid: boolean; mode?: string; digestHex?: string; errors: string[] }> {
     return this.request('/pqc/falcon/verify', 'POST', { message, signatureHex, publicKeyHex });
   }
+
+  // ========================================================
+  // v15.0.0 Post-Quantum Double Ratchet Client Methods
+  // ========================================================
+
+  public async generateRatchetKeyPair(): Promise<{ success: boolean; keyPair: any }> {
+    return this.request('/ratchet/keygen', 'POST', {});
+  }
+
+  public async initInitiatorRatchetSession(
+    bobCombinedPublicKey: string
+  ): Promise<{ success: boolean; session: any; initialMessageHeader: any }> {
+    return this.request('/ratchet/init/initiator', 'POST', { bobCombinedPublicKey });
+  }
+
+  public async initResponderRatchetSession(
+    bobKeyData: any
+  ): Promise<{ success: boolean; session: any }> {
+    return this.request('/ratchet/init/responder', 'POST', { bobKeyData });
+  }
+
+  public async encryptRatchet(
+    session: any,
+    payload: any
+  ): Promise<{ success: boolean; message: any; updatedSession: any }> {
+    return this.request('/ratchet/encrypt', 'POST', { session, payload });
+  }
+
+  public async decryptRatchet(
+    session: any,
+    message: any
+  ): Promise<{ success: boolean; plaintext: string; parsed: any; updatedSession: any }> {
+    return this.request('/ratchet/decrypt', 'POST', { session, message });
+  }
+
+  // ========================================================
+  // v15.0.0 Polynomial Commitments Client Methods
+  // ========================================================
+
+  public async generatePolySRS(
+    maxDegree: number = 16
+  ): Promise<{ success: boolean; srs: any }> {
+    return this.request('/zk/poly/srs', 'POST', { maxDegree });
+  }
+
+  public async commitPolynomial(
+    coefficients: number[] | string[],
+    srs: any
+  ): Promise<{ success: boolean; commitment: any }> {
+    return this.request('/zk/poly/commit', 'POST', { coefficients, srs });
+  }
+
+  public async evaluatePolynomial(
+    coefficients: number[] | string[],
+    pointZ: number | string
+  ): Promise<{ success: boolean; pointZ: string; valueY: string; formatted: string }> {
+    return this.request('/zk/poly/evaluate', 'POST', { coefficients, pointZ });
+  }
+
+  public async createPolyEvaluationProof(
+    coefficients: number[] | string[],
+    pointZ: number | string,
+    srs: any
+  ): Promise<{ success: boolean; proof: any }> {
+    return this.request('/zk/poly/prove', 'POST', { coefficients, pointZ, srs });
+  }
+
+  public async verifyPolyEvaluationProof(
+    commitment: any,
+    proof: any,
+    srs: any
+  ): Promise<{ success: boolean; valid: boolean; evaluationPointZ: string; evaluationValueY: string; errors: string[] }> {
+    return this.request('/zk/poly/verify', 'POST', { commitment, proof, srs });
+  }
+
+  public async createPolyMultiProof(
+    polynomials: Array<number[] | string[]>,
+    pointZ: number | string,
+    srs: any
+  ): Promise<{ success: boolean; multiProof: any }> {
+    return this.request('/zk/poly/multi-prove', 'POST', { polynomials, pointZ, srs });
+  }
+
+  public async aggregatePolyProofs(
+    commitments: any[],
+    proofs: any[],
+    srs: any
+  ): Promise<{ success: boolean; batchProof: any }> {
+    return this.request('/zk/poly/aggregate', 'POST', { commitments, proofs, srs });
+  }
+
+  // ========================================================
+  // v15.0.0 Hardware TEE Remote Attestation Client Methods
+  // ========================================================
+
+  public async generateTEEAttestationQuote(
+    platform: string,
+    measurements: any,
+    payload: any
+  ): Promise<{ success: boolean; quote: any }> {
+    return this.request('/tee/quote/generate', 'POST', { platform, measurements, payload });
+  }
+
+  public async verifyTEEAttestationQuote(
+    quote: any,
+    options: any = {}
+  ): Promise<{ success: boolean; valid: boolean; platform?: string; mrEnclave?: string; mrSigner?: string; errors: string[] }> {
+    return this.request('/tee/quote/verify', 'POST', { quote, options });
+  }
+
+  public async issueTEEBoundCredential(
+    claims: any,
+    enclaveKeyPair: any,
+    quote: any,
+    issuerPrivateKeyHex: string
+  ): Promise<{ success: boolean; credential: any }> {
+    return this.request('/tee/vc/issue', 'POST', { claims, enclaveKeyPair, quote, issuerPrivateKeyHex });
+  }
+
+  public async verifyTEEBoundCredential(
+    credential: any,
+    options: any = {}
+  ): Promise<{ success: boolean; valid: boolean; quoteValid?: boolean; signatureValid?: boolean; mrEnclave?: string; mrSigner?: string; errors: string[] }> {
+    return this.request('/tee/vc/verify', 'POST', { credential, options });
+  }
+
+  // ========================================================
+  // v15.0.0 IBC Relayer Client Methods
+  // ========================================================
+
+  public async computeIBCPacketCommitment(
+    packet: any
+  ): Promise<{ success: boolean; commitment: any }> {
+    return this.request('/ibc/packet/commit', 'POST', { packet });
+  }
+
+  public async generateIBCMerkleProof(
+    key: string,
+    valueHex: string,
+    options: any = {}
+  ): Promise<{ success: boolean; proof: any }> {
+    return this.request('/ibc/proof/generate', 'POST', { key, valueHex, ...options });
+  }
+
+  public async verifyIBCMerkleProof(
+    proof: any,
+    expectedRootAppHash?: string
+  ): Promise<{ success: boolean; valid: boolean; rootAppHash: string; key: string; errors: string[] }> {
+    return this.request('/ibc/proof/verify', 'POST', { proof, expectedRootAppHash });
+  }
+
+  public async createIBCLightClient(
+    chainId: string,
+    genesisHeader: any,
+    trustPeriodSeconds: number = 1209600
+  ): Promise<{ success: boolean; clientState: any }> {
+    return this.request('/ibc/client/create', 'POST', { chainId, genesisHeader, trustPeriodSeconds });
+  }
+
+  public async updateIBCLightClient(
+    clientState: any,
+    newHeader: any
+  ): Promise<{ success: boolean; clientState: any }> {
+    return this.request('/ibc/client/update', 'POST', { clientState, newHeader });
+  }
+
+  public async relayIBCPacket(
+    packet: any,
+    commitmentProof: any,
+    clientState: any
+  ): Promise<{ success: boolean; acknowledgement: any; receiptProof: any; updatedClientState: any }> {
+    return this.request('/ibc/packet/relay', 'POST', { packet, commitmentProof, clientState });
+  }
 }
+
 
 
 

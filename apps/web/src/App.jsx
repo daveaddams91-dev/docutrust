@@ -43,6 +43,10 @@ import AgentProvenanceStudio from './components/AgentProvenanceStudio.jsx';
 import VRFOracleStudio from './components/VRFOracleStudio.jsx';
 import ZKDSLStudio from './components/ZKDSLStudio.jsx';
 import AIBOMStudio from './components/AIBOMStudio.jsx';
+import PQRatchetStudio from './components/PQRatchetStudio.jsx';
+import PolynomialCommitmentStudio from './components/PolynomialCommitmentStudio.jsx';
+import TEEAttestationStudio from './components/TEEAttestationStudio.jsx';
+import IBCRelayerStudio from './components/IBCRelayerStudio.jsx';
 import Footer from './components/Footer.jsx';
 
 export default function App() {
@@ -60,6 +64,10 @@ export default function App() {
 
       <main className="flex-1">
         {activeTab === 'hero' && <HeroSection setActiveTab={setActiveTab} />}
+        {activeTab === 'pq-ratchet' && <PQRatchetStudio />}
+        {activeTab === 'poly-commit' && <PolynomialCommitmentStudio />}
+        {activeTab === 'tee-attest' && <TEEAttestationStudio />}
+        {activeTab === 'ibc-relayer' && <IBCRelayerStudio />}
         {activeTab === 'vrf-oracle' && <VRFOracleStudio />}
         {activeTab === 'zk-dsl' && <ZKDSLStudio />}
         {activeTab === 'ai-bom' && <AIBOMStudio />}

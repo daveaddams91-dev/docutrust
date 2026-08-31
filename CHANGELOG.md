@@ -1,5 +1,50 @@
 # 📝 DocuTrust Changelog & Release Notes
 
+## [v15.0.0] - Post-Quantum Double Ratchet, Polynomial Commitments & KZG, Hardware TEE Remote Attestation & Cosmos IBC Relayer - 2026-08-31
+
+### 🌟 Release Overview (v15.0.0 - Major Milestone Release)
+DocuTrust 15.0.0 represents a monumental leap in sovereign trust infrastructure, post-quantum communication security, verifiable computation, confidential hardware attestation, and cross-chain trust relaying:
+
+1. **Post-Quantum Double Ratchet Engine (`@docutrust/core/pq-ratchet`, `docutrust.pq_ratchet`)**:
+   - Implemented `PQRatchetEngine` providing continuous forward secrecy and post-compromise security over asynchronous communication channels.
+   - Hybrid cryptographic design combining NIST FIPS 203 ML-KEM-768 key encapsulation and classical X25519 Diffie-Hellman ephemeral ratchets.
+   - Symmetric root, sending, and receiving key chains derived via HMAC-SHA256 HKDF with automatic out-of-order message key tracking.
+   - AES-256-GCM authenticated message encryption with authenticated associated data (AAD) header binding.
+
+2. **Polynomial Commitments & KZG Evaluation Engine (`@docutrust/core/polynomial-commitment`, `docutrust.polynomial_commitment`)**:
+   - Implemented `PolynomialCommitmentEngine` supporting Kate-Zaverucha-Goldberg (KZG) polynomial commitments on the BN254 / Alt-bn128 pairing-friendly elliptic curve.
+   - Powers structured reference strings (SRS), Horner polynomial evaluation, and synthetic division quotient evaluation proofs: $\pi = \frac{P(x) - P(z)}{x - z}$.
+   - Full batching support with random linear combination multi-polynomial proofs and aggregate multi-point evaluation verifiers.
+   - Direct EVM bilinear pairing check verification calldata generation for `DocuTrustKZGVerifier.sol`.
+
+3. **Hardware TEE Remote Attestation & Confidential Computing Engine (`@docutrust/core/tee-attestation`, `docutrust.tee_attestation`)**:
+   - Implemented `TEEAttestationEngine` validating Intel SGX DCAP, AMD SEV-SNP, and AWS Nitro Enclave remote hardware quotes.
+   - Cryptographic verification of MRENCLAVE code measurement registers, MRSIGNER author signing authorities, ISV SVN security version numbers, and enclave quote signatures.
+   - Hardware-bound Verifiable Credential issuance (`TEEHardwareBoundCredential`) cryptographically binding computation digests and enclave public keys to immutable hardware roots of trust.
+
+4. **IBC Cross-Chain Interoperability & Relayer Engine (`@docutrust/core/ibc-relayer`, `docutrust.ibc_relayer`)**:
+   - Implemented `IBCRelayerEngine` implementing Cosmos Inter-Blockchain Communication (IBC) ICS-04 channel/packet commitments and ICS-23 Merkle multi-store state proofs.
+   - Computes deterministic packet commitment hashes over sequence numbers, timeout heights, port/channel identifiers, and payload digests.
+   - Built-in Tendermint / Cosmos SDK light client verification with trust period validation and automated cross-chain packet relay execution.
+
+5. **Interactive Web Studios (`PQRatchetStudio.jsx`, `PolynomialCommitmentStudio.jsx`, `TEEAttestationStudio.jsx`, `IBCRelayerStudio.jsx`)**:
+   - Built `PQRatchetStudio.jsx`: Live interactive Alice & Bob post-quantum ratchet simulator with forward ratchet step visualizers and ciphertext inspection.
+   - Built `PolynomialCommitmentStudio.jsx`: Polynomial coefficient committer, Horner evaluator, quotient proof generator, and EVM calldata builder.
+   - Built `TEEAttestationStudio.jsx`: Confidential computing enclave quote builder, MRENCLAVE measurement auditor, and TEE-bound VC issuance suite.
+   - Built `IBCRelayerStudio.jsx`: ICS-04 packet configurator, Merkle multi-store proof generator, and cross-chain relayer simulator.
+   - Updated `Navbar.jsx` and `App.jsx` with v15.0.0 tabs and branding.
+
+6. **Solidity On-Chain Verifier Contracts (`DocuTrustKZGVerifier.sol`, `docutrust.solidity`)**:
+   - Added `DocuTrustKZGVerifier.sol` supporting BN254 elliptic curve precompiles (`ecPairing`, `ecAdd`, `ecMul`) for on-chain polynomial evaluation verification.
+
+7. **Full-Stack CLI, REST API & SDK Parity**:
+   - CLI: Added 13 new commands (`pq-ratchet-keygen`, `pq-ratchet-init`, `pq-ratchet-encrypt`, `pq-ratchet-decrypt`, `poly-srs`, `poly-commit`, `poly-prove`, `poly-verify`, `tee-quote`, `tee-verify`, `ibc-packet-commit`, `ibc-merkle-proof`, `ibc-verify-proof`).
+   - REST API: Added 19 new endpoints across `/api/v1/ratchet/*`, `/api/v1/zk/poly/*`, `/api/v1/tee/*`, `/api/v1/ibc/*`.
+   - Python SDK (`docutrust`): Added `PQRatchetEngine`, `PolynomialCommitmentEngine`, `TEEAttestationEngine`, `IBCRelayerEngine`, client wrapper methods, and 89/89 passing unit tests.
+   - TypeScript SDK (`@docutrust/sdk`): Re-exported v15 engines and types, added 18 `DocuTrustClient` wrapper methods, with 100% test coverage.
+
+---
+
 ## [v14.0.0] - VRF & Multi-Oracle Consensus Mesh, ZK Multi-Attribute DSL Compiler, AI-BOM Weights Registry & Post-Quantum Falcon Signatures - 2026-08-31
 
 ### 🌟 Release Overview (v14.0.0 - Major Milestone Release)

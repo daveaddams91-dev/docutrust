@@ -73,8 +73,12 @@ from .vrf_oracle import VRFOracleEngine
 from .zk_dsl import ZKDSLEngine
 from .ai_bom import AIBOMRegistryEngine
 from .pqc_falcon import PQCFalconEngine
+from .pq_ratchet import PQRatchetEngine
+from .polynomial_commitments import PolynomialCommitmentEngine, BN254_SCALAR_FIELD
+from .tee_attestation import TEEAttestationEngine
+from .ibc_relayer import IBCRelayerEngine
 
-__version__ = "14.0.0"
+__version__ = "15.0.0"
 __all__ = [
     "DocuTrustClient",
     "canonicalize_json",
@@ -161,7 +165,12 @@ __all__ = [
     "VRFOracleEngine",
     "ZKDSLEngine",
     "AIBOMRegistryEngine",
-    "PQCFalconEngine"
+    "PQCFalconEngine",
+    "PQRatchetEngine",
+    "PolynomialCommitmentEngine",
+    "BN254_SCALAR_FIELD",
+    "TEEAttestationEngine",
+    "IBCRelayerEngine"
 ]
 
 
