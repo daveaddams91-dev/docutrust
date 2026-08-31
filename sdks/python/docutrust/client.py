@@ -1614,6 +1614,173 @@ class DocuTrustClient:
         from .agent_provenance import AgentProvenanceEngine
         return AgentProvenanceEngine.verify_attestation(attestation, agent_public_key_hex, expected_output)
 
+    # ========================================================
+    # v14.0.0 VRF & Multi-Oracle Consensus Mesh Methods
+    # ========================================================
+
+    def evaluate_vrf(
+        self,
+        input_seed: Union[str, bytes, Dict[str, Any]],
+        key_pair: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Evaluates a deterministic Verifiable Random Function (VRF) with proof."""
+        from .vrf_oracle import VRFOracleEngine
+        return VRFOracleEngine.evaluate(input_seed, key_pair)
+
+    def verify_vrf(
+        self,
+        evaluation: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Cryptographically verifies a VRF evaluation and deterministic output."""
+        from .vrf_oracle import VRFOracleEngine
+        return VRFOracleEngine.verify(evaluation)
+
+    def create_vrf_beacon(
+        self,
+        epoch: int,
+        round_num: int,
+        previous_beacon_hash: str,
+        oracle_key_pairs: List[Dict[str, Any]],
+        threshold_required: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Creates a multi-oracle threshold randomness beacon round."""
+        from .vrf_oracle import VRFOracleEngine
+        return VRFOracleEngine.create_beacon(epoch, round_num, previous_beacon_hash, oracle_key_pairs, threshold_required)
+
+    def verify_vrf_beacon(
+        self,
+        beacon: Dict[str, Any],
+        expected_beacon_hash: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Verifies a multi-oracle threshold randomness beacon."""
+        from .vrf_oracle import VRFOracleEngine
+        return VRFOracleEngine.verify_beacon(beacon, expected_beacon_hash)
+
+    def create_oracle_feed(
+        self,
+        feed_id: str,
+        round_num: int,
+        data_payload: Any,
+        oracle_key_pairs: List[Dict[str, Any]],
+        threshold_required: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Issues a signed multi-oracle threshold data feed."""
+        from .vrf_oracle import VRFOracleEngine
+        return VRFOracleEngine.issue_oracle_feed(feed_id, round_num, data_payload, oracle_key_pairs, threshold_required)
+
+    def verify_oracle_feed(
+        self,
+        feed: Dict[str, Any],
+        trusted_oracle_public_keys: Optional[Union[List[str], Dict[str, str]]] = None
+    ) -> Dict[str, Any]:
+        """Verifies a multi-oracle threshold consensus data feed."""
+        from .vrf_oracle import VRFOracleEngine
+        return VRFOracleEngine.verify_oracle_feed(feed, trusted_oracle_public_keys)
+
+    # ========================================================
+    # v14.0.0 ZK Multi-Attribute Predicate DSL Methods
+    # ========================================================
+
+    def compile_zk_dsl(
+        self,
+        expression: str
+    ) -> Dict[str, Any]:
+        """Compiles a declarative predicate expression into an AST & constraint system."""
+        from .zk_dsl import ZKDSLEngine
+        return ZKDSLEngine.compile_dsl(expression)
+
+    def prove_zk_dsl(
+        self,
+        expression: str,
+        attributes: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Synthesizes a non-interactive zero-knowledge proof for a predicate DSL."""
+        from .zk_dsl import ZKDSLEngine
+        return ZKDSLEngine.generate_proof(expression, attributes)
+
+    def verify_zk_dsl(
+        self,
+        proof: Dict[str, Any],
+        expression: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Verifies a Zero-Knowledge predicate DSL proof."""
+        from .zk_dsl import ZKDSLEngine
+        return ZKDSLEngine.verify_proof(proof, expression)
+
+    # ========================================================
+    # v14.0.0 AI-BOM Registry & Weights Merkle Methods
+    # ========================================================
+
+    def create_aibom_receipt(
+        self,
+        manifest: Dict[str, Any],
+        certifier_key_pair: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Computes a weights Merkle root and creates an AI-BOM cryptographic receipt."""
+        from .ai_bom import AIBOMRegistryEngine
+        return AIBOMRegistryEngine.create_aibom_receipt(manifest, certifier_key_pair)
+
+    def verify_aibom_receipt(
+        self,
+        receipt: Dict[str, Any],
+        certifier_public_key: str,
+        expected_weights_root: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Verifies an AI Bill of Materials (AI-BOM) receipt and weights root."""
+        from .ai_bom import AIBOMRegistryEngine
+        return AIBOMRegistryEngine.verify_aibom_receipt(receipt, certifier_public_key, expected_weights_root)
+
+    def generate_aibom_layer_proof(
+        self,
+        manifest: Dict[str, Any],
+        layer_index: int
+    ) -> Dict[str, Any]:
+        """Generates a Merkle inclusion proof for a single neural network layer."""
+        from .ai_bom import AIBOMRegistryEngine
+        return AIBOMRegistryEngine.generate_layer_proof(manifest, layer_index)
+
+    def verify_aibom_layer_proof(
+        self,
+        proof: Dict[str, Any],
+        expected_root: str
+    ) -> Dict[str, Any]:
+        """Verifies a single layer Merkle inclusion proof against a weights root."""
+        from .ai_bom import AIBOMRegistryEngine
+        return AIBOMRegistryEngine.verify_layer_proof(proof, expected_root)
+
+    # ========================================================
+    # v14.0.0 Post-Quantum Falcon & ML-DSA Signature Methods
+    # ========================================================
+
+    def generate_falcon_keypair(
+        self,
+        mode: str = 'Falcon-512'
+    ) -> Dict[str, Any]:
+        """Generates a Falcon-512 / Falcon-1024 dual-lattice key pair."""
+        from .pqc_falcon import PQCFalconEngine
+        return PQCFalconEngine.generate_key_pair(mode)
+
+    def sign_falcon(
+        self,
+        message: Any,
+        private_key_hex: str,
+        mode: str = 'Falcon-512'
+    ) -> Dict[str, Any]:
+        """Signs a payload using post-quantum Falcon lattice signature."""
+        from .pqc_falcon import PQCFalconEngine
+        return PQCFalconEngine.sign(message, private_key_hex, mode)
+
+    def verify_falcon(
+        self,
+        message: Any,
+        signature_hex: str,
+        public_key_hex: str
+    ) -> Dict[str, Any]:
+        """Verifies a post-quantum Falcon lattice signature."""
+        from .pqc_falcon import PQCFalconEngine
+        return PQCFalconEngine.verify(message, signature_hex, public_key_hex)
+
+
 
 
 

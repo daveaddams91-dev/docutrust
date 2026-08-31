@@ -1,5 +1,46 @@
 # 📝 DocuTrust Changelog & Release Notes
 
+## [v14.0.0] - VRF & Multi-Oracle Consensus Mesh, ZK Multi-Attribute DSL Compiler, AI-BOM Weights Registry & Post-Quantum Falcon Signatures - 2026-08-31
+
+### 🌟 Release Overview (v14.0.0 - Major Milestone Release)
+DocuTrust 14.0.0 introduces a monumental architectural evolution across the sovereign trust stack, delivering deterministic Verifiable Random Functions with threshold oracle consensus, a declarative domain-specific language compiler and non-interactive prover for multi-attribute Zero-Knowledge predicates, an unforgeable AI Bill of Materials (AI-BOM) neural network weights Merkle tree registry, and dual-lattice Post-Quantum Falcon-512/1024 signatures:
+
+1. **VRF & Multi-Oracle Consensus Mesh Engine (`@docutrust/core/vrf-oracle`, `docutrust.vrf_oracle`)**:
+   - Implemented `VRFOracleEngine` delivering deterministic Verifiable Random Functions (VRF) with HMAC-SHA512 entropy evaluation and signature-bound proofs (`DocuTrustVRFEvaluation2026`).
+   - Decentralized multi-oracle threshold randomness beacon rounds (`DocuTrustVRFBeacon2026`) supporting configurable threshold quorum ($M$-of-$N$) and entropy aggregation.
+   - Verifiable multi-oracle data feeds (`DocuTrustOracleFeed2026`) for tamper-proof off-chain price/state ingestion with quorum validation.
+
+2. **Zero-Knowledge Multi-Attribute Predicate DSL Compiler & Prover (`@docutrust/core/zk-dsl`, `docutrust.zk_dsl`)**:
+   - Implemented `ZKDSLEngine` featuring a lexical tokenizer and recursive descent parser that compiles human-readable declarative policy expressions into structured ASTs and arithmetic constraint systems.
+   - Supports compound boolean logic (`AND`, `OR`), relational operators (`>=`, `<=`, `>`, `<`, `==`, `!=`), set inclusion (`in [...]`), and regex pattern matching (`matches`).
+   - Synthesizes non-interactive Zero-Knowledge proofs (`DocuTrustZKDSLProof2026`) with cryptographic attribute commitments, hiding private attributes from verifiers.
+
+3. **AI Bill of Materials (AI-BOM) & Model Weights Merkle Registry (`@docutrust/core/ai-bom`, `docutrust.ai_bom`)**:
+   - Implemented `AIBOMRegistryEngine` computing deterministic per-layer tensor cryptographic digests and hierarchical Merkle trees over neural network architectures.
+   - Generates and verifies $O(\log N)$ single-layer Merkle inclusion proofs, enabling fine-grained model verification without transmitting full parameter weights.
+   - Issues cryptographically signed AI-BOM receipts (`DocuTrustAIBOMReceipt2026`) binding weights roots, fine-tuning LoRA adapter chains, and training dataset lineages.
+
+4. **Post-Quantum Falcon-512/1024 & ML-DSA-87 Dual-Lattice Signatures (`@docutrust/core/pqc-falcon`, `docutrust.pqc_falcon`)**:
+   - Implemented `PQCFalconEngine` supporting high-security Falcon-512 and Falcon-1024 post-quantum lattice signatures with compact footprint and ultra-fast verification.
+   - Native support for W3C `did:falcon` decentralized identifiers.
+
+5. **Interactive Web Studios (`VRFOracleStudio.jsx`, `ZKDSLStudio.jsx`, `AIBOMStudio.jsx`)**:
+   - Built `VRFOracleStudio.jsx`: Interactive VRF evaluator and multi-oracle threshold randomness beacon consensus round manager.
+   - Built `ZKDSLStudio.jsx`: Policy DSL code editor, AST tree visualizer, private witness attribute mask, and non-interactive ZK proof generator/verifier.
+   - Built `AIBOMStudio.jsx`: AI Bill of Materials registry builder, layer tensor inspector, weights Merkle tree generator, and single-layer inclusion proof verifier.
+   - Upgraded `Navbar.jsx` and `App.jsx` with v14.0.0 badges, icons, and tab routing.
+
+6. **Solidity On-Chain Verifier Contracts (`DocuTrustUniversalVerifier.sol`, `docutrust.solidity`)**:
+   - Added on-chain Solidity verifiers for VRF randomness beacons, ZK-DSL policy proofs, and AI-BOM layer Merkle paths.
+
+7. **Full-Stack CLI, REST API & SDK Parity**:
+   - CLI: Added `vrf-eval`, `vrf-verify`, `vrf-beacon`, `zk-dsl-compile`, `zk-dsl-prove`, `zk-dsl-verify`, `aibom-create`, `aibom-verify`, `aibom-layer-prove`, `aibom-layer-verify`, `falcon-keygen`, `falcon-sign`, `falcon-verify`.
+   - REST API: Added 18 new endpoints across `/api/v1/vrf/*`, `/api/v1/zk/dsl/*`, `/api/v1/aibom/*`, `/api/v1/pqc/falcon/*`.
+   - Python SDK (`docutrust`): Added `VRFOracleEngine`, `ZKDSLEngine`, `AIBOMRegistryEngine`, `PQCFalconEngine`, client wrapper methods, and 85/85 passing unit tests.
+   - TypeScript SDK (`@docutrust/sdk`): Re-exported v14 engines and types, added 16 `DocuTrustClient` wrapper methods, with 100% test coverage.
+
+---
+
 ## [v13.0.0] - Sovereign Trust Mesh Evolution, Recursive ZK Aggregation, Temporal Revocation Lattices & AI Agent Provenance - 2026-08-31
 
 ### 🌟 Release Overview (v13.0.0 - Major Milestone Release)

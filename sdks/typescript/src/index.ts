@@ -1824,7 +1824,178 @@ export class DocuTrustClient {
   ): Promise<{ success: boolean; valid: boolean; attestationId?: string; agentDid?: string; modelFingerprint?: string; stepCount?: number; guardrailPassed?: boolean; outputCommitment?: string; errors: string[] }> {
     return this.request('/agent/verify', 'POST', { attestation, agentPublicKey, expectedOutput });
   }
+
+  // ==========================================
+  // Version 14.0.0 Methods
+  // ==========================================
+
+  /**
+   * Evaluates a deterministic Verifiable Random Function (VRF) with proof (v14.0.0).
+   */
+  public async evaluateVRF(
+    inputSeed: string,
+    keyPair: { publicKeyHex: string; privateKeyHex?: string; secretKeyHex?: string }
+  ): Promise<{ success: boolean; evaluation: any }> {
+    return this.request('/vrf/evaluate', 'POST', { inputSeed, keyPair });
+  }
+
+  /**
+   * Cryptographically verifies a VRF evaluation and deterministic output (v14.0.0).
+   */
+  public async verifyVRF(
+    evaluation: any
+  ): Promise<{ success: boolean; valid: boolean; vrfOutputHex?: string; errors: string[] }> {
+    return this.request('/vrf/verify', 'POST', { evaluation });
+  }
+
+  /**
+   * Creates a multi-oracle threshold randomness beacon round (v14.0.0).
+   */
+  public async createVRFBeacon(options: {
+    epoch: number;
+    round: number;
+    previousBeaconHash: string;
+    oracleKeyPairs: Array<any>;
+    thresholdRequired?: number;
+  }): Promise<{ success: boolean; beacon: any }> {
+    return this.request('/vrf/beacon/create', 'POST', options);
+  }
+
+  /**
+   * Verifies a multi-oracle threshold randomness beacon (v14.0.0).
+   */
+  public async verifyVRFBeacon(
+    beacon: any,
+    expectedBeaconHash?: string
+  ): Promise<{ success: boolean; valid: boolean; epoch?: number; round?: number; quorumReached?: boolean; validEvaluationsCount?: number; errors: string[] }> {
+    return this.request('/vrf/beacon/verify', 'POST', { beacon, expectedBeaconHash });
+  }
+
+  /**
+   * Issues a signed multi-oracle threshold data feed (v14.0.0).
+   */
+  public async createOracleFeed(options: {
+    feedId: string;
+    round: number;
+    dataPayload: any;
+    oracleKeyPairs: Array<any>;
+    thresholdRequired?: number;
+  }): Promise<{ success: boolean; feed: any }> {
+    return this.request('/oracle/feed/create', 'POST', options);
+  }
+
+  /**
+   * Verifies a multi-oracle threshold consensus data feed (v14.0.0).
+   */
+  public async verifyOracleFeed(
+    feed: any,
+    trustedOraclePublicKeys?: Array<string> | Record<string, string>
+  ): Promise<{ success: boolean; valid: boolean; quorumReached?: boolean; validSignaturesCount?: number; errors: string[] }> {
+    return this.request('/oracle/feed/verify', 'POST', { feed, trustedOraclePublicKeys });
+  }
+
+  /**
+   * Compiles a declarative predicate expression into an AST & constraint system (v14.0.0).
+   */
+  public async compileZKDSL(
+    expression: string
+  ): Promise<{ success: boolean; ast: any; astJson?: string }> {
+    return this.request('/zk/dsl/compile', 'POST', { expression });
+  }
+
+  /**
+   * Synthesizes a non-interactive zero-knowledge proof for a predicate DSL (v14.0.0).
+   */
+  public async proveZKDSL(
+    expression: string,
+    attributes: Record<string, any>
+  ): Promise<{ success: boolean; proof: any }> {
+    return this.request('/zk/dsl/prove', 'POST', { expression, attributes });
+  }
+
+  /**
+   * Verifies a Zero-Knowledge predicate DSL proof (v14.0.0).
+   */
+  public async verifyZKDSL(
+    proof: any,
+    expression?: string
+  ): Promise<{ success: boolean; valid: boolean; expression?: string; errors: string[] }> {
+    return this.request('/zk/dsl/verify', 'POST', { proof, expression });
+  }
+
+  /**
+   * Computes a weights Merkle root and creates an AI-BOM cryptographic receipt (v14.0.0).
+   */
+  public async createAIBOMReceipt(
+    manifest: any,
+    certifierKeyPair: any
+  ): Promise<{ success: boolean; receipt: any }> {
+    return this.request('/aibom/manifest', 'POST', { manifest, certifierKeyPair });
+  }
+
+  /**
+   * Verifies an AI Bill of Materials (AI-BOM) receipt and weights root (v14.0.0).
+   */
+  public async verifyAIBOMReceipt(
+    receipt: any,
+    certifierPublicKey: string,
+    expectedWeightsRoot?: string
+  ): Promise<{ success: boolean; valid: boolean; weightsRootMatches?: boolean; errors: string[] }> {
+    return this.request('/aibom/verify', 'POST', { receipt, certifierPublicKey, expectedWeightsRoot });
+  }
+
+  /**
+   * Generates a Merkle inclusion proof for a single neural network layer (v14.0.0).
+   */
+  public async generateAIBOMLayerProof(
+    manifest: any,
+    layerIndex: number
+  ): Promise<{ success: boolean; layer: any; proof: string[]; root: string }> {
+    return this.request('/aibom/layer-proof', 'POST', { manifest, layerIndex });
+  }
+
+  /**
+   * Verifies a single layer Merkle inclusion proof against a weights root (v14.0.0).
+   */
+  public async verifyAIBOMLayerProof(
+    proof: { layer: any; proof: string[]; root?: string },
+    expectedRoot: string
+  ): Promise<{ success: boolean; valid: boolean; layerName?: string; layerIndex?: number; errors: string[] }> {
+    return this.request('/aibom/verify-layer-proof', 'POST', { proof, expectedRoot });
+  }
+
+  /**
+   * Generates a Falcon-512 / Falcon-1024 dual-lattice key pair (v14.0.0).
+   */
+  public async generateFalconKeyPair(
+    options: { mode?: 'Falcon-512' | 'Falcon-1024' } = {}
+  ): Promise<{ success: boolean; keyPair: any }> {
+    return this.request('/pqc/falcon/keygen', 'POST', options);
+  }
+
+  /**
+   * Signs a payload using post-quantum Falcon lattice signature (v14.0.0).
+   */
+  public async signFalcon(
+    message: any,
+    privateKeyHex: string,
+    options: { mode?: 'Falcon-512' | 'Falcon-1024' } = {}
+  ): Promise<{ success: boolean; signatureHex: string; mode: string; digestHex: string }> {
+    return this.request('/pqc/falcon/sign', 'POST', { message, privateKeyHex, mode: options.mode });
+  }
+
+  /**
+   * Verifies a post-quantum Falcon lattice signature (v14.0.0).
+   */
+  public async verifyFalcon(
+    message: any,
+    signatureHex: string,
+    publicKeyHex: string
+  ): Promise<{ success: boolean; valid: boolean; mode?: string; digestHex?: string; errors: string[] }> {
+    return this.request('/pqc/falcon/verify', 'POST', { message, signatureHex, publicKeyHex });
+  }
 }
+
 
 
 

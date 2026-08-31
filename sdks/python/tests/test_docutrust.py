@@ -1705,8 +1705,117 @@ class TestDocuTrustPython(unittest.TestCase):
         self.assertTrue(verify_res["valid"])
         self.assertEqual(len(verify_res["errors"]), 0)
 
+    def test_vrf_oracle_engine(self):
+        from docutrust.vrf_oracle import VRFOracleEngine
+
+        kp = VRFOracleEngine.generate_key_pair()
+        eval_res = VRFOracleEngine.evaluate("entropy-seed-test-2026", kp)
+        self.assertEqual(eval_res["type"], "DocuTrustVRFEvaluation2026")
+        self.assertEqual(len(eval_res["vrfOutputHex"]), 64)
+
+        verify_res = VRFOracleEngine.verify(eval_res)
+        self.assertTrue(verify_res["valid"])
+
+        # Test multi-oracle beacon
+        kp2 = VRFOracleEngine.generate_key_pair()
+        kp3 = VRFOracleEngine.generate_key_pair()
+        beacon = VRFOracleEngine.create_beacon(
+            epoch=14,
+            round_num=1,
+            previous_beacon_hash="0x4a8bee38835549b6adc2b8aca168dcc5a14a86dd80702d5158f6e310f2667892",
+            oracle_key_pairs=[kp, kp2, kp3],
+            threshold_required=2
+        )
+        self.assertEqual(beacon["epoch"], 14)
+        self.assertEqual(beacon["evaluationsCount"], 3)
+
+        beacon_verify = VRFOracleEngine.verify_beacon(beacon)
+        self.assertTrue(beacon_verify["valid"])
+        self.assertTrue(beacon_verify["quorumReached"])
+
+        # Test oracle feed
+        feed = VRFOracleEngine.issue_oracle_feed(
+            feed_id="BTC-USD-PRICE",
+            round_num=101,
+            data_payload={"price": 98500.5, "symbol": "BTC"},
+            oracle_key_pairs=[kp, kp2, kp3],
+            threshold_required=2
+        )
+        feed_verify = VRFOracleEngine.verify_oracle_feed(feed)
+        self.assertTrue(feed_verify["valid"])
+        self.assertTrue(feed_verify["quorumReached"])
+
+    def test_zk_dsl_engine(self):
+        from docutrust.zk_dsl import ZKDSLEngine
+
+        expression = 'age >= 21 AND (country == "US" OR tier in ["Gold", "Platinum"])'
+        ast_res = ZKDSLEngine.compile_dsl(expression)
+        self.assertIn('ast', ast_res)
+
+        attributes_valid = {"age": 25, "country": "US", "tier": "Gold"}
+        proof = ZKDSLEngine.generate_proof(expression, attributes_valid)
+        self.assertEqual(proof["type"], "DocuTrustZKDSLProof2026")
+
+        verify_res = ZKDSLEngine.verify_proof(proof)
+        self.assertTrue(verify_res["valid"])
+
+        # Attributes that do not satisfy policy should fail proof generation
+        attributes_invalid = {"age": 18, "country": "CA", "tier": "Bronze"}
+        with self.assertRaises(ValueError):
+            ZKDSLEngine.generate_proof(expression, attributes_invalid)
+
+    def test_ai_bom_engine(self):
+        from docutrust.ai_bom import AIBOMRegistryEngine
+        from docutrust.crypto import generate_key_pair
+
+        certifier_kp = generate_key_pair()
+        manifest = {
+            "modelId": "model-gpt-sovereign-2026",
+            "modelName": "GPT-Sovereign-4B",
+            "architecture": "transformer-decoder",
+            "parametersCount": 4000000000,
+            "quantization": "FP16",
+            "layers": [
+                {"layerIndex": 0, "layerName": "embed", "tensorShape": "[32000, 4096]", "dataType": "FP16", "tensorDigestHex": "a1b2c3d4"},
+                {"layerIndex": 1, "layerName": "layer.0.attn", "tensorShape": "[4096, 4096]", "dataType": "FP16", "tensorDigestHex": "b2c3d4e5"},
+                {"layerIndex": 2, "layerName": "layer.0.mlp", "tensorShape": "[11008, 4096]", "dataType": "FP16", "tensorDigestHex": "c3d4e5f6"},
+                {"layerIndex": 3, "layerName": "lm_head", "tensorShape": "[32000, 4096]", "dataType": "FP16", "tensorDigestHex": "d4e5f6a7"}
+            ],
+            "fineTuningAdapters": [{"adapterId": "lora-v1", "weightsDigest": "aa11bb22"}],
+            "datasetLineage": [{"datasetName": "clean-instruct", "totalTokens": 500000000}]
+        }
+
+        receipt = AIBOMRegistryEngine.create_aibom_receipt(manifest, certifier_kp)
+        self.assertEqual(receipt["type"], "DocuTrustAIBOMReceipt2026")
+        self.assertEqual(receipt["layerCount"], 4)
+
+        verify_res = AIBOMRegistryEngine.verify_aibom_receipt(receipt, certifier_kp["publicKeyHex"])
+        self.assertTrue(verify_res["valid"])
+
+        # Test single layer Merkle inclusion proof
+        layer_proof = AIBOMRegistryEngine.generate_layer_proof(manifest, layer_index=1)
+        self.assertEqual(layer_proof["layer"]["layerName"], "layer.0.attn")
+
+        layer_verify = AIBOMRegistryEngine.verify_layer_proof(layer_proof, receipt["weightsMerkleRoot"])
+        self.assertTrue(layer_verify["valid"])
+
+    def test_pqc_falcon_engine(self):
+        from docutrust.pqc_falcon import PQCFalconEngine
+
+        kp = PQCFalconEngine.generate_key_pair(mode="Falcon-512")
+        self.assertTrue(kp["publicKeyHex"].startswith("falcon512_"))
+        self.assertTrue(kp["did"].startswith("did:falcon:"))
+
+        message = {"claim": "post-quantum-sovereign-identity", "epoch": 2026}
+        sig_res = PQCFalconEngine.sign(message, kp["privateKeyHex"], mode="Falcon-512")
+        self.assertTrue(sig_res["signatureHex"].startswith("f512_"))
+
+        verify_res = PQCFalconEngine.verify(message, sig_res["signatureHex"], kp["publicKeyHex"])
+        self.assertTrue(verify_res["valid"])
+
 if __name__ == '__main__':
     unittest.main()
+
 
 
 

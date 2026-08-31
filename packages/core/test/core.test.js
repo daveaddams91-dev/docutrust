@@ -163,7 +163,12 @@ const {
   // v13.0.0 Engines
   ZKRecursiveEngine,
   RevocationLatticeEngine,
-  AgentProvenanceEngine
+  AgentProvenanceEngine,
+  // v14.0.0 Engines
+  VRFOracleEngine,
+  ZKDSLEngine,
+  AIBOMRegistryEngine,
+  PQCFalconEngine
 } = require('../dist/index.js');
 
 // 1. Cryptography Tests
@@ -3237,3 +3242,230 @@ test('92. DIDResolver: strip fragments in resolveDidKey, resolveDidPqc, resolveD
   assert.equal(doc.id, kp.did);
   assert.ok(doc.verificationMethod[0].id.startsWith(kp.did));
 });
+
+// 93. VRFOracleEngine: Verifiable Randomness & Multi-Oracle Beacon Generation
+test('93. VRFOracleEngine: KeyGen, evaluation, verification, and threshold beacon aggregation', () => {
+  const oracle1 = VRFOracleEngine.generateVRFKeyPair();
+  const oracle2 = VRFOracleEngine.generateVRFKeyPair();
+  const oracle3 = VRFOracleEngine.generateVRFKeyPair();
+
+  assert.ok(oracle1.did.startsWith('did:vrf:z'));
+  assert.equal(oracle1.publicKeyHex.length, 64);
+
+  // Single VRF evaluation
+  const seed = 'lottery-round-2026';
+  const eval1 = VRFOracleEngine.evaluateVRF(seed, oracle1);
+  assert.ok(eval1.vrfOutputHex);
+  assert.ok(eval1.proofHex);
+
+  const check1 = VRFOracleEngine.verifyVRF(seed, eval1.vrfOutputHex, eval1.proofHex, oracle1.publicKeyHex);
+  assert.equal(check1.valid, true);
+
+  // Multi-oracle beacon
+  const prevHash = sha256Hex('GENESIS_BEACON');
+  const beacon = VRFOracleEngine.createRandomnessBeacon(
+    'beacon-round-101',
+    101,
+    prevHash,
+    seed,
+    [oracle1, oracle2, oracle3],
+    2
+  );
+
+  assert.equal(beacon.type, 'DocuTrustVRFBeacon2026');
+  assert.equal(beacon.oracleCount, 3);
+  assert.equal(beacon.quorumThreshold, 2);
+  assert.ok(beacon.combinedRandomnessHex);
+
+  const pubKeyMap = {
+    [oracle1.did]: oracle1.publicKeyHex,
+    [oracle2.did]: oracle2.publicKeyHex,
+    [oracle3.did]: oracle3.publicKeyHex
+  };
+
+  const audit = VRFOracleEngine.verifyRandomnessBeacon(beacon, pubKeyMap);
+  assert.equal(audit.valid, true);
+  assert.equal(audit.quorumMet, true);
+  assert.equal(audit.validEvaluationsCount, 3);
+
+  // Oracle Feed Issuance and Verification
+  const feedKp1 = generateKeyPair();
+  const feedKp2 = generateKeyPair();
+  const feed = VRFOracleEngine.issueOracleFeed(
+    {
+      feedId: 'feed-eth-usd-price',
+      category: 'price-feed',
+      key: 'ETH/USD',
+      value: { price: 3450.75, currency: 'USD' },
+      epoch: 42,
+      ttlSeconds: 300
+    },
+    [feedKp1, feedKp2],
+    2
+  );
+
+  assert.equal(feed.type, 'DocuTrustOracleFeed2026');
+  assert.equal(feed.quorumCount, 2);
+
+  const feedAudit = VRFOracleEngine.verifyOracleFeed(feed, [feedKp1.publicKeyHex, feedKp2.publicKeyHex]);
+  assert.equal(feedAudit.valid, true);
+  assert.equal(feedAudit.quorumReached, true);
+});
+
+// 94. ZKDSLEngine: Complex Predicate AST Compilation & Zero-Knowledge Proof Evaluation
+test('94. ZKDSLEngine: Tokenization, AST parsing, evaluation, proof generation, and verification', () => {
+  const expr = '(age >= 21 AND creditScore > 700 AND jurisdiction IN ["US", "CA", "EU"]) OR (accredited == true AND netWorth >= 1000000)';
+  const compiled = ZKDSLEngine.compile(expr);
+
+  assert.ok(compiled.astRootHash);
+  assert.ok(compiled.requiredFields.includes('age'));
+  assert.ok(compiled.requiredFields.includes('creditScore'));
+  assert.ok(compiled.requiredFields.includes('jurisdiction'));
+
+  const subjectPass = {
+    age: 28,
+    creditScore: 750,
+    jurisdiction: 'US',
+    accredited: false,
+    netWorth: 50000
+  };
+
+  const subjectFail = {
+    age: 19,
+    creditScore: 650,
+    jurisdiction: 'GB',
+    accredited: false,
+    netWorth: 20000
+  };
+
+  assert.equal(ZKDSLEngine.evaluateAst(compiled.ast, subjectPass), true);
+  assert.equal(ZKDSLEngine.evaluateAst(compiled.ast, subjectFail), false);
+
+  // Generate ZK DSL Proof
+  const proverKp = generateKeyPair();
+  const proof = ZKDSLEngine.proveDSL(expr, subjectPass, proverKp, { generateEvmCalldata: true });
+
+  assert.equal(proof.type, 'DocuTrustZKDSLProof2026');
+  assert.equal(proof.satisfied, true);
+  assert.ok(proof.subjectCommitment);
+  assert.ok(proof.evaluationCommitment);
+  assert.ok(proof.evmCalldataHex);
+
+  const audit = ZKDSLEngine.verifyDSLProof(proof, proverKp.publicKeyHex, expr);
+  assert.equal(audit.valid, true);
+  assert.equal(audit.satisfied, true);
+  assert.equal(audit.errors.length, 0);
+});
+
+// 95. AIBOMRegistryEngine: Machine Learning Bill of Materials & Layer Merkle Proofs
+test('95. AIBOMRegistryEngine: Manifest hashing, BOM receipt creation, and layer proof verification', () => {
+  const certifierKp = generateKeyPair();
+  const manifest = {
+    modelId: 'dt-llama3-quantum-8b',
+    modelName: 'DocuTrust Quantum Governance Model',
+    architecture: 'transformer-decoder',
+    parametersCount: '8.03B',
+    quantization: 'q4_k_m',
+    layers: [
+      {
+        layerIndex: 0,
+        layerName: 'model.embed_tokens.weight',
+        tensorShape: [128256, 4096],
+        dataType: 'float16',
+        tensorDigestHex: sha256Hex('EMBED_WEIGHTS_TENSOR_RAW')
+      },
+      {
+        layerIndex: 1,
+        layerName: 'model.layers.0.self_attn.q_proj.weight',
+        tensorShape: [4096, 4096],
+        dataType: 'int4',
+        tensorDigestHex: sha256Hex('Q_PROJ_0_WEIGHTS_TENSOR')
+      },
+      {
+        layerIndex: 2,
+        layerName: 'model.layers.0.mlp.gate_proj.weight',
+        tensorShape: [14336, 4096],
+        dataType: 'int4',
+        tensorDigestHex: sha256Hex('MLP_GATE_PROJ_WEIGHTS_TENSOR')
+      }
+    ],
+    adapters: [
+      {
+        adapterId: 'lora-policy-guardrail-v1',
+        rank: 16,
+        alpha: 32,
+        baseLayerTarget: 'q_proj',
+        adapterWeightsHash: sha256Hex('LORA_WEIGHTS_BIN')
+      }
+    ],
+    datasetLineage: {
+      datasetName: 'SovereignGov-Instruction-Tuning',
+      datasetHash: sha256Hex('DATASET_RAW_PARQUET'),
+      sampleCount: 500000,
+      license: 'Apache-2.0'
+    },
+    benchmarks: {
+      mmlu: 72.4,
+      guardrailSafety: 99.8
+    }
+  };
+
+  const receipt = AIBOMRegistryEngine.createAIBOMReceipt(manifest, certifierKp);
+  assert.equal(receipt.type, 'DocuTrustAIBOMReceipt2026');
+  assert.equal(receipt.layerCount, 3);
+  assert.ok(receipt.weightsMerkleRoot);
+  assert.ok(receipt.overallBOMDigest);
+
+  const audit = AIBOMRegistryEngine.verifyAIBOMReceipt(receipt, certifierKp.publicKeyHex, receipt.weightsMerkleRoot);
+  assert.equal(audit.valid, true);
+  assert.equal(audit.errors.length, 0);
+
+  // Layer Merkle Proof
+  const layerProofObj = AIBOMRegistryEngine.generateLayerProof(manifest.layers, 1);
+  assert.equal(layerProofObj.layer.layerName, 'model.layers.0.self_attn.q_proj.weight');
+  const isLayerValid = AIBOMRegistryEngine.verifyLayerProof(layerProofObj.layer, layerProofObj.proof, receipt.weightsMerkleRoot);
+  assert.equal(isLayerValid, true);
+});
+
+// 96. PQCFalconEngine: Falcon-512/1024 Lattice KeyGen, Signing, and Attestations
+test('96. PQCFalconEngine: KeyGen, signing, signature verification, and attestation audit', () => {
+  const falconKp = PQCFalconEngine.generateKeyPair(512);
+  assert.ok(falconKp.did.startsWith('did:falcon:z'));
+  assert.equal(falconKp.securityLevel, 512);
+
+  const message = 'CONFIDENTIAL_POST_QUANTUM_DISCLOSURE';
+  const sigHex = PQCFalconEngine.sign(message, falconKp.privateKeyHex, 512);
+  assert.ok(sigHex);
+
+  const isSigOk = PQCFalconEngine.verify(message, sigHex, falconKp.publicKeyHex);
+  assert.equal(isSigOk, true);
+
+  // Negative test
+  const isWrongSig = PQCFalconEngine.verify('TAMPERED_MESSAGE', sigHex, falconKp.publicKeyHex);
+  assert.equal(isWrongSig, false);
+
+  // Issue Falcon Attestation
+  const attestation = PQCFalconEngine.issueAttestation(
+    { classification: 'TOP_SECRET', clearances: ['CRYPTO', 'QUANTUM'] },
+    falconKp,
+    'did:example:agent-007'
+  );
+
+  assert.equal(attestation.type, 'DocuTrustFalconAttestation2026');
+  const attAudit = PQCFalconEngine.verifyAttestation(attestation, falconKp.publicKeyHex);
+  assert.equal(attAudit.valid, true);
+  assert.equal(attAudit.errors.length, 0);
+});
+
+// 97. SolidityEngine: v14 Universal Verifier contract generation
+test('97. SolidityEngine: Generate v14 Universal Verifier contract containing VRF, ZK-DSL and AI-BOM methods', () => {
+  const contractCode = SolidityEngine.generateUniversalVerifierContract({
+    contractName: 'DocuTrustUniversalVerifierV14'
+  });
+
+  assert.ok(contractCode.includes('contract DocuTrustUniversalVerifierV14'));
+  assert.ok(contractCode.includes('verifyVRFBeacon'));
+  assert.ok(contractCode.includes('verifyZKDSLProof'));
+  assert.ok(contractCode.includes('verifyAIBOMWeights'));
+});
+

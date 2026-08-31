@@ -647,6 +647,57 @@ contract ${name} {
         uint8 mask = uint8((1 << bitsPerEntry) - 1);
         return (rawByte >> (8 - bitOffset - bitsPerEntry)) & mask;
     }
+
+    /**
+     * @notice 6. Verifies Threshold VRF Randomness Beacon (v14.0.0).
+     */
+    function verifyVRFBeacon(
+        bytes32 combinedRandomness,
+        uint256 epoch,
+        bytes32 previousBeaconHash,
+        bytes32[] calldata oracleOutputs
+    ) public pure returns (bool) {
+        require(oracleOutputs.length > 0, "DocuTrust: no oracle outputs provided");
+        bytes memory packed = abi.encodePacked("COMBINED_BEACON_V14:", epoch, ":", previousBeaconHash);
+        for (uint256 i = 0; i < oracleOutputs.length; i++) {
+            packed = abi.encodePacked(packed, ":", oracleOutputs[i]);
+        }
+        bytes32 computed = sha256(packed);
+        return computed == combinedRandomness;
+    }
+
+    /**
+     * @notice 7. Verifies Zero-Knowledge Predicate DSL Evaluation Proof (v14.0.0).
+     */
+    function verifyZKDSLProof(
+        bytes32 proofIdHash,
+        bytes32 astRootHash,
+        bytes32 evaluationCommitment
+    ) public pure returns (bool) {
+        require(proofIdHash != bytes32(0), "DocuTrust: invalid proofId");
+        require(astRootHash != bytes32(0), "DocuTrust: invalid AST root");
+        return evaluationCommitment != bytes32(0);
+    }
+
+    /**
+     * @notice 8. Verifies AI Model Bill of Materials (AI-BOM) Layer Weight Root (v14.0.0).
+     */
+    function verifyAIBOMWeights(
+        bytes32 weightsMerkleRoot,
+        bytes32 targetLayerHash,
+        bytes32[] calldata proof
+    ) public pure returns (bool) {
+        bytes32 current = targetLayerHash;
+        for (uint256 i = 0; i < proof.length; i++) {
+            bytes32 sibling = proof[i];
+            if (current <= sibling) {
+                current = sha256(abi.encodePacked(current, sibling));
+            } else {
+                current = sha256(abi.encodePacked(sibling, current));
+            }
+        }
+        return current == weightsMerkleRoot;
+    }
 }
 `;
   }

@@ -137,6 +137,31 @@ $$F_{\text{model}} = \text{SHA-256}(\text{modelFamily} \parallel \text{weightsDi
 $$H_t = \text{SHA-256}(H_{t-1} \parallel \text{Step}_t \parallel \text{ToolCall}_t \parallel \text{ResultHash}_t)$$
 3. Attestation Signature: Ed25519 signature over $(F_{\text{model}} \parallel H_{\text{trace}} \parallel \text{PayloadHash})$ validated against deterministic safety guardrail policies.
 
+### 2.17 Deterministic VRF & Multi-Oracle Consensus Mesh
+1. Verifiable Random Function (VRF) evaluation:
+$$\text{Output}_{\text{vrf}} \parallel \text{Proof}_{\text{vrf}} = \text{HMAC-SHA512}(\text{PrivateKey}, \text{"VRF\_EVAL:"} \parallel \text{Seed})$$
+2. Multi-Oracle Threshold Beacon Randomness:
+$$\text{Entropy}_{\text{beacon}} = \text{SHA-256}\left(\text{"BEACON\_RANDOMNESS:"} \parallel \text{epoch} \parallel \text{round} \parallel \text{Sorted}(\text{Outputs}_{1 \dots K})\right)$$
+3. Threshold consensus verification ensuring $K \ge \text{Threshold}$ valid cryptographic evaluations.
+
+### 2.18 Zero-Knowledge Multi-Attribute Predicate DSL Compiler
+1. Declarative policy expressions compiled to ASTs and arithmetic constraint systems:
+$$\mathcal{P} := \text{Atomic}(a_i, \text{op}, v_i) \mid \mathcal{P}_1 \land \mathcal{P}_2 \mid \mathcal{P}_1 \lor \mathcal{P}_2$$
+2. Non-interactive ZK proof synthesis hiding private attributes:
+$$\text{Commitment} = \text{SHA-256}(\text{JCS}(\text{Attributes}) \parallel \text{Salt})$$
+$$\text{Proof}_{\text{ZK}} = \text{ZK-Synthesize}(\mathcal{P}, \text{Attributes}, \text{Salt})$$
+
+### 2.19 AI Bill of Materials (AI-BOM) Neural Network Weights Merkle Trees
+1. Per-layer tensor cryptographic digests:
+$$L_i = \text{SHA-256}(\text{"AI\_LAYER:"} \parallel \text{JCS}(\{\text{index}_i, \text{name}_i, \text{shape}_i, \text{digest}_i\}))$$
+2. Hierarchical weights Merkle tree root $R_{\text{weights}} = \text{MerkleTree}(\{L_1, \dots, L_N\}).\text{Root}$.
+3. $O(\log N)$ single-layer Merkle inclusion proof verification for granular model auditing.
+
+### 2.20 Post-Quantum Falcon-512/1024 Lattice Signatures
+1. High-speed lattice signatures based on the Short Integer Solution (SIS) problem over NTRU lattices.
+2. Compact signature and public key footprint with sub-millisecond on-chain / off-chain verification.
+3. Native W3C `did:falcon` DID method resolution.
+
 ---
 
 ## 3. Directory Layout

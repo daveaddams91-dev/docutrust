@@ -2,24 +2,21 @@
 
 # 🛡️ DocuTrust
 
-### The Open-Source Sovereign Trust Fabric for Verifiable Credentials, Recursive ZK Proofs, 2D Revocation Lattices & AI Agent Provenance
+### The Open-Source Sovereign Trust Fabric for Verifiable Credentials, VRF Consensus Mesh, ZK Multi-Attribute DSL, AI-BOM Weights & Post-Quantum Falcon
 
-[![Version](https://img.shields.io/badge/Version-v13.0.0-cyan.svg)]()
+[![Version](https://img.shields.io/badge/Version-v14.0.0-cyan.svg)]()
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CI Status](https://img.shields.io/badge/CI-100%25%20Passing-brightgreen.svg)]()
+[![VRF Oracle Mesh](https://img.shields.io/badge/VRF-Multi--Oracle%20Consensus%20Beacon-orange.svg)]()
+[![ZK Predicate DSL](https://img.shields.io/badge/ZK--DSL-Multi--Attribute%20Compiler%20%26%20Prover-cyan.svg)]()
+[![AI-BOM Registry](https://img.shields.io/badge/AI--BOM-Weights%20Merkle%20Tree%20Registry-indigo.svg)]()
+[![PQ Falcon](https://img.shields.io/badge/Post--Quantum-Falcon--512%2F1024%20Lattice-purple.svg)]()
 [![Recursive ZK](https://img.shields.io/badge/ZK-Recursive%20Proof%20Folding-cyan.svg)]()
-[![Revocation Lattice](https://img.shields.io/badge/Lattice-2D%20Temporal%20Accumulator-emerald.svg)]()
-[![AI Provenance](https://img.shields.io/badge/AI-Agent%20Action%20Attestation-purple.svg)]()
-[![Trust Score Engine](https://img.shields.io/badge/Risk--Engine-Quantitative%20Trust%200--1000-emerald.svg)]()
-[![Verifiable Compute](https://img.shields.io/badge/VM-Verifiable%20Off--Chain%20Compute-indigo.svg)]()
-[![Universal Verifier](https://img.shields.io/badge/EVM-Master%20Universal%20Verifier-amber.svg)]()
-[![NIST FIPS 205](https://img.shields.io/badge/Post--Quantum-NIST%20FIPS%20205%20SLH--DSA-purple.svg)]()
-[![WebAuthn Passkeys](https://img.shields.io/badge/Hardware-FIDO2%20WebAuthn%20Passkeys-blue.svg)]()
 [![Python SDK](https://img.shields.io/badge/Python-3.8+-3776AB?logo=python&logoColor=white)]()
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)]()
 
 <p align="center">
-  <b>DocuTrust</b> enables universities, enterprises, AI systems, and governments to issue tamper-proof academic degrees, credentials, and autonomous agent attestations with <b>sub-50ms instant verification</b>, <b>Recursive Zero-Knowledge Proof Aggregation with Fiat-Shamir folding & EVM calldata</b>, <b>2D Temporal-Spatial Revocation Lattices with O(1) constant-size witnesses & time-travel proofs</b>, <b>Autonomous AI Agent Action Attestation with model card fingerprinting & safety guardrail verification</b>, <b>Quantitative Multi-Vector Trust & Risk Scoring (0-1000 rating, AAA-F risk tiers)</b>, <b>Verifiable Off-Chain Compute VM with execution step hashing</b>, <b>Ephemeral Forward-Secret Vanish Credentials</b>, <b>Compact O(Δ) Cross-Ledger State Synchronization</b>, and <b>Master Universal EVM Verifier Smart Contracts</b>.
+  <b>DocuTrust</b> enables universities, enterprises, AI systems, and decentralized networks to issue tamper-proof academic degrees, credentials, and autonomous agent attestations with <b>deterministic Verifiable Random Functions (VRF) & threshold oracle consensus</b>, <b>Zero-Knowledge Multi-Attribute Predicate DSL Compilation & Non-Interactive Proofs</b>, <b>AI Bill of Materials (AI-BOM) Neural Network Weights Merkle Trees & Layer Inclusion Proofs</b>, <b>Post-Quantum Falcon-512/1024 Lattice Signatures</b>, <b>Recursive ZK Folding with Fiat-Shamir & EVM Calldata</b>, <b>2D Temporal-Spatial Revocation Lattices with O(1) Witnesses</b>, and <b>Autonomous AI Agent Action Attestations</b>.
 </p>
 
 [Quickstart Demo](#-10-second-quickstart-demo) • [Architecture](#-system-architecture--workflow) • [Security Hardening](#-defense-in-depth-security-hardening-uncrackable-guarantee) • [CLI Toolkit](#-cli-toolkit) • [Python SDK](#-python-sdk-docutrust) • [REST API](#-rest-api-endpoints)

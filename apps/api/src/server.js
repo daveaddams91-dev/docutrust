@@ -101,7 +101,11 @@ const {
   generateUniversalVerifierContract,
   ZKRecursiveEngine,
   RevocationLatticeEngine,
-  AgentProvenanceEngine
+  AgentProvenanceEngine,
+  VRFOracleEngine,
+  ZKDSLEngine,
+  AIBOMRegistryEngine,
+  PQCFalconEngine
 } = require('@docutrust/core');
 
 const PORT = process.env.PORT || 4000;
@@ -2726,6 +2730,264 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // 9. v14.0.0 Verifiable Random Function (VRF) & Oracle Feeds
+    if (pathname === '/api/v1/vrf/keygen' && req.method === 'POST') {
+      const body = await readJsonBody().catch(() => ({}));
+      const { securityLevel } = body;
+      try {
+        const keyPair = VRFOracleEngine.generateVRFKeyPair(securityLevel);
+        return jsonResponse(200, { success: true, keyPair });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/vrf/evaluate' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { seed, keyPair } = body;
+      if (!seed || !keyPair) {
+        return jsonResponse(400, { error: 'Missing seed or keyPair.' });
+      }
+      try {
+        const evaluation = VRFOracleEngine.evaluateVRF(seed, keyPair);
+        return jsonResponse(200, { success: true, evaluation });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/vrf/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { seed, vrfOutputHex, proofHex, publicKeyHex } = body;
+      if (!seed || !vrfOutputHex || !proofHex || !publicKeyHex) {
+        return jsonResponse(400, { error: 'Missing seed, vrfOutputHex, proofHex, or publicKeyHex.' });
+      }
+      try {
+        const result = VRFOracleEngine.verifyVRF(seed, vrfOutputHex, proofHex, publicKeyHex);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/vrf/beacon' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { beaconId, epoch, previousBeaconHash, entropySeed, oracleKeyPairs, quorumThreshold } = body;
+      if (!beaconId || epoch === undefined || !previousBeaconHash || !oracleKeyPairs || !quorumThreshold) {
+        return jsonResponse(400, { error: 'Missing beaconId, epoch, previousBeaconHash, oracleKeyPairs, or quorumThreshold.' });
+      }
+      try {
+        const beacon = VRFOracleEngine.createRandomnessBeacon(
+          beaconId,
+          epoch,
+          previousBeaconHash,
+          entropySeed || `seed-epoch-${epoch}`,
+          oracleKeyPairs,
+          quorumThreshold
+        );
+        return jsonResponse(200, { success: true, beacon });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/vrf/beacon/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { beacon, oraclePublicKeysMap } = body;
+      if (!beacon) {
+        return jsonResponse(400, { error: 'Missing beacon object.' });
+      }
+      try {
+        const result = VRFOracleEngine.verifyRandomnessBeacon(beacon, oraclePublicKeysMap);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/oracle/feed' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { feedData, signerKeyPairs, quorumThreshold } = body;
+      if (!feedData || !signerKeyPairs || !quorumThreshold) {
+        return jsonResponse(400, { error: 'Missing feedData, signerKeyPairs, or quorumThreshold.' });
+      }
+      try {
+        const feed = VRFOracleEngine.createOracleFeed(feedData, signerKeyPairs, quorumThreshold);
+        return jsonResponse(200, { success: true, feed });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/oracle/feed/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { feed, trustedPublicKeys } = body;
+      if (!feed || !trustedPublicKeys) {
+        return jsonResponse(400, { error: 'Missing feed or trustedPublicKeys map.' });
+      }
+      try {
+        const result = VRFOracleEngine.verifyOracleFeed(feed, trustedPublicKeys);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // 10. v14.0.0 ZK Multi-Attribute Predicate DSL Engine
+    if (pathname === '/api/v1/zk/dsl/compile' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { expression } = body;
+      if (!expression) {
+        return jsonResponse(400, { error: 'Missing expression string.' });
+      }
+      try {
+        const compiled = ZKDSLEngine.compile(expression);
+        return jsonResponse(200, { success: true, ...compiled });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/zk/dsl/prove' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { expression, privateSubject, proverKeyPair, options } = body;
+      if (!expression || !privateSubject || !proverKeyPair) {
+        return jsonResponse(400, { error: 'Missing expression, privateSubject, or proverKeyPair.' });
+      }
+      try {
+        const proof = ZKDSLEngine.proveDSL(expression, privateSubject, proverKeyPair, options);
+        return jsonResponse(200, { success: true, proof });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/zk/dsl/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { proof, proverPublicKeyHex, expectedExpression } = body;
+      if (!proof || !proverPublicKeyHex) {
+        return jsonResponse(400, { error: 'Missing proof or proverPublicKeyHex.' });
+      }
+      try {
+        const result = ZKDSLEngine.verifyDSLProof(proof, proverPublicKeyHex, expectedExpression);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // 11. v14.0.0 AI Model Weights & Provenance Registry (AI-BOM)
+    if (pathname === '/api/v1/aibom/create' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { manifest, certifierKeyPair } = body;
+      if (!manifest || !certifierKeyPair) {
+        return jsonResponse(400, { error: 'Missing AI-BOM manifest or certifierKeyPair.' });
+      }
+      try {
+        const receipt = AIBOMRegistryEngine.createAIBOMReceipt(manifest, certifierKeyPair);
+        return jsonResponse(200, { success: true, receipt });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/aibom/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { receipt, certifierPublicKeyHex, expectedWeightsMerkleRoot } = body;
+      if (!receipt || !certifierPublicKeyHex) {
+        return jsonResponse(400, { error: 'Missing AI-BOM receipt or certifierPublicKeyHex.' });
+      }
+      try {
+        const result = AIBOMRegistryEngine.verifyAIBOMReceipt(receipt, certifierPublicKeyHex, expectedWeightsMerkleRoot);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/aibom/layer-proof' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { manifest, layerIndex } = body;
+      if (!manifest || layerIndex === undefined) {
+        return jsonResponse(400, { error: 'Missing manifest or layerIndex.' });
+      }
+      try {
+        const layers = manifest.layers || (Array.isArray(manifest) ? manifest : []);
+        const proofData = AIBOMRegistryEngine.generateLayerProof(layers, layerIndex);
+        return jsonResponse(200, { success: true, ...proofData });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // 12. v14.0.0 Post-Quantum Falcon & ML-DSA-87 Dual-Lattice Signatures
+    if (pathname === '/api/v1/pqc/falcon/keygen' && req.method === 'POST') {
+      const body = await readJsonBody().catch(() => ({}));
+      const { securityLevel = 512 } = body;
+      try {
+        const keyPair = (PQCFalconEngine.generateFalconKeyPair || PQCFalconEngine.generateKeyPair).call(PQCFalconEngine, securityLevel);
+        return jsonResponse(200, { success: true, keyPair });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/pqc/falcon/sign' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { data, privateKeyHex, securityLevel = 512 } = body;
+      if (!data || !privateKeyHex) {
+        return jsonResponse(400, { error: 'Missing data or privateKeyHex.' });
+      }
+      try {
+        const signatureHex = (PQCFalconEngine.signFalcon || PQCFalconEngine.sign).call(PQCFalconEngine, data, privateKeyHex, securityLevel);
+        return jsonResponse(200, { success: true, signatureHex });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/pqc/falcon/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { data, signatureHex, publicKeyHex } = body;
+      if (!data || !signatureHex || !publicKeyHex) {
+        return jsonResponse(400, { error: 'Missing data, signatureHex, or publicKeyHex.' });
+      }
+      try {
+        const valid = (PQCFalconEngine.verifyFalcon || PQCFalconEngine.verify).call(PQCFalconEngine, data, signatureHex, publicKeyHex);
+        return jsonResponse(200, { success: true, valid });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/pqc/falcon/attestation/issue' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { payload, signerKeyPair, subjectDid = 'did:example:holder' } = body;
+      if (!payload || !signerKeyPair) {
+        return jsonResponse(400, { error: 'Missing payload or signerKeyPair.' });
+      }
+      try {
+        const attestation = (PQCFalconEngine.issueFalconAttestation || PQCFalconEngine.issueAttestation).call(PQCFalconEngine, payload, signerKeyPair, subjectDid);
+        return jsonResponse(200, { success: true, attestation });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/pqc/falcon/attestation/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { attestation, trustedPublicKeyHex } = body;
+      if (!attestation || !trustedPublicKeyHex) {
+        return jsonResponse(400, { error: 'Missing attestation or trustedPublicKeyHex.' });
+      }
+      try {
+        const result = (PQCFalconEngine.verifyFalconAttestation || PQCFalconEngine.verifyAttestation).call(PQCFalconEngine, attestation, trustedPublicKeyHex);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
     // Default 404
     jsonResponse(404, { error: 'Route not found' });
   } catch (err) {
@@ -2735,7 +2997,7 @@ const server = http.createServer(async (req, res) => {
 
 if (require.main === module) {
   server.listen(PORT, () => {
-    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v13.0.0 running on http://localhost:${PORT}`);
+    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v14.0.0 running on http://localhost:${PORT}`);
   });
 }
 

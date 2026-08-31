@@ -69,8 +69,12 @@ from .state_sync import StateSyncEngine
 from .zk_recursive import ZKRecursiveEngine
 from .revocation_lattice import RevocationLatticeEngine
 from .agent_provenance import AgentProvenanceEngine
+from .vrf_oracle import VRFOracleEngine
+from .zk_dsl import ZKDSLEngine
+from .ai_bom import AIBOMRegistryEngine
+from .pqc_falcon import PQCFalconEngine
 
-__version__ = "13.0.0"
+__version__ = "14.0.0"
 __all__ = [
     "DocuTrustClient",
     "canonicalize_json",
@@ -153,6 +157,11 @@ __all__ = [
     "StateSyncEngine",
     "ZKRecursiveEngine",
     "RevocationLatticeEngine",
-    "AgentProvenanceEngine"
+    "AgentProvenanceEngine",
+    "VRFOracleEngine",
+    "ZKDSLEngine",
+    "AIBOMRegistryEngine",
+    "PQCFalconEngine"
 ]
+
 

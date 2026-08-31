@@ -5,6 +5,7 @@ import * as crypto from 'crypto';
  * Ensures deterministic string representation of JSON objects before signing.
  */
 export function canonicalizeJson(obj: any): string {
+  if (obj === undefined) return 'null';
   if (obj === null || typeof obj !== 'object') {
     return JSON.stringify(obj);
   }
@@ -22,6 +23,9 @@ export function canonicalizeJson(obj: any): string {
  * SHA-256 Hash of string or Buffer, returned as hex.
  */
 export function sha256Hex(data: string | Buffer): string {
+  if (data === undefined || data === null) {
+    return crypto.createHash('sha256').update('').digest('hex');
+  }
   return crypto.createHash('sha256').update(data).digest('hex');
 }
 

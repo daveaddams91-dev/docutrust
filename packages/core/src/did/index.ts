@@ -91,6 +91,14 @@ export class DIDResolver {
       return this.resolveDidSLH(did);
     }
 
+    if (did.startsWith('did:vrf:')) {
+      return this.resolveDidVrf(did);
+    }
+
+    if (did.startsWith('did:falcon:')) {
+      return this.resolveDidFalcon(did);
+    }
+
     throw new Error(`Unsupported DID method: ${did}`);
   }
 
@@ -154,6 +162,76 @@ export class DIDResolver {
         {
           id: keyId,
           type: 'SLHDSAVerificationKey2026',
+          controller: cleanDid,
+          publicKeyHex,
+          publicKeyMultibase: multibase
+        }
+      ],
+      authentication: [keyId],
+      assertionMethod: [keyId]
+    };
+  }
+
+  /**
+   * Deterministically resolve a did:vrf (Verifiable Random Function key).
+   */
+  public static resolveDidVrf(did: string): DIDDocument {
+    const cleanDid = did.split('#')[0].split('?')[0];
+    const multibase = cleanDid.replace('did:vrf:', '');
+    if (!multibase.startsWith('z')) {
+      throw new Error(`Invalid did:vrf format. Expected multibase 'z' prefix.`);
+    }
+
+    const decoded = decodeBase58(multibase.substring(1));
+    const rawPub = decoded.subarray(2);
+    const publicKeyHex = rawPub.toString('hex');
+    const keyId = `${cleanDid}#vrf-1`;
+
+    return {
+      '@context': [
+        'https://www.w3.org/ns/did/v1',
+        'https://w3id.org/security/suites/ed25519-2020/v1'
+      ],
+      id: cleanDid,
+      verificationMethod: [
+        {
+          id: keyId,
+          type: 'VRFVerificationKey2026',
+          controller: cleanDid,
+          publicKeyHex,
+          publicKeyMultibase: multibase
+        }
+      ],
+      authentication: [keyId],
+      assertionMethod: [keyId]
+    };
+  }
+
+  /**
+   * Deterministically resolve a did:falcon (Post-Quantum Falcon Key).
+   */
+  public static resolveDidFalcon(did: string): DIDDocument {
+    const cleanDid = did.split('#')[0].split('?')[0];
+    const multibase = cleanDid.replace('did:falcon:', '');
+    if (!multibase.startsWith('z')) {
+      throw new Error(`Invalid did:falcon format. Expected multibase 'z' prefix.`);
+    }
+
+    const decoded = decodeBase58(multibase.substring(1));
+    const rawPub = decoded.subarray(2);
+    const publicKeyHex = rawPub.toString('hex');
+    const keyId = `${cleanDid}#falcon-1`;
+
+    return {
+      '@context': [
+        'https://www.w3.org/ns/did/v1',
+        'https://w3id.org/security/data-integrity/v1'
+      ],
+      id: cleanDid,
+      verificationMethod: [
+        {
+          id: keyId,
+          type: 'FalconVerificationKey2026',
           controller: cleanDid,
           publicKeyHex,
           publicKeyMultibase: multibase

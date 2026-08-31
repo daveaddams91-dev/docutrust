@@ -173,3 +173,20 @@ export * from './revocation-lattice';
 
 // Export Autonomous AI Agent Action Attestation & Policy Guardrail Engine (DocuTrust v13.0.0)
 export * from './agent-provenance';
+
+// ========================================================
+// DocuTrust v14.0.0 Sovereign Trust Mesh Evolution
+// ========================================================
+
+// Export Decentralized Threshold VRF Oracle Consensus Mesh (DocuTrust v14.0.0)
+export * from './vrf-oracle';
+
+// Export Zero-Knowledge Multi-Attribute Predicate DSL Compiler (DocuTrust v14.0.0)
+export * from './zk-dsl';
+
+// Export Verifiable AI Model Weights & Provenance Registry (AI-BOM) (DocuTrust v14.0.0)
+export * from './ai-bom';
+
+// Export Post-Quantum Falcon & ML-DSA-87 Dual-Lattice Digital Signatures (DocuTrust v14.0.0)
+export * from './pqc-falcon';
+

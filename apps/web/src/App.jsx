@@ -40,6 +40,9 @@ import UniversalVerifierStudio from './components/UniversalVerifierStudio.jsx';
 import ZKRecursiveStudio from './components/ZKRecursiveStudio.jsx';
 import RevocationLatticeStudio from './components/RevocationLatticeStudio.jsx';
 import AgentProvenanceStudio from './components/AgentProvenanceStudio.jsx';
+import VRFOracleStudio from './components/VRFOracleStudio.jsx';
+import ZKDSLStudio from './components/ZKDSLStudio.jsx';
+import AIBOMStudio from './components/AIBOMStudio.jsx';
 import Footer from './components/Footer.jsx';
 
 export default function App() {
@@ -57,6 +60,9 @@ export default function App() {
 
       <main className="flex-1">
         {activeTab === 'hero' && <HeroSection setActiveTab={setActiveTab} />}
+        {activeTab === 'vrf-oracle' && <VRFOracleStudio />}
+        {activeTab === 'zk-dsl' && <ZKDSLStudio />}
+        {activeTab === 'ai-bom' && <AIBOMStudio />}
         {activeTab === 'zk-recursive' && <ZKRecursiveStudio />}
         {activeTab === 'lattice' && <RevocationLatticeStudio />}
         {activeTab === 'agent-provenance' && <AgentProvenanceStudio />}

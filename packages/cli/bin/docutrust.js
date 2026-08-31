@@ -391,6 +391,26 @@ function printHelp() {
   \x1b[32mdidcomm-unpack\x1b[0m --envelope <file> --key <priv>  Unpack and decrypt DIDComm v2 envelope
   \x1b[32mmmr-append\x1b[0m --leaf <text>                       Append entry to Merkle Mountain Range ledger
 
+\x1b[1mVRF ORACLE & MULTI-ORACLE CONSENSUS MESH (v14.0.0):\x1b[0m
+  \x1b[32mvrf-beacon\x1b[0m --epoch <num> --seed <str> --keys <k1,k2> Generate threshold VRF randomness beacon
+  \x1b[32mvrf-verify\x1b[0m --beacon <file.json> [--keys <pubMap>] Verify VRF randomness beacon quorum
+  \x1b[32moracle-feed\x1b[0m --feed-id <id> --key <k> --val <v> -k <keys> Issue multi-signed oracle data feed
+  \x1b[32moracle-verify-feed\x1b[0m --feed <file.json> --keys <k1,k2> Verify signed oracle feed consensus
+
+\x1b[1mZERO-KNOWLEDGE PREDICATE DSL & COMPILER (v14.0.0):\x1b[0m
+  \x1b[32mzk-compile-dsl\x1b[0m --expr "<expression>" [--out <f>] Compile boolean DSL expression into AST & root hash
+  \x1b[32mzk-dsl-prove\x1b[0m --expr "<expr>" --subject <f> -k <key> Generate ZK DSL evaluation proof
+  \x1b[32mzk-dsl-verify\x1b[0m --proof <file> --key <pub> --expr "<e>" Verify zero-knowledge DSL evaluation proof
+
+\x1b[1mAI MODEL BILL OF MATERIALS (AI-BOM) REGISTRY (v14.0.0):\x1b[0m
+  \x1b[32maibom-create\x1b[0m --manifest <f> --key <keyfile> [--out <f>] Issue verifiable weights Merkle receipt
+  \x1b[32maibom-verify\x1b[0m --receipt <f> --key <pub> [--root <h>]  Verify AI-BOM manifest & weight roots
+
+\x1b[1mPOST-QUANTUM FALCON & ML-DSA-87 DUAL-LATTICE (v14.0.0):\x1b[0m
+  \x1b[32mpqc-falcon-keygen\x1b[0m [--level <512|1024>] [--out <f>]  Generate Falcon lattice keypair (did:falcon)
+  \x1b[32mpqc-falcon-sign\x1b[0m --data <text|file> --key <k> [--out <f>] Sign message using Falcon lattice signature
+  \x1b[32mpqc-falcon-verify\x1b[0m --data <t> --sig <hex> --key <pub>  Verify Falcon lattice digital signature
+
 \x1b[1mQUICKSTART:\x1b[0m
   $ docutrust demo
   $ docutrust keygen --out keys.json
@@ -468,7 +488,7 @@ async function runDemoWizard() {
 
 async function main() {
   if (command === 'version' || command === '--version' || command === '-v') {
-    console.log('12.0.0');
+    console.log('14.0.0');
     return;
   }
 
@@ -3674,6 +3694,372 @@ async function main() {
       console.log(`  Guardrail State: ${result.guardrailPassed ? '\x1b[32mCOMPLIANT\x1b[0m' : '\x1b[31mNON-COMPLIANT\x1b[0m'}`);
     } else {
       console.error(`\x1b[31m✖\x1b[0m Agent attestation verification \x1b[1m\x1b[31mFAILED\x1b[0m:`, result.errors.join(', '));
+      process.exit(1);
+    }
+    return;
+  }
+
+  // ==========================================
+  // DocuTrust v14.0.0 CLI Command Handlers
+  // ==========================================
+
+  if (command === 'vrf-beacon') {
+    const epoch = parseInt(getArgValue('--epoch') || '1', 10);
+    const seed = getArgValue('--seed') || `epoch-${epoch}-seed`;
+    const keysArg = getArgValue('--keys') || getArgValue('-k');
+    const threshold = parseInt(getArgValue('--threshold') || getArgValue('-t') || '2', 10);
+    const prevHash = getArgValue('--prev-hash') || sha256Hex('GENESIS_VRF_BEACON');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!keysArg) {
+      console.error('\x1b[31mError:\x1b[0m Missing --keys <key1.json,key2.json...>');
+      process.exit(1);
+    }
+
+    const keyFiles = keysArg.split(',');
+    const oracles = keyFiles.map(kf => {
+      const data = JSON.parse(fs.readFileSync(kf.trim(), 'utf-8'));
+      return data;
+    });
+
+    const beacon = core.VRFOracleEngine.createRandomnessBeacon(
+      `beacon-epoch-${epoch}`,
+      epoch,
+      prevHash,
+      seed,
+      oracles,
+      threshold
+    );
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(beacon, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m VRF Randomness Beacon saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(beacon, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'vrf-verify') {
+    const beaconFile = getArgValue('--beacon') || getArgValue('-b');
+    const keysArg = getArgValue('--keys') || getArgValue('-k');
+
+    if (!beaconFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --beacon <beacon.json>');
+      process.exit(1);
+    }
+
+    const beacon = JSON.parse(fs.readFileSync(beaconFile, 'utf-8'));
+    let pubKeyMap;
+    if (keysArg) {
+      if (fs.existsSync(keysArg)) {
+        pubKeyMap = JSON.parse(fs.readFileSync(keysArg, 'utf-8'));
+      } else {
+        pubKeyMap = JSON.parse(keysArg);
+      }
+    }
+
+    const result = core.VRFOracleEngine.verifyRandomnessBeacon(beacon, pubKeyMap);
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m VRF Randomness Beacon is \x1b[1m\x1b[32mVERIFIED & CONSENSUS-VALIDATED\x1b[0m`);
+      console.log(`  Beacon ID:           ${result.beaconId}`);
+      console.log(`  Combined Randomness: ${result.combinedRandomnessHex}`);
+      console.log(`  Valid Evaluations:   ${result.validEvaluationsCount}`);
+      console.log(`  Quorum Status:       ${result.quorumMet ? '\x1b[32mREACHED\x1b[0m' : '\x1b[31mFAILED\x1b[0m'}`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m VRF Randomness Beacon verification \x1b[1m\x1b[31mFAILED\x1b[0m:`, result.errors.join(', '));
+      process.exit(1);
+    }
+    return;
+  }
+
+  if (command === 'oracle-feed') {
+    const feedId = getArgValue('--feed-id') || `feed-${Date.now()}`;
+    const category = getArgValue('--category') || 'general';
+    const key = getArgValue('--key-name') || getArgValue('--key');
+    const valArg = getArgValue('--value') || getArgValue('--val');
+    const keysArg = getArgValue('--signers') || getArgValue('-k');
+    const quorum = parseInt(getArgValue('--quorum') || getArgValue('-q') || '2', 10);
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!key || !valArg || !keysArg) {
+      console.error('\x1b[31mError:\x1b[0m Missing --key-name <key>, --value <val>, or --signers <k1.json,k2.json>');
+      process.exit(1);
+    }
+
+    let parsedVal = valArg;
+    try {
+      parsedVal = JSON.parse(valArg);
+    } catch (e) {}
+
+    const keyFiles = keysArg.split(',');
+    const signers = keyFiles.map(kf => JSON.parse(fs.readFileSync(kf.trim(), 'utf-8')));
+
+    const feed = core.VRFOracleEngine.issueOracleFeed(
+      {
+        feedId,
+        category,
+        key,
+        value: parsedVal,
+        epoch: Math.floor(Date.now() / 1000)
+      },
+      signers,
+      quorum
+    );
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(feed, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Oracle Data Feed saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(feed, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'oracle-verify-feed') {
+    const feedFile = getArgValue('--feed') || getArgValue('-f');
+    const keysArg = getArgValue('--keys') || getArgValue('-k');
+
+    if (!feedFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --feed <feed.json>');
+      process.exit(1);
+    }
+
+    const feed = JSON.parse(fs.readFileSync(feedFile, 'utf-8'));
+    let publicKeys;
+    if (keysArg) {
+      publicKeys = keysArg.split(',').map(k => {
+        if (fs.existsSync(k.trim())) {
+          const kd = JSON.parse(fs.readFileSync(k.trim(), 'utf-8'));
+          return kd.publicKeyHex || kd;
+        }
+        return k.trim();
+      });
+    }
+
+    const result = core.VRFOracleEngine.verifyOracleFeed(feed, publicKeys);
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m Oracle Feed Attestation is \x1b[1m\x1b[32mVERIFIED & CONSENSUS-VALIDATED\x1b[0m`);
+      console.log(`  Feed ID:      ${result.feedId}`);
+      console.log(`  Key / Value:  ${result.key} = ${JSON.stringify(result.value)}`);
+      console.log(`  Quorum Count: ${result.quorumCount}`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m Oracle Feed verification \x1b[1m\x1b[31mFAILED\x1b[0m:`, result.errors.join(', '));
+      process.exit(1);
+    }
+    return;
+  }
+
+  if (command === 'zk-compile-dsl') {
+    const expr = getArgValue('--expr') || getArgValue('-e');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!expr) {
+      console.error('\x1b[31mError:\x1b[0m Missing --expr "<boolean dsl expression>"');
+      process.exit(1);
+    }
+
+    const compiled = core.ZKDSLEngine.compile(expr);
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(compiled, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m ZK-DSL AST compiled and saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(compiled, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'zk-dsl-prove') {
+    const expr = getArgValue('--expr') || getArgValue('-e');
+    const subjectFile = getArgValue('--subject') || getArgValue('-s');
+    const keyFile = getArgValue('--key') || getArgValue('-k');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!expr || !subjectFile || !keyFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --expr "<expr>", --subject <subject.json>, or --key <key.json>');
+      process.exit(1);
+    }
+
+    const subject = JSON.parse(fs.readFileSync(subjectFile, 'utf-8'));
+    const keyData = JSON.parse(fs.readFileSync(keyFile, 'utf-8'));
+
+    const proof = core.ZKDSLEngine.proveDSL(expr, subject, keyData, { generateEvmCalldata: true });
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(proof, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Zero-Knowledge DSL Proof saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(proof, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'zk-dsl-verify') {
+    const proofFile = getArgValue('--proof') || getArgValue('-p');
+    const keyArg = getArgValue('--key') || getArgValue('-k');
+    const expr = getArgValue('--expr') || getArgValue('-e');
+
+    if (!proofFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --proof <proof.json>');
+      process.exit(1);
+    }
+
+    const proof = JSON.parse(fs.readFileSync(proofFile, 'utf-8'));
+    let proverPub = keyArg;
+    if (keyArg && fs.existsSync(keyArg)) {
+      const kd = JSON.parse(fs.readFileSync(keyArg, 'utf-8'));
+      proverPub = kd.publicKeyHex || kd;
+    }
+
+    const result = core.ZKDSLEngine.verifyDSLProof(proof, proverPub, expr);
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m Zero-Knowledge DSL Proof is \x1b[1m\x1b[32mVALID & SATISFIED\x1b[0m`);
+      console.log(`  Proof ID:    ${result.proofId}`);
+      console.log(`  AST Root:    ${result.astRootHash}`);
+      console.log(`  Satisfied:   \x1b[32mTRUE\x1b[0m`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m Zero-Knowledge DSL Proof verification \x1b[1m\x1b[31mFAILED\x1b[0m:`, result.errors.join(', '));
+      process.exit(1);
+    }
+    return;
+  }
+
+  if (command === 'aibom-create') {
+    const manifestFile = getArgValue('--manifest') || getArgValue('-m');
+    const keyFile = getArgValue('--key') || getArgValue('-k');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!manifestFile || !keyFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --manifest <manifest.json> or --key <key.json>');
+      process.exit(1);
+    }
+
+    const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf-8'));
+    const certifierKey = JSON.parse(fs.readFileSync(keyFile, 'utf-8'));
+
+    const receipt = core.AIBOMRegistryEngine.createAIBOMReceipt(manifest, certifierKey);
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(receipt, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m AI-BOM Receipt saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(receipt, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'aibom-verify') {
+    const receiptFile = getArgValue('--receipt') || getArgValue('-r');
+    const keyArg = getArgValue('--key') || getArgValue('-k');
+    const rootArg = getArgValue('--root');
+
+    if (!receiptFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --receipt <receipt.json>');
+      process.exit(1);
+    }
+
+    const receipt = JSON.parse(fs.readFileSync(receiptFile, 'utf-8'));
+    let certifierPub = keyArg;
+    if (keyArg && fs.existsSync(keyArg)) {
+      const kd = JSON.parse(fs.readFileSync(keyArg, 'utf-8'));
+      certifierPub = kd.publicKeyHex || kd;
+    }
+
+    const result = core.AIBOMRegistryEngine.verifyAIBOMReceipt(receipt, certifierPub, rootArg);
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m AI-BOM Receipt is \x1b[1m\x1b[32mAUTHENTIC & MERKLE-VERIFIED\x1b[0m`);
+      console.log(`  Model ID:     ${result.modelId}`);
+      console.log(`  Layer Count:  ${result.layerCount}`);
+      console.log(`  Weights Root: ${result.weightsMerkleRoot}`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m AI-BOM Receipt verification \x1b[1m\x1b[31mFAILED\x1b[0m:`, result.errors.join(', '));
+      process.exit(1);
+    }
+    return;
+  }
+
+  if (command === 'pqc-falcon-keygen') {
+    const level = parseInt(getArgValue('--level') || '512', 10);
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    const kp = core.PQCFalconEngine.generateKeyPair(level);
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(kp, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Falcon-${level} KeyPair saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(kp, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'pqc-falcon-sign') {
+    const dataArg = getArgValue('--data') || getArgValue('-d');
+    const keyFile = getArgValue('--key') || getArgValue('-k');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!dataArg || !keyFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --data <text|file> or --key <key.json>');
+      process.exit(1);
+    }
+
+    const data = fs.existsSync(dataArg) ? fs.readFileSync(dataArg, 'utf-8') : dataArg;
+    const keyData = JSON.parse(fs.readFileSync(keyFile, 'utf-8'));
+    const sigHex = core.PQCFalconEngine.sign(data, keyData.privateKeyHex, keyData.securityLevel || 512);
+
+    const outObj = {
+      message: data,
+      signatureHex: sigHex,
+      publicKeyHex: keyData.publicKeyHex,
+      securityLevel: keyData.securityLevel || 512
+    };
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(outObj, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Falcon signature saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(outObj, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'pqc-falcon-verify') {
+    const dataArg = getArgValue('--data') || getArgValue('-d');
+    const sigArg = getArgValue('--sig') || getArgValue('-s');
+    const keyArg = getArgValue('--key') || getArgValue('-k');
+    const attFile = getArgValue('--attestation') || getArgValue('-a');
+
+    if (attFile) {
+      const att = JSON.parse(fs.readFileSync(attFile, 'utf-8'));
+      let pub = keyArg;
+      if (keyArg && fs.existsSync(keyArg)) {
+        const kd = JSON.parse(fs.readFileSync(keyArg, 'utf-8'));
+        pub = kd.publicKeyHex || kd;
+      }
+      const res = core.PQCFalconEngine.verifyAttestation(att, pub);
+      if (res.valid) {
+        console.log(`\x1b[32m✔\x1b[0m Falcon Attestation is \x1b[1m\x1b[32mVERIFIED & AUTHENTIC\x1b[0m`);
+      } else {
+        console.error(`\x1b[31m✖\x1b[0m Falcon Attestation verification \x1b[1m\x1b[31mFAILED\x1b[0m:`, res.errors.join(', '));
+        process.exit(1);
+      }
+      return;
+    }
+
+    if (!dataArg || !sigArg || !keyArg) {
+      console.error('\x1b[31mError:\x1b[0m Missing --data <text|file>, --sig <sigHex>, or --key <pubHex|key.json>');
+      process.exit(1);
+    }
+
+    const data = fs.existsSync(dataArg) ? fs.readFileSync(dataArg, 'utf-8') : dataArg;
+    let pubHex = keyArg;
+    if (fs.existsSync(keyArg)) {
+      const kd = JSON.parse(fs.readFileSync(keyArg, 'utf-8'));
+      pubHex = kd.publicKeyHex || kd;
+    }
+
+    const isValid = core.PQCFalconEngine.verify(data, sigArg, pubHex);
+    if (isValid) {
+      console.log(`\x1b[32m✔\x1b[0m Falcon Signature is \x1b[1m\x1b[32mVALID\x1b[0m`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m Falcon Signature is \x1b[1m\x1b[31mINVALID\x1b[0m`);
       process.exit(1);
     }
     return;

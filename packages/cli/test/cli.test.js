@@ -800,15 +800,15 @@ test('CLI Suite', async (t) => {
     assert.ok(aggOut.includes('Status List Multi-Partition Root matches'));
   });
 
-  await t.test('29. docutrust version displays v12.0.0', () => {
+  await t.test('29. docutrust version displays v14.0.0', () => {
     const out1 = execSync(`node "${cliPath}" version`).toString().trim();
-    assert.equal(out1, '12.0.0');
+    assert.equal(out1, '14.0.0');
 
     const out2 = execSync(`node "${cliPath}" --version`).toString().trim();
-    assert.equal(out2, '12.0.0');
+    assert.equal(out2, '14.0.0');
 
     const out3 = execSync(`node "${cliPath}" -v`).toString().trim();
-    assert.equal(out3, '12.0.0');
+    assert.equal(out3, '14.0.0');
   });
 
   await t.test('30. docutrust ringsig-sign and ringsig-verify (Linkable Ring Signatures)', () => {
@@ -1113,7 +1113,129 @@ test('CLI Suite', async (t) => {
     assert.ok(verifyOut.includes('VERIFIED & TAMPER-FREE'));
     assert.ok(verifyOut.includes('COMPLIANT'));
   });
+
+  await t.test('46. docutrust vrf-beacon, vrf-verify, oracle-feed & oracle-verify-feed', () => {
+    const oKey1 = path.join(tempDir, 'oracle-key-1.json');
+    const oKey2 = path.join(tempDir, 'oracle-key-2.json');
+    const beaconFile = path.join(tempDir, 'vrf-beacon.json');
+    const feedFile = path.join(tempDir, 'oracle-feed.json');
+
+    execSync(`node "${cliPath}" keygen --out "${oKey1}"`);
+    execSync(`node "${cliPath}" keygen --out "${oKey2}"`);
+
+    // 1. Create VRF Beacon
+    const beaconOut = execSync(`node "${cliPath}" vrf-beacon --epoch 10 --seed "lottery-seed" --keys "${oKey1},${oKey2}" --threshold 2 --out "${beaconFile}"`).toString();
+    assert.ok(beaconOut.includes('VRF Randomness Beacon saved'));
+    assert.ok(fs.existsSync(beaconFile));
+
+    // 2. Verify VRF Beacon
+    const verifyBeaconOut = execSync(`node "${cliPath}" vrf-verify --beacon "${beaconFile}"`).toString();
+    assert.ok(verifyBeaconOut.includes('VERIFIED & CONSENSUS-VALIDATED'));
+
+    // 3. Oracle Feed
+    const feedOut = execSync(`node "${cliPath}" oracle-feed --feed-id "eth-usd" --key "ETH_PRICE" --val "3500.50" --signers "${oKey1},${oKey2}" --quorum 2 --out "${feedFile}"`).toString();
+    assert.ok(feedOut.includes('Oracle Data Feed saved'));
+    assert.ok(fs.existsSync(feedFile));
+
+    // 4. Verify Oracle Feed
+    const verifyFeedOut = execSync(`node "${cliPath}" oracle-verify-feed --feed "${feedFile}" --keys "${oKey1},${oKey2}"`).toString();
+    assert.ok(verifyFeedOut.includes('VERIFIED & CONSENSUS-VALIDATED'));
+  });
+
+  await t.test('47. docutrust zk-compile-dsl, zk-dsl-prove & zk-dsl-verify', () => {
+    const dslAstFile = path.join(tempDir, 'dsl-ast.json');
+    const subjectFile = path.join(tempDir, 'dsl-subject.json');
+    const proverKey = path.join(tempDir, 'dsl-prover-key.json');
+    const proofFile = path.join(tempDir, 'dsl-proof.json');
+
+    execSync(`node "${cliPath}" keygen --out "${proverKey}"`);
+    fs.writeFileSync(subjectFile, JSON.stringify({ age: 25, income: 80000, jurisdiction: 'US' }), 'utf-8');
+
+    const expr = "age >= 21 AND income >= 50000 AND jurisdiction == 'US'";
+
+    // 1. Compile
+    const compileOut = execSync(`node "${cliPath}" zk-compile-dsl --expr "${expr}" --out "${dslAstFile}"`).toString();
+    assert.ok(compileOut.includes('ZK-DSL AST compiled and saved'));
+    assert.ok(fs.existsSync(dslAstFile));
+
+    // 2. Prove
+    const proveOut = execSync(`node "${cliPath}" zk-dsl-prove --expr "${expr}" --subject "${subjectFile}" --key "${proverKey}" --out "${proofFile}"`).toString();
+    assert.ok(proveOut.includes('Zero-Knowledge DSL Proof saved'));
+    assert.ok(fs.existsSync(proofFile));
+
+    // 3. Verify
+    const verifyOut = execSync(`node "${cliPath}" zk-dsl-verify --proof "${proofFile}" --key "${proverKey}" --expr "${expr}"`).toString();
+    assert.ok(verifyOut.includes('Zero-Knowledge DSL Proof is'));
+    assert.ok(verifyOut.includes('VALID & SATISFIED'));
+  });
+
+  await t.test('48. docutrust aibom-create & aibom-verify', () => {
+    const certKey = path.join(tempDir, 'aibom-cert-key.json');
+    const manifestFile = path.join(tempDir, 'aibom-manifest.json');
+    const receiptFile = path.join(tempDir, 'aibom-receipt.json');
+
+    execSync(`node "${cliPath}" keygen --out "${certKey}"`);
+
+    const manifest = {
+      modelId: 'dt-gpt-gov-7b',
+      modelName: 'DocuTrust Governance LLM',
+      architecture: 'transformer',
+      parametersCount: '7B',
+      quantization: 'fp16',
+      layers: [
+        {
+          layerIndex: 0,
+          layerName: 'embed.weight',
+          tensorShape: [32000, 4096],
+          dataType: 'float16',
+          tensorDigestHex: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+        },
+        {
+          layerIndex: 1,
+          layerName: 'layer0.attn.q_proj.weight',
+          tensorShape: [4096, 4096],
+          dataType: 'float16',
+          tensorDigestHex: 'fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210'
+        }
+      ]
+    };
+    fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 2), 'utf-8');
+
+    // 1. Create Receipt
+    const createOut = execSync(`node "${cliPath}" aibom-create --manifest "${manifestFile}" --key "${certKey}" --out "${receiptFile}"`).toString();
+    assert.ok(createOut.includes('AI-BOM Receipt saved'));
+    assert.ok(fs.existsSync(receiptFile));
+
+    // 2. Verify Receipt
+    const verifyOut = execSync(`node "${cliPath}" aibom-verify --receipt "${receiptFile}" --key "${certKey}"`).toString();
+    assert.ok(verifyOut.includes('AI-BOM Receipt is'));
+    assert.ok(verifyOut.includes('AUTHENTIC & MERKLE-VERIFIED'));
+  });
+
+  await t.test('49. docutrust pqc-falcon-keygen, pqc-falcon-sign & pqc-falcon-verify', () => {
+    const falconKeyFile = path.join(tempDir, 'falcon-key.json');
+    const sigFile = path.join(tempDir, 'falcon-sig.json');
+
+    // 1. KeyGen
+    const keygenOut = execSync(`node "${cliPath}" pqc-falcon-keygen --level 512 --out "${falconKeyFile}"`).toString();
+    assert.ok(keygenOut.includes('Falcon-512 KeyPair saved'));
+    assert.ok(fs.existsSync(falconKeyFile));
+
+    // 2. Sign
+    const msg = 'Post-quantum high-assurance intelligence data';
+    const signOut = execSync(`node "${cliPath}" pqc-falcon-sign --data "${msg}" --key "${falconKeyFile}" --out "${sigFile}"`).toString();
+    assert.ok(signOut.includes('Falcon signature saved'));
+    assert.ok(fs.existsSync(sigFile));
+
+    const sigData = JSON.parse(fs.readFileSync(sigFile, 'utf-8'));
+
+    // 3. Verify
+    const verifyOut = execSync(`node "${cliPath}" pqc-falcon-verify --data "${msg}" --sig "${sigData.signatureHex}" --key "${falconKeyFile}"`).toString();
+    assert.ok(verifyOut.includes('Falcon Signature is'));
+    assert.ok(verifyOut.includes('VALID'));
+  });
 });
+
 
 
 

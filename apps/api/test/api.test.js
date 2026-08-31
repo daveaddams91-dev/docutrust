@@ -1893,6 +1893,216 @@ test('API Server Suite', async (t) => {
     assert.equal(verifyRes.body.success, true);
     assert.equal(verifyRes.body.valid, true);
   });
+
+  await t.test('60. POST /api/v1/vrf (Keygen, Evaluate, Verify, Beacon & Multi-Oracle Consensus)', async () => {
+    // 1. Keygen
+    const keyRes = await makeRequest('POST', '/api/v1/vrf/keygen', { securityLevel: 256 });
+    assert.equal(keyRes.status, 200);
+    assert.ok(keyRes.body.keyPair.did.startsWith('did:vrf:'));
+    const oracleKp1 = keyRes.body.keyPair;
+
+    // 2. Evaluate
+    const evalRes = await makeRequest('POST', '/api/v1/vrf/evaluate', {
+      seed: 'vrf-lottery-epoch-100',
+      keyPair: oracleKp1
+    });
+    assert.equal(evalRes.status, 200);
+    assert.ok(evalRes.body.evaluation.vrfOutputHex);
+    assert.ok(evalRes.body.evaluation.proofHex);
+
+    // 3. Verify
+    const verifyRes = await makeRequest('POST', '/api/v1/vrf/verify', {
+      seed: 'vrf-lottery-epoch-100',
+      vrfOutputHex: evalRes.body.evaluation.vrfOutputHex,
+      proofHex: evalRes.body.evaluation.proofHex,
+      publicKeyHex: oracleKp1.publicKeyHex
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.valid, true);
+
+    // 4. Randomness Beacon
+    const oracleKp2 = (await makeRequest('POST', '/api/v1/vrf/keygen', {})).body.keyPair;
+    const oracleKp3 = (await makeRequest('POST', '/api/v1/vrf/keygen', {})).body.keyPair;
+
+    const beaconRes = await makeRequest('POST', '/api/v1/vrf/beacon', {
+      beaconId: 'beacon-epoch-100',
+      epoch: 100,
+      previousBeaconHash: '0000000000000000000000000000000000000000000000000000000000000000',
+      entropySeed: 'seed-epoch-100',
+      oracleKeyPairs: [oracleKp1, oracleKp2, oracleKp3],
+      quorumThreshold: 2
+    });
+    assert.equal(beaconRes.status, 200);
+    assert.equal(beaconRes.body.beacon.type, 'DocuTrustVRFBeacon2026');
+
+    // 5. Verify Beacon
+    const beaconVerifyRes = await makeRequest('POST', '/api/v1/vrf/beacon/verify', {
+      beacon: beaconRes.body.beacon
+    });
+    assert.equal(beaconVerifyRes.status, 200);
+    assert.equal(beaconVerifyRes.body.valid, true);
+    assert.equal(beaconVerifyRes.body.validEvaluationsCount, 3);
+  });
+
+  await t.test('61. POST /api/v1/oracle/feed (Feed Attestation and Multi-Oracle Verification)', async () => {
+    const k1 = (await makeRequest('POST', '/api/v1/keys/generate')).body.keyPair;
+    const k2 = (await makeRequest('POST', '/api/v1/keys/generate')).body.keyPair;
+
+    const feedData = {
+      feedId: 'ETH-USD-PRICE',
+      timestamp: new Date().toISOString(),
+      value: 3450.75,
+      confidence: 0.999
+    };
+
+    const feedRes = await makeRequest('POST', '/api/v1/oracle/feed', {
+      feedData,
+      signerKeyPairs: [k1, k2],
+      quorumThreshold: 2
+    });
+    assert.equal(feedRes.status, 200);
+    assert.equal(feedRes.body.feed.type, 'DocuTrustOracleFeed2026');
+
+    const trustedPublicKeys = {
+      [k1.did]: k1.publicKeyHex,
+      [k2.did]: k2.publicKeyHex
+    };
+
+    const verifyRes = await makeRequest('POST', '/api/v1/oracle/feed/verify', {
+      feed: feedRes.body.feed,
+      trustedPublicKeys
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.valid, true);
+    assert.equal(verifyRes.body.validSignaturesCount, 2);
+  });
+
+  await t.test('62. POST /api/v1/zk/dsl (Compile, Prove, and Verify DSL Expressions)', async () => {
+    const expr = "age >= 21 AND income >= 50000 AND jurisdiction == 'US'";
+
+    // 1. Compile
+    const compileRes = await makeRequest('POST', '/api/v1/zk/dsl/compile', { expression: expr });
+    assert.equal(compileRes.status, 200);
+    assert.ok(compileRes.body.astRootHash);
+    assert.deepEqual(compileRes.body.requiredFields, ['age', 'income', 'jurisdiction']);
+
+    // 2. Prove
+    const proverKp = (await makeRequest('POST', '/api/v1/keys/generate')).body.keyPair;
+    const privateSubject = { age: 28, income: 95000, jurisdiction: 'US', ssn: '000-11-2222' };
+
+    const proveRes = await makeRequest('POST', '/api/v1/zk/dsl/prove', {
+      expression: expr,
+      privateSubject,
+      proverKeyPair: proverKp,
+      options: { generateEvmCalldata: true }
+    });
+    assert.equal(proveRes.status, 200);
+    assert.equal(proveRes.body.proof.type, 'DocuTrustZKDSLProof2026');
+    assert.ok(proveRes.body.proof.evmCalldataHex);
+
+    // 3. Verify
+    const verifyRes = await makeRequest('POST', '/api/v1/zk/dsl/verify', {
+      proof: proveRes.body.proof,
+      proverPublicKeyHex: proverKp.publicKeyHex,
+      expectedExpression: expr
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.valid, true);
+    assert.equal(verifyRes.body.satisfied, true);
+  });
+
+  await t.test('63. POST /api/v1/aibom (Manifest Creation, Verification, and Layer Inclusion Proofs)', async () => {
+    const certKp = (await makeRequest('POST', '/api/v1/keys/generate')).body.keyPair;
+
+    const manifest = {
+      modelName: 'DeepTrust-LLM-70B',
+      architecture: 'Transformer-Decoder',
+      modelFamily: 'DeepTrust',
+      modelVersion: '1.0.0',
+      license: 'Apache-2.0',
+      trainingParameters: { precision: 'bfloat16', totalParameters: '70B' },
+      layers: [
+        { layerName: 'transformer.embed_tokens', tensorShape: [128256, 8192], quantizationType: 'FP16', weightsDigest: 'digest-layer-0' },
+        { layerName: 'transformer.layers.0.self_attn', tensorShape: [8192, 8192], quantizationType: 'FP16', weightsDigest: 'digest-layer-1' }
+      ],
+      loraAdapters: [{ adapterName: 'finance-lora', rank: 16, alpha: 32, adapterWeightsDigest: 'lora-digest-1' }],
+      datasetsLineage: [{ datasetId: 'ds-curated-web', datasetHash: 'ds-hash-1' }]
+    };
+
+    // 1. Create Receipt
+    const createRes = await makeRequest('POST', '/api/v1/aibom/create', {
+      manifest,
+      certifierKeyPair: certKp
+    });
+    assert.equal(createRes.status, 200);
+    assert.equal(createRes.body.receipt.type, 'DocuTrustAIBOMReceipt2026');
+    assert.ok(createRes.body.receipt.weightsMerkleRoot);
+
+    // 2. Verify Receipt
+    const verifyRes = await makeRequest('POST', '/api/v1/aibom/verify', {
+      receipt: createRes.body.receipt,
+      certifierPublicKeyHex: certKp.publicKeyHex
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.valid, true);
+
+    // 3. Layer Inclusion Proof
+    const layerProofRes = await makeRequest('POST', '/api/v1/aibom/layer-proof', {
+      manifest,
+      layerIndex: 1
+    });
+    assert.equal(layerProofRes.status, 200);
+    assert.equal(layerProofRes.body.layer.layerName, 'transformer.layers.0.self_attn');
+    assert.ok(layerProofRes.body.proof);
+  });
+
+  await t.test('64. POST /api/v1/pqc/falcon (Keygen, Sign, Verify, Attestation Issue & Verify)', async () => {
+    // 1. Keygen
+    const keyRes = await makeRequest('POST', '/api/v1/pqc/falcon/keygen', { securityLevel: 512 });
+    assert.equal(keyRes.status, 200);
+    assert.ok(keyRes.body.keyPair.did.startsWith('did:falcon:'));
+    const falconKp = keyRes.body.keyPair;
+
+    // 2. Sign & Verify Raw Data
+    const data = 'Critical Financial Transfer Confirmation #99482';
+    const signRes = await makeRequest('POST', '/api/v1/pqc/falcon/sign', {
+      data,
+      privateKeyHex: falconKp.privateKeyHex,
+      securityLevel: 512
+    });
+    assert.equal(signRes.status, 200);
+    assert.ok(signRes.body.signatureHex);
+
+    const verifyRawRes = await makeRequest('POST', '/api/v1/pqc/falcon/verify', {
+      data,
+      signatureHex: signRes.body.signatureHex,
+      publicKeyHex: falconKp.publicKeyHex
+    });
+    assert.equal(verifyRawRes.status, 200);
+    assert.equal(verifyRawRes.body.valid, true);
+
+    // 3. Issue & Verify Structured Attestation
+    const attestationPayload = {
+      action: 'DEPLOY_MODEL_TO_PRODUCTION',
+      targetCluster: 'us-east-cluster-01',
+      complianceAuditId: 'SOC2-2026-Q3'
+    };
+
+    const issueRes = await makeRequest('POST', '/api/v1/pqc/falcon/attestation/issue', {
+      payload: attestationPayload,
+      signerKeyPair: falconKp,
+      securityLevel: 512
+    });
+    assert.equal(issueRes.status, 200);
+    assert.equal(issueRes.body.attestation.type, 'DocuTrustFalconAttestation2026');
+
+    const verifyAttestRes = await makeRequest('POST', '/api/v1/pqc/falcon/attestation/verify', {
+      attestation: issueRes.body.attestation,
+      trustedPublicKeyHex: falconKp.publicKeyHex
+    });
+    assert.equal(verifyAttestRes.status, 200);
+    assert.equal(verifyAttestRes.body.valid, true);
+  });
 });
 
 
