@@ -1,5 +1,5 @@
 from __future__ import annotations
-__version__ = "13.0.0"
+__version__ = "16.0.0"
 from .client import DocuTrustClient
 from .crypto import canonicalize_json, sha256_hex, MerkleTree, encode_base58, decode_base58
 from .pqc import generate_pqc_hybrid_keys
@@ -77,8 +77,12 @@ from .pq_ratchet import PQRatchetEngine
 from .polynomial_commitments import PolynomialCommitmentEngine, BN254_SCALAR_FIELD
 from .tee_attestation import TEEAttestationEngine
 from .ibc_relayer import IBCRelayerEngine
+from .fhe_query import FHEQueryEngine
+from .frost_threshold import FROSTEngine
+from .zk_plonk import ZKPlonKEngine
+from .agentic_capability import AgenticCapabilityEngine
 
-__version__ = "15.0.0"
+__version__ = "16.0.0"
 __all__ = [
     "DocuTrustClient",
     "canonicalize_json",
@@ -170,7 +174,11 @@ __all__ = [
     "PolynomialCommitmentEngine",
     "BN254_SCALAR_FIELD",
     "TEEAttestationEngine",
-    "IBCRelayerEngine"
+    "IBCRelayerEngine",
+    "FHEQueryEngine",
+    "FROSTEngine",
+    "ZKPlonKEngine",
+    "AgenticCapabilityEngine"
 ]
 
 

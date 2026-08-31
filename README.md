@@ -2,22 +2,20 @@
 
 # 🛡️ DocuTrust
 
-### The Open-Source Sovereign Trust Fabric for Verifiable Credentials, Post-Quantum Double Ratchet, Polynomial KZG Commitments, Hardware TEE Remote Attestation & Cosmos IBC Relayer
+### The Open-Source Sovereign Trust Fabric for Verifiable Credentials, Fully Homomorphic Encryption (FHE), FROST Threshold Schnorr, ZK-PlonK Arithmetization & Agentic Capability Delegation
 
-[![Version](https://img.shields.io/badge/Version-v15.0.0-cyan.svg)]()
+[![Version](https://img.shields.io/badge/Version-v16.0.0-cyan.svg)]()
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CI Status](https://img.shields.io/badge/CI-100%25%20Passing-brightgreen.svg)]()
-[![PQ Double Ratchet](https://img.shields.io/badge/PQ--Ratchet-ML--KEM--768%20%2B%20X25519-indigo.svg)]()
-[![Polynomial Commitments](https://img.shields.io/badge/KZG-BN254%20Polynomial%20Commitments-cyan.svg)]()
-[![TEE Attestation](https://img.shields.io/badge/TEE-Intel%20SGX%20%26%20AMD%20SEV-amber.svg)]()
-[![Cosmos IBC Relayer](https://img.shields.io/badge/IBC-ICS--04%20%26%20ICS--23%20Relayer-purple.svg)]()
-[![VRF Oracle Mesh](https://img.shields.io/badge/VRF-Multi--Oracle%20Consensus%20Beacon-orange.svg)]()
-[![ZK Predicate DSL](https://img.shields.io/badge/ZK--DSL-Multi--Attribute%20Compiler-cyan.svg)]()
+[![FHE Queries](https://img.shields.io/badge/FHE-LWE%20%2F%20RLWE%20Encrypted%20Queries-emerald.svg)]()
+[![FROST Threshold](https://img.shields.io/badge/FROST-Secp256k1%20Schnorr%20DKG-cyan.svg)]()
+[![ZK PlonK](https://img.shields.io/badge/ZK--PlonK-Universal%20Permutation%20%2B%20Plookup-amber.svg)]()
+[![Agentic Capability](https://img.shields.io/badge/Agentic-UCAN%20%2F%20OCAP--LD%20Mesh-rose.svg)]()
 [![Python SDK](https://img.shields.io/badge/Python-3.8+-3776AB?logo=python&logoColor=white)]()
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)]()
 
 <p align="center">
-  <b>DocuTrust</b> enables universities, enterprises, AI systems, and decentralized networks to issue tamper-proof academic degrees, credentials, and autonomous agent attestations with <b>Post-Quantum ML-KEM-768 Double Ratchet Forward Secrecy</b>, <b>BN254 Kate-Zaverucha-Goldberg (KZG) Polynomial Commitments & Synthetic Division Proofs</b>, <b>Intel SGX / AMD SEV Confidential Computing Remote Attestation & TEE-Bound VCs</b>, <b>Cosmos IBC ICS-04 / ICS-23 Cross-Chain Packet Relayer</b>, <b>deterministic Verifiable Random Functions (VRF) & threshold oracle consensus</b>, <b>Zero-Knowledge Multi-Attribute Predicate DSL Compilation & Non-Interactive Proofs</b>, <b>AI Bill of Materials (AI-BOM) Neural Network Weights Merkle Trees & Layer Inclusion Proofs</b>, <b>Post-Quantum Falcon-512/1024 Lattice Signatures</b>, and <b>Recursive ZK Folding with Fiat-Shamir</b>.
+  <b>DocuTrust</b> enables universities, enterprises, AI systems, and decentralized networks to issue tamper-proof academic degrees, credentials, and autonomous agent attestations with <b>Fully Homomorphic Encryption (FHE) blind database queries & encrypted range filtering</b>, <b>FROST 2-round threshold Schnorr signatures over Secp256k1</b>, <b>Universal ZK-PlonK arithmetization with custom gate selectors, permutation arguments & Plookup tables</b>, <b>Agentic UCAN / OCAP-LD capability delegation tokens & verifiable execution receipts</b>, <b>Post-Quantum ML-KEM-768 Double Ratchet Forward Secrecy</b>, <b>BN254 Kate-Zaverucha-Goldberg (KZG) Polynomial Commitments</b>, <b>Intel SGX / AMD SEV Confidential Computing Remote Attestation</b>, and <b>Cosmos IBC ICS-04 / ICS-23 Cross-Chain Packet Relayers</b>.
 </p>
 
 [Quickstart Demo](#-10-second-quickstart-demo) • [Architecture](#-system-architecture--workflow) • [Security Hardening](#-defense-in-depth-security-hardening-uncrackable-guarantee) • [CLI Toolkit](#-cli-toolkit) • [Python SDK](#-python-sdk-docutrust) • [REST API](#-rest-api-endpoints)

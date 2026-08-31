@@ -188,6 +188,27 @@ $$\text{Commitment} = \text{SHA-256}(\text{timeoutTimestamp} \parallel \text{tim
 2. ICS-23 Merkle multi-store state proof verification against Tendermint consensus `AppHash`.
 3. Trust period verification and automated cross-chain packet relay execution.
 
+### 2.25 Fully Homomorphic Encryption (FHE) & Blind Database Queries
+1. LWE ciphertext generation: $\mathbf{c} = (\mathbf{a}, b = \langle \mathbf{a}, \mathbf{s} \rangle + e + \Delta \cdot m \pmod q)$.
+2. Homomorphic evaluation directly on ciphertexts without decryption:
+$$\mathbf{c}_{\text{sum}} = \mathbf{c}_1 + \mathbf{c}_2 \pmod q, \quad \mathbf{c}_{\text{scalar}} = k \cdot \mathbf{c} \pmod q$$
+3. Blind database range predicates and verifiable computation receipts (`DocuTrustFHEQueryReceipt2026`).
+
+### 2.26 FROST Flexible Round-Optimized Threshold Schnorr Signatures (Secp256k1)
+1. Distributed Key Generation (DKG) with polynomial secret shares: $f_i(x) = s_i + \sum_{k=1}^{t-1} a_{ik} x^k$.
+2. 2-Round signature protocol with hiding/binding nonce commitments $(D_i, E_i)$ and partial signature shares $z_i = d_i + (e_i \cdot \rho_i) + \lambda_i s_i c$.
+3. Group signature aggregation: $(R, z) = (\sum R_i, \sum z_i)$ verified against $Y$ as a single Schnorr signature.
+
+### 2.27 Universal ZK-PlonK & Plookup Arithmetization
+1. PlonKish gate constraints: $q_{Li} a_i + q_{Ri} b_i + q_{Oi} c_i + q_{Mi} (a_i b_i) + q_{Ci} = 0$.
+2. Permutation copy constraints via grand product polynomial $Z(X)$.
+3. Plookup table arguments for zero-overhead range and authorized set inclusion proofs.
+
+### 2.28 Agentic Capability Delegation & Monotonic Caveats (UCAN / OCAP-LD)
+1. Capability delegation tokens: $\text{Token} = \text{Sign}_{\text{Delegator}}(\text{JCS}(\{\text{iss}, \text{aud}, \text{att}, \text{prf}, \text{fct}\}))$.
+2. Strict monotonic caveat attenuation preventing privilege escalation.
+3. Cryptographically signed execution receipts (`DocuTrustAgentExecutionReceipt2026`).
+
 ---
 
 ## 3. Directory Layout

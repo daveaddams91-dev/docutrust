@@ -47,6 +47,10 @@ import PQRatchetStudio from './components/PQRatchetStudio.jsx';
 import PolynomialCommitmentStudio from './components/PolynomialCommitmentStudio.jsx';
 import TEEAttestationStudio from './components/TEEAttestationStudio.jsx';
 import IBCRelayerStudio from './components/IBCRelayerStudio.jsx';
+import FHEQueryStudio from './components/FHEQueryStudio.jsx';
+import FROSTStudio from './components/FROSTStudio.jsx';
+import PlonKStudio from './components/PlonKStudio.jsx';
+import AgenticCapabilityStudio from './components/AgenticCapabilityStudio.jsx';
 import Footer from './components/Footer.jsx';
 
 export default function App() {
@@ -64,6 +68,10 @@ export default function App() {
 
       <main className="flex-1">
         {activeTab === 'hero' && <HeroSection setActiveTab={setActiveTab} />}
+        {activeTab === 'fhe-query' && <FHEQueryStudio />}
+        {activeTab === 'frost-studio' && <FROSTStudio />}
+        {activeTab === 'plonk-studio' && <PlonKStudio />}
+        {activeTab === 'capability-studio' && <AgenticCapabilityStudio />}
         {activeTab === 'pq-ratchet' && <PQRatchetStudio />}
         {activeTab === 'poly-commit' && <PolynomialCommitmentStudio />}
         {activeTab === 'tee-attest' && <TEEAttestationStudio />}

@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
 const { server } = require('../src/server.js');
-const { BitstringStatusList2024, BitstringStatusListAggregator } = require('@docutrust/core');
+const { BitstringStatusList2024, BitstringStatusListAggregator, generateKeyPair } = require('@docutrust/core');
 
 let baseUrl;
 let serverInstance;
@@ -2301,7 +2301,278 @@ test('API Server Suite', async (t) => {
     assert.equal(relayRes.status, 200);
     assert.equal(relayRes.body.relayReceipt.status, 'RELAYED');
   });
+
+  await t.test('69. POST /api/v1/fhe (Keypair, Encrypt, Decrypt, Add, Multiply, DB Query, Receipt Create & Verify)', async () => {
+    // 1. Keypair
+    const kpRes = await makeRequest('POST', '/api/v1/fhe/keypair', {});
+    assert.equal(kpRes.status, 200);
+    const keyPair = kpRes.body.keyPair;
+
+    // 2. Encrypt
+    const enc1Res = await makeRequest('POST', '/api/v1/fhe/encrypt', {
+      value: 60000,
+      publicKey: keyPair.publicKey,
+      tag: 'salary_alice'
+    });
+    assert.equal(enc1Res.status, 200);
+    const c1 = enc1Res.body.ciphertext;
+
+    const enc2Res = await makeRequest('POST', '/api/v1/fhe/encrypt', {
+      value: 40000,
+      publicKey: keyPair.publicKey,
+      tag: 'salary_bob'
+    });
+    assert.equal(enc2Res.status, 200);
+    const c2 = enc2Res.body.ciphertext;
+
+    // 3. Add
+    const addRes = await makeRequest('POST', '/api/v1/fhe/add', { c1, c2 });
+    assert.equal(addRes.status, 200);
+    const sumC = addRes.body.sum;
+
+    const decAddRes = await makeRequest('POST', '/api/v1/fhe/decrypt', {
+      ciphertext: sumC,
+      privateKey: keyPair.privateKey
+    });
+    assert.equal(decAddRes.status, 200);
+    assert.equal(decAddRes.body.decrypted, 100000);
+
+    // 4. Multiply
+    const multRes = await makeRequest('POST', '/api/v1/fhe/multiply', {
+      ciphertext: c1,
+      scalar: 2
+    });
+    assert.equal(multRes.status, 200);
+    const scaledC = multRes.body.scaled;
+
+    const decMultRes = await makeRequest('POST', '/api/v1/fhe/decrypt', {
+      ciphertext: scaledC,
+      privateKey: keyPair.privateKey
+    });
+    assert.equal(decMultRes.status, 200);
+    assert.equal(decMultRes.body.decrypted, 120000);
+
+    // 5. DB Query
+    const queryDbRes = await makeRequest('POST', '/api/v1/fhe/query-db', {
+      records: [
+        { id: 'rec-1', encryptedAttributes: { salary: c1 } },
+        { id: 'rec-2', encryptedAttributes: { salary: c2 } }
+      ],
+      attributeName: 'salary',
+      weights: [1, 1]
+    });
+    assert.equal(queryDbRes.status, 200);
+    const queryResult = queryDbRes.body.result;
+    assert.equal(queryResult.evaluatedCount, 2);
+
+    // 6. Query Receipt Create & Verify
+    const issuerKp = generateKeyPair();
+    const receiptRes = await makeRequest('POST', '/api/v1/fhe/receipt/create', {
+      queryId: 'query-101',
+      filterType: 'SUM',
+      recordCount: 2,
+      resultCiphertext: queryResult.aggregatedResult,
+      issuerDid: issuerKp.did,
+      issuerPrivateKeyHex: issuerKp.privateKeyHex
+    });
+    assert.equal(receiptRes.status, 200);
+    const receipt = receiptRes.body.receipt;
+
+    const verifyReceiptRes = await makeRequest('POST', '/api/v1/fhe/receipt/verify', {
+      receipt,
+      expectedIssuerPrivateKeyHex: issuerKp.privateKeyHex
+    });
+    assert.equal(verifyReceiptRes.status, 200);
+    assert.equal(verifyReceiptRes.body.verification.valid, true);
+    assert.equal(verifyReceiptRes.body.verification.noiseAcceptable, true);
+  });
+
+  await t.test('70. POST /api/v1/frost (DKG, Round 1, Round 2, Aggregate, Verify, Credential Issue & Verify)', async () => {
+    // 1. DKG Key generation (2-of-3)
+    const dkgRes = await makeRequest('POST', '/api/v1/frost/dkg', {
+      threshold: 2,
+      totalSigners: 3
+    });
+    assert.equal(dkgRes.status, 200);
+    const { keyPackages, groupPublicKey } = dkgRes.body.dkgResult;
+    assert.equal(keyPackages.length, 3);
+
+    // 2. Round 1 Nonces
+    const r1Res1 = await makeRequest('POST', '/api/v1/frost/round1', { signerId: 1 });
+    const r1Res2 = await makeRequest('POST', '/api/v1/frost/round1', { signerId: 2 });
+    assert.equal(r1Res1.status, 200);
+    assert.equal(r1Res2.status, 200);
+    const nonces1 = r1Res1.body.nonces;
+    const nonces2 = r1Res2.body.nonces;
+    const commitmentList = [nonces1.commitments, nonces2.commitments];
+
+    // 3. Round 2 Partial Signing
+    const message = 'TREASURY_TRANSFER_PAYLOAD_2026';
+    const r2Res1 = await makeRequest('POST', '/api/v1/frost/round2', {
+      message,
+      signerId: 1,
+      secretShareHex: keyPackages[0].secretShare,
+      nonces: nonces1,
+      commitmentList,
+      groupPublicKey
+    });
+    const r2Res2 = await makeRequest('POST', '/api/v1/frost/round2', {
+      message,
+      signerId: 2,
+      secretShareHex: keyPackages[1].secretShare,
+      nonces: nonces2,
+      commitmentList,
+      groupPublicKey
+    });
+    assert.equal(r2Res1.status, 200);
+    assert.equal(r2Res2.status, 200);
+    const shares = [r2Res1.body.share, r2Res2.body.share];
+
+    // 4. Aggregate Signatures
+    const aggRes = await makeRequest('POST', '/api/v1/frost/aggregate', {
+      message,
+      signatureShares: shares,
+      commitmentList,
+      groupPublicKey,
+      threshold: 2
+    });
+    assert.equal(aggRes.status, 200);
+    const thresholdSignature = aggRes.body.signature;
+
+    // 5. Verify Threshold Signature
+    const verifySigRes = await makeRequest('POST', '/api/v1/frost/verify', {
+      message,
+      signature: thresholdSignature,
+      expectedGroupPublicKey: groupPublicKey
+    });
+    assert.equal(verifySigRes.status, 200);
+    assert.equal(verifySigRes.body.result.valid, true);
+
+    // 6. Threshold Credential Issue & Verify
+    const credRes = await makeRequest('POST', '/api/v1/frost/credential/issue', {
+      credentialSubject: { id: 'did:key:alice', role: 'ChiefAuditor' },
+      thresholdSignature,
+      issuerDid: 'did:key:governance-mesh'
+    });
+    assert.equal(credRes.status, 200);
+    const credential = credRes.body.credential;
+
+    const verifyCredRes = await makeRequest('POST', '/api/v1/frost/credential/verify', {
+      credential,
+      expectedGroupPublicKey: groupPublicKey
+    });
+    assert.equal(verifyCredRes.status, 200);
+    assert.equal(verifyCredRes.body.result.valid, true);
+  });
+
+  await t.test('71. POST /api/v1/zk/plonk (Compile, Prove, Verify)', async () => {
+    // 1. Compile PlonK circuit: tier * multiplier - grantAmount == 0
+    const gates = [
+      {
+        gateIndex: 0,
+        qL: 0,
+        qR: 0,
+        qO: -1,
+        qM: 1,
+        qC: 0,
+        aVar: 'tier',
+        bVar: 'multiplier',
+        cVar: 'grantAmount',
+        lookupTable: 'validTiers'
+      }
+    ];
+    const lookupTables = { validTiers: [10, 20, 30, 40, 50] };
+
+    const compileRes = await makeRequest('POST', '/api/v1/zk/plonk/compile', {
+      circuitId: 'plonk_test_circuit',
+      gates,
+      lookupTables
+    });
+    assert.equal(compileRes.status, 200);
+    const compiled = compileRes.body.compiled;
+
+    // 2. Generate Proof (witness: tier=20, multiplier=5; publicInputs: grantAmount=100)
+    const proveRes = await makeRequest('POST', '/api/v1/zk/plonk/prove', {
+      circuit: compiled.circuit,
+      witness: { tier: 20, multiplier: 5 },
+      publicInputs: { grantAmount: 100 }
+    });
+    assert.equal(proveRes.status, 200);
+    const proof = proveRes.body.proof;
+    assert.equal(proof.type, 'DocuTrustPlonKProof2026');
+
+    // 3. Verify Proof
+    const verifyRes = await makeRequest('POST', '/api/v1/zk/plonk/verify', {
+      proof,
+      verificationKey: compiled.verificationKey,
+      publicInputs: { grantAmount: 100 }
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.result.valid, true);
+  });
+
+  await t.test('72. POST /api/v1/capability (Root Issue, Attenuate, Chain Verify, Receipt Create & Verify)', async () => {
+    const rootKp = generateKeyPair();
+    const agentAKp = generateKeyPair();
+    const agentBKp = generateKeyPair();
+
+    // 1. Issue Root UCAN
+    const rootRes = await makeRequest('POST', '/api/v1/capability/root/issue', {
+      issuerDid: rootKp.did,
+      audienceDid: agentAKp.did,
+      capabilities: [{ resource: 'urn:docutrust:vault:*', action: '*' }],
+      caveats: [{ type: 'maxSpend', value: 5000 }],
+      expiresInSeconds: 3600,
+      issuerPrivateKeyHex: rootKp.privateKeyHex
+    });
+    assert.equal(rootRes.status, 200);
+    const rootToken = rootRes.body.token;
+
+    // 2. Attenuate Capability
+    const attRes = await makeRequest('POST', '/api/v1/capability/attenuate', {
+      parentToken: rootToken,
+      delegatorDid: agentAKp.did,
+      delegateeDid: agentBKp.did,
+      restrictedCapabilities: [{ resource: 'urn:docutrust:vault:docs', action: 'READ' }],
+      additionalCaveats: [{ type: 'ipWhitelist', value: ['10.0.0.1', '127.0.0.1'] }],
+      expiresInSeconds: 1800,
+      delegatorPrivateKeyHex: agentAKp.privateKeyHex
+    });
+    assert.equal(attRes.status, 200);
+    const attenuatedToken = attRes.body.token;
+
+    // 3. Verify Delegation Path
+    const chain = [rootToken, attenuatedToken];
+    const chainVerifyRes = await makeRequest('POST', '/api/v1/capability/chain/verify', {
+      tokenChain: chain,
+      targetAction: 'READ',
+      targetResource: 'urn:docutrust:vault:docs',
+      context: { spendAmount: 200, clientIp: '127.0.0.1' }
+    });
+    assert.equal(chainVerifyRes.status, 200);
+    assert.equal(chainVerifyRes.body.result.valid, true);
+
+    // 4. Create Execution Receipt
+    const receiptRes = await makeRequest('POST', '/api/v1/capability/receipt/create', {
+      agentDid: agentBKp.did,
+      invokedCapability: { resource: 'urn:docutrust:vault:docs', action: 'READ' },
+      tokenChain: chain,
+      executionPayload: { query: 'SELECT * FROM docs', executionResult: 'SUCCESS' },
+      agentPrivateKeyHex: agentBKp.privateKeyHex
+    });
+    assert.equal(receiptRes.status, 200);
+    const receipt = receiptRes.body.receipt;
+
+    // 5. Verify Execution Receipt
+    const verifyReceiptRes = await makeRequest('POST', '/api/v1/capability/receipt/verify', {
+      receipt,
+      expectedAgentPrivateKeyHex: agentBKp.privateKeyHex
+    });
+    assert.equal(verifyReceiptRes.status, 200);
+    assert.equal(verifyReceiptRes.body.result.valid, true);
+  });
 });
+
 
 
 

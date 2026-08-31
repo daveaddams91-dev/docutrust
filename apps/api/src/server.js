@@ -109,7 +109,11 @@ const {
   PQRatchetEngine,
   PolynomialCommitmentEngine,
   TEEAttestationEngine,
-  IBCRelayerEngine
+  IBCRelayerEngine,
+  FHEQueryEngine,
+  FROSTEngine,
+  ZKPlonKEngine,
+  AgenticCapabilityEngine
 } = require('@docutrust/core');
 
 const PORT = process.env.PORT || 4000;
@@ -3323,6 +3327,347 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // ========================================================
+    // 78. Fully Homomorphic Encryption (FHE) Query Endpoints (v16.0.0)
+    // ========================================================
+    if (pathname === '/api/v1/fhe/keypair' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { dimension = 8, modulus = 2147483647 } = body || {};
+      try {
+        const keyPair = FHEQueryEngine.generateKeyPair(dimension, modulus);
+        return jsonResponse(200, { success: true, keyPair });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/fhe/encrypt' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { value, publicKey, tag } = body;
+      if (value === undefined || !publicKey) {
+        return jsonResponse(400, { error: 'Missing value or publicKey.' });
+      }
+      try {
+        const ciphertext = FHEQueryEngine.encryptValue(value, publicKey, tag);
+        return jsonResponse(200, { success: true, ciphertext });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/fhe/decrypt' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { ciphertext, privateKey } = body;
+      if (!ciphertext || !privateKey) {
+        return jsonResponse(400, { error: 'Missing ciphertext or privateKey.' });
+      }
+      try {
+        const decrypted = FHEQueryEngine.decryptValue(ciphertext, privateKey);
+        return jsonResponse(200, { success: true, decrypted });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/fhe/add' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { c1, c2 } = body;
+      if (!c1 || !c2) {
+        return jsonResponse(400, { error: 'Missing c1 or c2.' });
+      }
+      try {
+        const sum = FHEQueryEngine.addCiphertexts(c1, c2);
+        return jsonResponse(200, { success: true, sum });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/fhe/multiply' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { ciphertext, scalar } = body;
+      if (!ciphertext || scalar === undefined) {
+        return jsonResponse(400, { error: 'Missing ciphertext or scalar.' });
+      }
+      try {
+        const scaled = FHEQueryEngine.multiplyScalar(ciphertext, scalar);
+        return jsonResponse(200, { success: true, scaled });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/fhe/query-db' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { records, attributeName, weights } = body;
+      if (!records || !attributeName) {
+        return jsonResponse(400, { error: 'Missing records or attributeName.' });
+      }
+      try {
+        const result = FHEQueryEngine.queryEncryptedDatabase(records, attributeName, weights);
+        return jsonResponse(200, { success: true, result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/fhe/receipt/create' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { queryId, filterType, recordCount, resultCiphertext, issuerDid, issuerPrivateKeyHex } = body;
+      if (!queryId || !filterType || recordCount === undefined || !resultCiphertext || !issuerDid || !issuerPrivateKeyHex) {
+        return jsonResponse(400, { error: 'Missing required FHE receipt parameters.' });
+      }
+      try {
+        const receipt = FHEQueryEngine.createQueryReceipt(
+          queryId, filterType, recordCount, resultCiphertext, issuerDid, issuerPrivateKeyHex
+        );
+        return jsonResponse(200, { success: true, receipt });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/fhe/receipt/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { receipt, expectedIssuerPrivateKeyHex } = body;
+      if (!receipt) {
+        return jsonResponse(400, { error: 'Missing receipt.' });
+      }
+      try {
+        const verification = FHEQueryEngine.verifyQueryReceipt(receipt, expectedIssuerPrivateKeyHex);
+        return jsonResponse(200, { success: true, verification });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ========================================================
+    // 79. FROST Threshold Schnorr Signature Endpoints (v16.0.0)
+    // ========================================================
+    if (pathname === '/api/v1/frost/dkg' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { threshold, totalSigners } = body;
+      if (!threshold || !totalSigners) {
+        return jsonResponse(400, { error: 'Missing threshold or totalSigners.' });
+      }
+      try {
+        const dkgResult = FROSTEngine.generateDKGKeyShares(threshold, totalSigners);
+        return jsonResponse(200, { success: true, dkgResult });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/frost/round1' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { signerId } = body;
+      if (!signerId) {
+        return jsonResponse(400, { error: 'Missing signerId.' });
+      }
+      try {
+        const nonces = FROSTEngine.round1Commitment(signerId);
+        return jsonResponse(200, { success: true, nonces });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/frost/round2' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { message, signerId, secretShareHex, nonces, commitmentList, groupPublicKey } = body;
+      if (!message || !signerId || !secretShareHex || !nonces || !commitmentList || !groupPublicKey) {
+        return jsonResponse(400, { error: 'Missing required FROST Round 2 parameters.' });
+      }
+      try {
+        const share = FROSTEngine.round2Sign(message, signerId, secretShareHex, nonces, commitmentList, groupPublicKey);
+        return jsonResponse(200, { success: true, share });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/frost/aggregate' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { message, signatureShares, commitmentList, groupPublicKey, threshold } = body;
+      if (!message || !signatureShares || !commitmentList || !groupPublicKey || !threshold) {
+        return jsonResponse(400, { error: 'Missing required FROST aggregation parameters.' });
+      }
+      try {
+        const signature = FROSTEngine.aggregateSignatures(message, signatureShares, commitmentList, groupPublicKey, threshold);
+        return jsonResponse(200, { success: true, signature });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/frost/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { message, signature, expectedGroupPublicKey } = body;
+      if (!message || !signature || !expectedGroupPublicKey) {
+        return jsonResponse(400, { error: 'Missing message, signature, or expectedGroupPublicKey.' });
+      }
+      try {
+        const result = FROSTEngine.verifyThresholdSignature(message, signature, expectedGroupPublicKey);
+        return jsonResponse(200, { success: true, result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/frost/credential/issue' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { credentialSubject, thresholdSignature, issuerDid } = body;
+      if (!credentialSubject || !thresholdSignature || !issuerDid) {
+        return jsonResponse(400, { error: 'Missing credentialSubject, thresholdSignature, or issuerDid.' });
+      }
+      try {
+        const credential = FROSTEngine.issueThresholdCredential(credentialSubject, thresholdSignature, issuerDid);
+        return jsonResponse(200, { success: true, credential });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/frost/credential/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { credential, expectedGroupPublicKey } = body;
+      if (!credential || !expectedGroupPublicKey) {
+        return jsonResponse(400, { error: 'Missing credential or expectedGroupPublicKey.' });
+      }
+      try {
+        const result = FROSTEngine.verifyThresholdCredential(credential, expectedGroupPublicKey);
+        return jsonResponse(200, { success: true, result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ========================================================
+    // 80. ZK-PlonK & Plookup Endpoints (v16.0.0)
+    // ========================================================
+    if (pathname === '/api/v1/zk/plonk/compile' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { circuitId, gates, publicInputKeys = [], lookupTables, plookupTables } = body;
+      if (!circuitId || !gates) {
+        return jsonResponse(400, { error: 'Missing circuitId or gates.' });
+      }
+      try {
+        const compiled = ZKPlonKEngine.compileCircuit(circuitId, gates, publicInputKeys, lookupTables || plookupTables || {});
+        return jsonResponse(200, { success: true, compiled });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/zk/plonk/prove' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { circuit, compiledCircuit, witness, wireAssignments, publicInputs = {} } = body;
+      const targetCircuit = circuit || (compiledCircuit && compiledCircuit.circuit);
+      const targetWitness = witness || wireAssignments;
+      if (!targetCircuit || !targetWitness) {
+        return jsonResponse(400, { error: 'Missing circuit or witness.' });
+      }
+      try {
+        const proof = ZKPlonKEngine.createPlonKProof(targetCircuit, targetWitness, publicInputs);
+        return jsonResponse(200, { success: true, proof });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/zk/plonk/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { proof, verificationKey, publicInputs } = body;
+      if (!proof || !verificationKey) {
+        return jsonResponse(400, { error: 'Missing proof or verificationKey.' });
+      }
+      try {
+        const result = ZKPlonKEngine.verifyPlonKProof(proof, verificationKey, publicInputs);
+        return jsonResponse(200, { success: true, result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ========================================================
+    // 81. Verifiable Agentic Capability & Delegation Mesh (v16.0.0)
+    // ========================================================
+    if (pathname === '/api/v1/capability/root/issue' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { issuerDid, audienceDid, capabilities, caveats = [], expiresInSeconds = 3600, issuerPrivateKeyHex } = body;
+      if (!issuerDid || !audienceDid || !capabilities || !issuerPrivateKeyHex) {
+        return jsonResponse(400, { error: 'Missing required root capability parameters.' });
+      }
+      try {
+        const token = AgenticCapabilityEngine.issueRootCapability(
+          issuerDid, audienceDid, capabilities, caveats, expiresInSeconds, issuerPrivateKeyHex
+        );
+        return jsonResponse(200, { success: true, token });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/capability/attenuate' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { parentToken, delegatorDid, delegateeDid, restrictedCapabilities, additionalCaveats = [], expiresInSeconds = 1800, delegatorPrivateKeyHex } = body;
+      if (!parentToken || !delegatorDid || !delegateeDid || !restrictedCapabilities || !delegatorPrivateKeyHex) {
+        return jsonResponse(400, { error: 'Missing required attenuation parameters.' });
+      }
+      try {
+        const token = AgenticCapabilityEngine.attenuateCapability(
+          parentToken, delegatorDid, delegateeDid, restrictedCapabilities, additionalCaveats, expiresInSeconds, delegatorPrivateKeyHex
+        );
+        return jsonResponse(200, { success: true, token });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/capability/chain/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { tokenChain, targetAction, targetResource, context } = body;
+      if (!tokenChain || !targetAction || !targetResource) {
+        return jsonResponse(400, { error: 'Missing tokenChain, targetAction, or targetResource.' });
+      }
+      try {
+        const result = AgenticCapabilityEngine.verifyDelegationPath(tokenChain, targetAction, targetResource, context);
+        return jsonResponse(200, { success: true, result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/capability/receipt/create' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { agentDid, invokedCapability, tokenChain, executionPayload, agentPrivateKeyHex } = body;
+      if (!agentDid || !invokedCapability || !tokenChain || !executionPayload || !agentPrivateKeyHex) {
+        return jsonResponse(400, { error: 'Missing required execution receipt parameters.' });
+      }
+      try {
+        const receipt = AgenticCapabilityEngine.createExecutionReceipt(
+          agentDid, invokedCapability, tokenChain, executionPayload, agentPrivateKeyHex
+        );
+        return jsonResponse(200, { success: true, receipt });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/capability/receipt/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { receipt, expectedAgentPrivateKeyHex } = body;
+      if (!receipt) {
+        return jsonResponse(400, { error: 'Missing receipt.' });
+      }
+      try {
+        const result = AgenticCapabilityEngine.verifyExecutionReceipt(receipt, expectedAgentPrivateKeyHex);
+        return jsonResponse(200, { success: true, result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
     // Default 404
     jsonResponse(404, { error: 'Route not found' });
   } catch (err) {
@@ -3332,7 +3677,7 @@ const server = http.createServer(async (req, res) => {
 
 if (require.main === module) {
   server.listen(PORT, () => {
-    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v15.0.0 running on http://localhost:${PORT}`);
+    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v16.0.0 running on http://localhost:${PORT}`);
   });
 }
 

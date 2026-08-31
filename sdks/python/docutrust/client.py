@@ -1979,6 +1979,253 @@ class DocuTrustClient:
         from .ibc_relayer import IBCRelayerEngine
         return IBCRelayerEngine.relay_packet(packet, proof, source_client_on_dest, proof_height, relayer_key_pair)
 
+    # ========================================================
+    # v16.0.0 Fully Homomorphic Encryption (FHE) Query Methods
+    # ========================================================
+
+    def fhe_generate_key_pair(self, dimension: int = 8, modulus: int = 2147483647) -> Dict[str, Any]:
+        """Generates an LWE / RLWE homomorphic encryption key pair."""
+        from .fhe_query import FHEQueryEngine
+        return FHEQueryEngine.generate_key_pair(dimension, modulus)
+
+    def fhe_encrypt_value(self, value: int, public_key: Dict[str, Any], tag: str = "scalar") -> Dict[str, Any]:
+        """Encrypts an integer under the FHE public key."""
+        from .fhe_query import FHEQueryEngine
+        return FHEQueryEngine.encrypt_value(value, public_key, tag)
+
+    def fhe_decrypt_value(self, ciphertext: Dict[str, Any], private_key: Dict[str, Any]) -> int:
+        """Decrypts an FHE ciphertext using the private key."""
+        from .fhe_query import FHEQueryEngine
+        return FHEQueryEngine.decrypt_value(ciphertext, private_key)
+
+    def fhe_add_ciphertexts(self, c1: Dict[str, Any], c2: Dict[str, Any]) -> Dict[str, Any]:
+        """Performs homomorphic addition of two encrypted ciphertexts."""
+        from .fhe_query import FHEQueryEngine
+        return FHEQueryEngine.add_ciphertexts(c1, c2)
+
+    def fhe_multiply_scalar(self, c: Dict[str, Any], scalar: int) -> Dict[str, Any]:
+        """Performs homomorphic scalar multiplication on a ciphertext."""
+        from .fhe_query import FHEQueryEngine
+        return FHEQueryEngine.multiply_scalar(c, scalar)
+
+    def fhe_linear_combination(self, ciphertexts: List[Dict[str, Any]], weights: List[int]) -> Dict[str, Any]:
+        """Computes homomorphic linear combination of ciphertexts."""
+        from .fhe_query import FHEQueryEngine
+        return FHEQueryEngine.linear_combination(ciphertexts, weights)
+
+    def fhe_query_encrypted_database(
+        self,
+        records: List[Dict[str, Any]],
+        attribute_name: str,
+        weights: Optional[List[int]] = None
+    ) -> Dict[str, Any]:
+        """Evaluates an aggregation query over an encrypted credential dataset."""
+        from .fhe_query import FHEQueryEngine
+        return FHEQueryEngine.query_encrypted_database(records, attribute_name, weights)
+
+    def fhe_create_query_receipt(
+        self,
+        query_id: str,
+        filter_type: str,
+        record_count: int,
+        result_ciphertext: Dict[str, Any],
+        issuer_did: str,
+        issuer_private_key_hex: str
+    ) -> Dict[str, Any]:
+        """Creates a signed verifiable query receipt for an FHE computation."""
+        from .fhe_query import FHEQueryEngine
+        return FHEQueryEngine.create_query_receipt(
+            query_id, filter_type, record_count, result_ciphertext, issuer_did, issuer_private_key_hex
+        )
+
+    def fhe_verify_query_receipt(
+        self,
+        receipt: Dict[str, Any],
+        expected_issuer_private_key_hex: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Verifies an FHE query receipt."""
+        from .fhe_query import FHEQueryEngine
+        return FHEQueryEngine.verify_query_receipt(receipt, expected_issuer_private_key_hex)
+
+    # ========================================================
+    # v16.0.0 FROST Two-Round Threshold Signature Methods
+    # ========================================================
+
+    def frost_generate_dkg_key_shares(self, threshold: int, total_signers: int) -> Dict[str, Any]:
+        """Generates FROST distributed key shares for t-of-n signers."""
+        from .frost_threshold import FROSTEngine
+        return FROSTEngine.generate_dkg_key_shares(threshold, total_signers)
+
+    def frost_round1_commitment(self, signer_id: int) -> Dict[str, Any]:
+        """Generates Round 1 hiding and binding nonces and commitments."""
+        from .frost_threshold import FROSTEngine
+        return FROSTEngine.round1_commitment(signer_id)
+
+    def frost_round2_sign(
+        self,
+        message: str,
+        signer_id: int,
+        secret_share_hex: str,
+        nonces: Dict[str, Any],
+        commitment_list: List[Dict[str, Any]],
+        group_public_key: str
+    ) -> Dict[str, Any]:
+        """Performs Round 2 partial signing."""
+        from .frost_threshold import FROSTEngine
+        return FROSTEngine.round2_sign(
+            message, signer_id, secret_share_hex, nonces, commitment_list, group_public_key
+        )
+
+    def frost_aggregate_signatures(
+        self,
+        message: str,
+        signature_shares: List[Dict[str, Any]],
+        commitment_list: List[Dict[str, Any]],
+        group_public_key: str,
+        threshold: int
+    ) -> Dict[str, Any]:
+        """Aggregates partial signature shares into a valid FROST threshold signature."""
+        from .frost_threshold import FROSTEngine
+        return FROSTEngine.aggregate_signatures(
+            message, signature_shares, commitment_list, group_public_key, threshold
+        )
+
+    def frost_verify_threshold_signature(
+        self,
+        message: str,
+        signature: Dict[str, Any],
+        expected_group_public_key: str
+    ) -> Dict[str, Any]:
+        """Verifies a FROST threshold signature."""
+        from .frost_threshold import FROSTEngine
+        return FROSTEngine.verify_threshold_signature(message, signature, expected_group_public_key)
+
+    def frost_issue_threshold_credential(
+        self,
+        credential_subject: Dict[str, Any],
+        threshold_signature: Dict[str, Any],
+        issuer_did: str
+    ) -> Dict[str, Any]:
+        """Issues a Verifiable Credential signed with FROST threshold signature."""
+        from .frost_threshold import FROSTEngine
+        return FROSTEngine.issue_threshold_credential(credential_subject, threshold_signature, issuer_did)
+
+    def frost_verify_threshold_credential(
+        self,
+        credential: Dict[str, Any],
+        expected_group_public_key: str
+    ) -> Dict[str, Any]:
+        """Verifies a FROST threshold signed credential."""
+        from .frost_threshold import FROSTEngine
+        return FROSTEngine.verify_threshold_credential(credential, expected_group_public_key)
+
+    # ========================================================
+    # v16.0.0 ZK-PlonK & Plookup Methods
+    # ========================================================
+
+    def plonk_compile_circuit(
+        self,
+        circuit_id: str,
+        gates: List[Dict[str, Any]],
+        plookup_tables: Optional[Dict[str, List[int]]] = None
+    ) -> Dict[str, Any]:
+        """Compiles an arithmetic circuit into PlonKish format."""
+        from .zk_plonk import ZKPlonKEngine
+        return ZKPlonKEngine.compile_plonk_circuit(circuit_id, gates, plookup_tables)
+
+    def plonk_generate_proof(
+        self,
+        compiled_circuit: Dict[str, Any],
+        wire_assignments: Dict[str, List[int]],
+        public_inputs: List[int]
+    ) -> Dict[str, Any]:
+        """Generates a PlonK Zero-Knowledge proof."""
+        from .zk_plonk import ZKPlonKEngine
+        return ZKPlonKEngine.generate_proof(compiled_circuit, wire_assignments, public_inputs)
+
+    def plonk_verify_proof(
+        self,
+        proof: Dict[str, Any],
+        verification_key: Dict[str, Any],
+        public_inputs: List[int]
+    ) -> Dict[str, Any]:
+        """Verifies a PlonK proof."""
+        from .zk_plonk import ZKPlonKEngine
+        return ZKPlonKEngine.verify_proof(proof, verification_key, public_inputs)
+
+    # ========================================================
+    # v16.0.0 Verifiable Agentic Capability & Delegation Mesh
+    # ========================================================
+
+    def capability_issue_root(
+        self,
+        issuer_did: str,
+        audience_did: str,
+        capabilities: List[Dict[str, Any]],
+        caveats: List[Dict[str, Any]],
+        expires_in_seconds: int,
+        issuer_private_key_hex: str
+    ) -> Dict[str, Any]:
+        """Issues a root UCAN capability token."""
+        from .agentic_capability import AgenticCapabilityEngine
+        return AgenticCapabilityEngine.issue_root_capability(
+            issuer_did, audience_did, capabilities, caveats, expires_in_seconds, issuer_private_key_hex
+        )
+
+    def capability_attenuate(
+        self,
+        parent_token: Dict[str, Any],
+        delegator_did: str,
+        delegatee_did: str,
+        restricted_capabilities: List[Dict[str, Any]],
+        additional_caveats: List[Dict[str, Any]],
+        expires_in_seconds: int,
+        delegator_private_key_hex: str
+    ) -> Dict[str, Any]:
+        """Attenuates and delegates a UCAN capability token."""
+        from .agentic_capability import AgenticCapabilityEngine
+        return AgenticCapabilityEngine.attenuate_capability(
+            parent_token, delegator_did, delegatee_did, restricted_capabilities,
+            additional_caveats, expires_in_seconds, delegator_private_key_hex
+        )
+
+    def capability_verify_delegation_path(
+        self,
+        token_chain: List[Dict[str, Any]],
+        target_action: str,
+        target_resource: str,
+        context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Verifies an attenuated UCAN delegation chain."""
+        from .agentic_capability import AgenticCapabilityEngine
+        return AgenticCapabilityEngine.verify_delegation_path(
+            token_chain, target_action, target_resource, context
+        )
+
+    def capability_create_execution_receipt(
+        self,
+        agent_did: str,
+        invoked_capability: Dict[str, Any],
+        token_chain: List[Dict[str, Any]],
+        execution_payload: Any,
+        agent_private_key_hex: str
+    ) -> Dict[str, Any]:
+        """Generates a verifiable execution receipt for an agent action."""
+        from .agentic_capability import AgenticCapabilityEngine
+        return AgenticCapabilityEngine.create_execution_receipt(
+            agent_did, invoked_capability, token_chain, execution_payload, agent_private_key_hex
+        )
+
+    def capability_verify_execution_receipt(
+        self,
+        receipt: Dict[str, Any],
+        expected_agent_private_key_hex: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Verifies an agent execution receipt."""
+        from .agentic_capability import AgenticCapabilityEngine
+        return AgenticCapabilityEngine.verify_execution_receipt(receipt, expected_agent_private_key_hex)
+
+
 
 
 

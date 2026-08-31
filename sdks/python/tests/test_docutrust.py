@@ -1956,8 +1956,189 @@ class TestDocuTrustPython(unittest.TestCase):
         self.assertEqual(relayed["status"], "RELAYED")
         self.assertIn("acknowledgementHex", relayed)
 
+    def test_fhe_query_engine(self):
+        from docutrust.fhe_query import FHEQueryEngine
+        from docutrust.crypto import generate_key_pair
+
+        keypair = FHEQueryEngine.generate_key_pair()
+        issuer_kp = generate_key_pair()
+
+        # 1. Encrypt attributes
+        c1 = FHEQueryEngine.encrypt_value(50000, keypair["public_key"], "salary_alice")
+        c2 = FHEQueryEngine.encrypt_value(75000, keypair["public_key"], "salary_bob")
+
+        # 2. Homomorphic addition
+        sum_c = FHEQueryEngine.add_ciphertexts(c1, c2)
+        decrypted_sum = FHEQueryEngine.decrypt_value(sum_c, keypair["private_key"])
+        self.assertEqual(decrypted_sum, 125000)
+
+        # 3. Scalar multiplication & linear combination
+        scaled = FHEQueryEngine.multiply_scalar(c1, 3)
+        decrypted_scaled = FHEQueryEngine.decrypt_value(scaled, keypair["private_key"])
+        self.assertEqual(decrypted_scaled, 150000)
+
+        lin_comb = FHEQueryEngine.linear_combination([c1, c2], [2, 1])
+        decrypted_lin = FHEQueryEngine.decrypt_value(lin_comb, keypair["private_key"])
+        self.assertEqual(decrypted_lin, 175000)
+
+        # 4. Database aggregation query
+        records = [
+            {"id": "rec_001", "encrypted_attributes": {"salary": c1}},
+            {"id": "rec_002", "encrypted_attributes": {"salary": c2}}
+        ]
+        query_res = FHEQueryEngine.query_encrypted_database(records, "salary", [1, 1])
+        self.assertEqual(query_res["evaluated_count"], 2)
+        decrypted_query = FHEQueryEngine.decrypt_value(query_res["aggregated_result"], keypair["private_key"])
+        self.assertEqual(decrypted_query, 125000)
+
+        # 5. Query receipt issuance and verification
+        receipt = FHEQueryEngine.create_query_receipt(
+            "q_fhe_101",
+            "SUM",
+            2,
+            query_res["aggregated_result"],
+            issuer_kp["did"],
+            issuer_kp["privateKeyHex"]
+        )
+        self.assertEqual(receipt["type"], "DocuTrustFHEQueryReceipt2026")
+        self.assertTrue(receipt["signature"].startswith("0x"))
+
+        verify_res = FHEQueryEngine.verify_query_receipt(receipt, issuer_kp["privateKeyHex"])
+        self.assertTrue(verify_res["valid"])
+        self.assertTrue(verify_res["noise_acceptable"])
+
+    def test_frost_threshold_engine(self):
+        from docutrust.frost_threshold import FROSTEngine
+
+        # 1. DKG 2-of-3 setup
+        dkg = FROSTEngine.generate_dkg_key_shares(threshold=2, total_signers=3)
+        self.assertEqual(len(dkg["key_packages"]), 3)
+        self.assertTrue(dkg["group_public_key"].startswith("0x"))
+
+        # 2. Round 1 Commitments
+        nonces_1 = FROSTEngine.round1_commitment(1)
+        nonces_2 = FROSTEngine.round1_commitment(2)
+        commitment_list = [nonces_1["commitments"], nonces_2["commitments"]]
+
+        # 3. Round 2 Partial Signing
+        msg = "FROST_THRESHOLD_TRANSACTION_PAYLOAD_2026"
+        share_1 = FROSTEngine.round2_sign(
+            msg, 1, dkg["key_packages"][0]["secret_share"], nonces_1, commitment_list, dkg["group_public_key"]
+        )
+        share_2 = FROSTEngine.round2_sign(
+            msg, 2, dkg["key_packages"][1]["secret_share"], nonces_2, commitment_list, dkg["group_public_key"]
+        )
+
+        # 4. Signature Aggregation
+        threshold_sig = FROSTEngine.aggregate_signatures(
+            msg, [share_1, share_2], commitment_list, dkg["group_public_key"], 2
+        )
+        self.assertEqual(threshold_sig["type"], "DocuTrustFROSTSchnorrSignature2026")
+        self.assertEqual(threshold_sig["participantCount"], 2)
+
+        # 5. Threshold Signature Verification
+        verify_sig = FROSTEngine.verify_threshold_signature(msg, threshold_sig, dkg["group_public_key"])
+        self.assertTrue(verify_sig["valid"])
+
+        # 6. Threshold Credential Issuance and Verification
+        subject = {"id": "did:key:holder_subject", "role": "TreasuryAdmin", "clearance": "Level3"}
+        cred = FROSTEngine.issue_threshold_credential(subject, threshold_sig, "did:key:group_authority")
+        self.assertIn("FROSTThresholdCredential2026", cred["type"])
+
+        verify_cred = FROSTEngine.verify_threshold_credential(cred, dkg["group_public_key"])
+        self.assertTrue(verify_cred["valid"])
+
+    def test_zk_plonk_engine(self):
+        from docutrust.zk_plonk import ZKPlonKEngine
+
+        # Circuit: x * y + 5 == z (x=3, y=4, z=17)
+        gates = [
+            {
+                "gateIndex": 0,
+                "qL": 0,
+                "qR": 0,
+                "qO": -1,
+                "qM": 1,
+                "qC": 5,
+                "copyConstraints": [[0, 1]]
+            }
+        ]
+        plookup_tables = {"range_8": list(range(256))}
+
+        compiled = ZKPlonKEngine.compile_plonk_circuit("plonk_mult_add_circuit", gates, plookup_tables)
+        self.assertEqual(compiled["circuit_id"], "plonk_mult_add_circuit")
+        self.assertIn("verification_key", compiled)
+
+        wire_assignments = {"a": [3], "b": [4], "c": [17]}
+        public_inputs = [17]
+
+        proof = ZKPlonKEngine.generate_proof(compiled, wire_assignments, public_inputs)
+        self.assertEqual(proof["type"], "DocuTrustPlonKProof2026")
+        self.assertTrue(proof["calldata"].startswith("0x"))
+
+        verify_res = ZKPlonKEngine.verify_proof(proof, compiled["verification_key"], public_inputs)
+        self.assertTrue(verify_res["valid"])
+
+    def test_agentic_capability_engine(self):
+        from docutrust.agentic_capability import AgenticCapabilityEngine
+        from docutrust.crypto import generate_key_pair
+
+        root_kp = generate_key_pair()
+        agent_a_kp = generate_key_pair()
+        agent_b_kp = generate_key_pair()
+
+        # 1. Issue Root UCAN Token
+        root_token = AgenticCapabilityEngine.issue_root_capability(
+            issuer_did=root_kp["did"],
+            audience_did=agent_a_kp["did"],
+            capabilities=[{"resource": "urn:docutrust:vault:*", "action": "*"}],
+            caveats=[{"type": "maxSpend", "value": 5000}],
+            expires_in_seconds=3600,
+            issuer_private_key_hex=root_kp["privateKeyHex"]
+        )
+        self.assertEqual(root_token["type"], "DocuTrustUCANToken2026")
+        self.assertEqual(root_token["audience"], agent_a_kp["did"])
+
+        # 2. Attenuate Capability to Agent B
+        attenuated_token = AgenticCapabilityEngine.attenuate_capability(
+            parent_token=root_token,
+            delegator_did=agent_a_kp["did"],
+            delegatee_did=agent_b_kp["did"],
+            restricted_capabilities=[{"resource": "urn:docutrust:vault:documents", "action": "READ"}],
+            additional_caveats=[{"type": "ipWhitelist", "value": ["10.0.0.1", "127.0.0.1"]}],
+            expires_in_seconds=1800,
+            delegator_private_key_hex=agent_a_kp["privateKeyHex"]
+        )
+        self.assertEqual(attenuated_token["issuer"], agent_a_kp["did"])
+        self.assertEqual(attenuated_token["audience"], agent_b_kp["did"])
+
+        # 3. Verify Delegation Chain
+        token_chain = [root_token, attenuated_token]
+        chain_verify = AgenticCapabilityEngine.verify_delegation_path(
+            token_chain,
+            target_action="READ",
+            target_resource="urn:docutrust:vault:documents",
+            context={"spend_amount": 100, "client_ip": "127.0.0.1"}
+        )
+        self.assertTrue(chain_verify["valid"])
+
+        # 4. Create and Verify Execution Receipt
+        receipt = AgenticCapabilityEngine.create_execution_receipt(
+            agent_did=agent_b_kp["did"],
+            invoked_capability={"resource": "urn:docutrust:vault:documents", "action": "READ"},
+            token_chain=token_chain,
+            execution_payload={"documentId": "doc_confidential_001", "resultStatus": "SUCCESS"},
+            agent_private_key_hex=agent_b_kp["privateKeyHex"]
+        )
+        self.assertEqual(receipt["status"], "EXECUTED_AUTHENTIC")
+        self.assertTrue(receipt["executionDigest"].startswith("0x"))
+
+        verify_receipt = AgenticCapabilityEngine.verify_execution_receipt(receipt, agent_b_kp["privateKeyHex"])
+        self.assertTrue(verify_receipt["valid"])
+
 if __name__ == '__main__':
     unittest.main()
+
 
 
 

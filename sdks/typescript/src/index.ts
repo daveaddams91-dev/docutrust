@@ -2167,6 +2167,211 @@ export class DocuTrustClient {
   ): Promise<{ success: boolean; acknowledgement: any; receiptProof: any; updatedClientState: any }> {
     return this.request('/ibc/packet/relay', 'POST', { packet, commitmentProof, clientState });
   }
+
+  // ========================================================
+  // v16.0.0 Fully Homomorphic Encryption (FHE) Client Methods
+  // ========================================================
+
+  public async generateFHEKeyPair(
+    dimension: number = 8,
+    modulus: number = 2147483647
+  ): Promise<{ success: boolean; keypair: any }> {
+    return this.request('/fhe/keypair', 'POST', { dimension, modulus });
+  }
+
+  public async encryptFHEValue(
+    value: number,
+    publicKey: any,
+    tag: string = 'scalar'
+  ): Promise<{ success: boolean; ciphertext: any }> {
+    return this.request('/fhe/encrypt', 'POST', { value, publicKey, tag });
+  }
+
+  public async decryptFHEValue(
+    ciphertext: any,
+    privateKey: any
+  ): Promise<{ success: boolean; value: number }> {
+    return this.request('/fhe/decrypt', 'POST', { ciphertext, privateKey });
+  }
+
+  public async addFHECiphertexts(
+    c1: any,
+    c2: any
+  ): Promise<{ success: boolean; sumCiphertext: any }> {
+    return this.request('/fhe/add', 'POST', { c1, c2 });
+  }
+
+  public async multiplyFHECiphertexts(
+    c1: any,
+    c2: any
+  ): Promise<{ success: boolean; productCiphertext: any }> {
+    return this.request('/fhe/multiply', 'POST', { c1, c2 });
+  }
+
+  public async queryFHEDatabase(
+    encryptedRecords: any[],
+    predicate: any
+  ): Promise<{ success: boolean; queryResult: any }> {
+    return this.request('/fhe/query-db', 'POST', { encryptedRecords, predicate });
+  }
+
+  public async createFHEQueryReceipt(
+    queryId: string,
+    encryptedResult: any,
+    serverDid: string,
+    serverPrivateKeyHex: string
+  ): Promise<{ success: boolean; receipt: any }> {
+    return this.request('/fhe/receipt/create', 'POST', { queryId, encryptedResult, serverDid, serverPrivateKeyHex });
+  }
+
+  public async verifyFHEQueryReceipt(
+    receipt: any,
+    serverPublicKeyHex?: string
+  ): Promise<{ success: boolean; result: any }> {
+    return this.request('/fhe/receipt/verify', 'POST', { receipt, serverPublicKeyHex });
+  }
+
+  // ========================================================
+  // v16.0.0 FROST Threshold Signature Client Methods
+  // ========================================================
+
+  public async generateFROSTDKG(
+    threshold: number = 2,
+    totalParticipants: number = 3
+  ): Promise<{ success: boolean; dkg: any }> {
+    return this.request('/frost/dkg', 'POST', { threshold, totalParticipants });
+  }
+
+  public async generateFROSTRound1Commitment(
+    signerId: number
+  ): Promise<{ success: boolean; nonces: any }> {
+    return this.request('/frost/round1', 'POST', { signerId });
+  }
+
+  public async generateFROSTRound2Share(
+    signerId: number,
+    keyPackage: any,
+    round1Commitments: any[],
+    message: string
+  ): Promise<{ success: boolean; signatureShare: any }> {
+    return this.request('/frost/round2', 'POST', { signerId, keyPackage, round1Commitments, message });
+  }
+
+  public async aggregateFROSTSignatures(
+    message: string,
+    commitments: any[],
+    shares: any[],
+    groupPublicKey: string
+  ): Promise<{ success: boolean; signature: any }> {
+    return this.request('/frost/aggregate', 'POST', { message, commitments, shares, groupPublicKey });
+  }
+
+  public async verifyFROSTThresholdSignature(
+    message: string,
+    signature: any,
+    groupPublicKey: string
+  ): Promise<{ success: boolean; result: any }> {
+    return this.request('/frost/verify', 'POST', { message, signature, groupPublicKey });
+  }
+
+  public async issueFROSTThresholdCredential(
+    credentialSubject: any,
+    groupPublicKey: string,
+    thresholdSignature: any,
+    issuerDid: string,
+    options: any = {}
+  ): Promise<{ success: boolean; credential: any }> {
+    return this.request('/frost/credential/issue', 'POST', { credentialSubject, groupPublicKey, thresholdSignature, issuerDid, options });
+  }
+
+  public async verifyFROSTThresholdCredential(
+    credential: any,
+    expectedGroupPublicKey?: string
+  ): Promise<{ success: boolean; result: any }> {
+    return this.request('/frost/credential/verify', 'POST', { credential, expectedGroupPublicKey });
+  }
+
+  // ========================================================
+  // v16.0.0 ZK-PlonK Client Methods
+  // ========================================================
+
+  public async compilePlonKCircuit(
+    circuitId: string,
+    gates: any[],
+    publicInputKeys: string[] = [],
+    lookupTables: Record<string, number[]> = {}
+  ): Promise<{ success: boolean; compiled: any }> {
+    return this.request('/zk/plonk/compile', 'POST', { circuitId, gates, publicInputKeys, lookupTables });
+  }
+
+  public async generatePlonKProof(
+    circuit: any,
+    witness: Record<string, number>,
+    publicInputs: Record<string, number> = {}
+  ): Promise<{ success: boolean; proof: any }> {
+    return this.request('/zk/plonk/prove', 'POST', { circuit, witness, publicInputs });
+  }
+
+  public async verifyPlonKProof(
+    proof: any,
+    verificationKey: any,
+    publicInputs?: Record<string, number>
+  ): Promise<{ success: boolean; result: any }> {
+    return this.request('/zk/plonk/verify', 'POST', { proof, verificationKey, publicInputs });
+  }
+
+  // ========================================================
+  // v16.0.0 Agentic Capability & Delegation Client Methods
+  // ========================================================
+
+  public async issueRootCapability(
+    issuerDid: string,
+    audienceDid: string,
+    capabilities: any[],
+    caveats: any[] = [],
+    expiresInSeconds: number = 3600,
+    issuerPrivateKeyHex: string
+  ): Promise<{ success: boolean; token: any }> {
+    return this.request('/capability/root/issue', 'POST', { issuerDid, audienceDid, capabilities, caveats, expiresInSeconds, issuerPrivateKeyHex });
+  }
+
+  public async attenuateCapability(
+    parentToken: any,
+    delegatorDid: string,
+    audienceDid: string,
+    capabilities: any[],
+    caveats: any[] = [],
+    expiresInSeconds: number = 1800,
+    delegatorPrivateKeyHex: string
+  ): Promise<{ success: boolean; token: any }> {
+    return this.request('/capability/attenuate', 'POST', { parentToken, delegatorDid, audienceDid, capabilities, caveats, expiresInSeconds, delegatorPrivateKeyHex });
+  }
+
+  public async verifyDelegationChain(
+    chain: any[],
+    requiredAction: string,
+    requiredResource: string,
+    context: any = {}
+  ): Promise<{ success: boolean; result: any }> {
+    return this.request('/capability/chain/verify', 'POST', { chain, requiredAction, requiredResource, context });
+  }
+
+  public async createAgentExecutionReceipt(
+    agentDid: string,
+    capabilityExercised: any,
+    delegationChain: any[],
+    executionPayload: any,
+    agentPrivateKeyHex: string
+  ): Promise<{ success: boolean; receipt: any }> {
+    return this.request('/capability/receipt/create', 'POST', { agentDid, capabilityExercised, delegationChain, executionPayload, agentPrivateKeyHex });
+  }
+
+  public async verifyAgentExecutionReceipt(
+    receipt: any,
+    agentPublicKeyHex?: string
+  ): Promise<{ success: boolean; result: any }> {
+    return this.request('/capability/receipt/verify', 'POST', { receipt, agentPublicKeyHex });
+  }
 }
 
 

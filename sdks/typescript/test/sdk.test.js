@@ -370,6 +370,60 @@ describe('DocuTrust TypeScript SDK (@docutrust/sdk)', () => {
     assert.strictEqual(mockCalls[94].url, 'https://test-api.docutrust.org/api/v1/ibc/client/update');
     await client.relayIBCPacket({}, {}, {});
     assert.strictEqual(mockCalls[95].url, 'https://test-api.docutrust.org/api/v1/ibc/packet/relay');
+
+    // 62. v16.0.0 FHE Queries
+    await client.generateFHEKeyPair(8, 2147483647);
+    assert.strictEqual(mockCalls[96].url, 'https://test-api.docutrust.org/api/v1/fhe/keypair');
+    await client.encryptFHEValue(42, {});
+    assert.strictEqual(mockCalls[97].url, 'https://test-api.docutrust.org/api/v1/fhe/encrypt');
+    await client.decryptFHEValue({}, {});
+    assert.strictEqual(mockCalls[98].url, 'https://test-api.docutrust.org/api/v1/fhe/decrypt');
+    await client.addFHECiphertexts({}, {});
+    assert.strictEqual(mockCalls[99].url, 'https://test-api.docutrust.org/api/v1/fhe/add');
+    await client.multiplyFHECiphertexts({}, {});
+    assert.strictEqual(mockCalls[100].url, 'https://test-api.docutrust.org/api/v1/fhe/multiply');
+    await client.queryFHEDatabase([], {});
+    assert.strictEqual(mockCalls[101].url, 'https://test-api.docutrust.org/api/v1/fhe/query-db');
+    await client.createFHEQueryReceipt('q1', {}, 'did:key:z1', '0x123');
+    assert.strictEqual(mockCalls[102].url, 'https://test-api.docutrust.org/api/v1/fhe/receipt/create');
+    await client.verifyFHEQueryReceipt({});
+    assert.strictEqual(mockCalls[103].url, 'https://test-api.docutrust.org/api/v1/fhe/receipt/verify');
+
+    // 63. v16.0.0 FROST Threshold Signatures
+    await client.generateFROSTDKG(2, 3);
+    assert.strictEqual(mockCalls[104].url, 'https://test-api.docutrust.org/api/v1/frost/dkg');
+    await client.generateFROSTRound1Commitment(1);
+    assert.strictEqual(mockCalls[105].url, 'https://test-api.docutrust.org/api/v1/frost/round1');
+    await client.generateFROSTRound2Share(1, {}, [], 'msg');
+    assert.strictEqual(mockCalls[106].url, 'https://test-api.docutrust.org/api/v1/frost/round2');
+    await client.aggregateFROSTSignatures('msg', [], [], '0x123');
+    assert.strictEqual(mockCalls[107].url, 'https://test-api.docutrust.org/api/v1/frost/aggregate');
+    await client.verifyFROSTThresholdSignature('msg', {}, '0x123');
+    assert.strictEqual(mockCalls[108].url, 'https://test-api.docutrust.org/api/v1/frost/verify');
+    await client.issueFROSTThresholdCredential({}, '0x123', {}, 'did:key:z1');
+    assert.strictEqual(mockCalls[109].url, 'https://test-api.docutrust.org/api/v1/frost/credential/issue');
+    await client.verifyFROSTThresholdCredential({});
+    assert.strictEqual(mockCalls[110].url, 'https://test-api.docutrust.org/api/v1/frost/credential/verify');
+
+    // 64. v16.0.0 ZK-PlonK
+    await client.compilePlonKCircuit('circ1', []);
+    assert.strictEqual(mockCalls[111].url, 'https://test-api.docutrust.org/api/v1/zk/plonk/compile');
+    await client.generatePlonKProof({}, {});
+    assert.strictEqual(mockCalls[112].url, 'https://test-api.docutrust.org/api/v1/zk/plonk/prove');
+    await client.verifyPlonKProof({}, {});
+    assert.strictEqual(mockCalls[113].url, 'https://test-api.docutrust.org/api/v1/zk/plonk/verify');
+
+    // 65. v16.0.0 Agentic Capabilities
+    await client.issueRootCapability('did:key:root', 'did:key:aud', [], [], 3600, '0x123');
+    assert.strictEqual(mockCalls[114].url, 'https://test-api.docutrust.org/api/v1/capability/root/issue');
+    await client.attenuateCapability({}, 'did:key:del', 'did:key:aud', [], [], 1800, '0x123');
+    assert.strictEqual(mockCalls[115].url, 'https://test-api.docutrust.org/api/v1/capability/attenuate');
+    await client.verifyDelegationChain([], 'READ', 'urn:res');
+    assert.strictEqual(mockCalls[116].url, 'https://test-api.docutrust.org/api/v1/capability/chain/verify');
+    await client.createAgentExecutionReceipt('did:key:agent', {}, [], {}, '0x123');
+    assert.strictEqual(mockCalls[117].url, 'https://test-api.docutrust.org/api/v1/capability/receipt/create');
+    await client.verifyAgentExecutionReceipt({});
+    assert.strictEqual(mockCalls[118].url, 'https://test-api.docutrust.org/api/v1/capability/receipt/verify');
   });
 
   test('DocuTrustClient handles HTTP error responses gracefully', async () => {

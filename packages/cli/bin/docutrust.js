@@ -510,7 +510,7 @@ async function runDemoWizard() {
 
 async function main() {
   if (command === 'version' || command === '--version' || command === '-v') {
-    console.log('15.0.0');
+    console.log('16.0.0');
     return;
   }
 
@@ -4404,6 +4404,254 @@ async function main() {
       console.log(`\x1b[32m✔\x1b[0m IBC Merkle Proof is \x1b[1m\x1b[32mVALID against Root AppHash\x1b[0m`);
     } else {
       console.error(`\x1b[31m✖\x1b[0m IBC Merkle Proof is \x1b[1m\x1b[31mINVALID\x1b[0m`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // ========================================================
+  // v16.0.0 Fully Homomorphic Encryption (FHE) CLI
+  // ========================================================
+
+  if (command === 'fhe-keypair') {
+    const dim = parseInt(getArgValue('--dim') || '8', 10);
+    const mod = parseInt(getArgValue('--modulus') || '2147483647', 10);
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    const keypair = core.FHEQueryEngine.generateKeyPair(dim, mod);
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(keypair, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m FHE KeyPair saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(keypair, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'fhe-encrypt') {
+    const valArg = getArgValue('--value') || getArgValue('-v');
+    const pubKeyFile = getArgValue('--pubkey') || getArgValue('-k');
+    const tag = getArgValue('--tag') || 'scalar';
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!valArg || !pubKeyFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --value <int> or --pubkey <keypair.json>');
+      process.exit(1);
+    }
+
+    const keyData = JSON.parse(fs.readFileSync(pubKeyFile, 'utf-8'));
+    const pubKey = keyData.publicKey || keyData;
+    const ciphertext = core.FHEQueryEngine.encryptValue(parseInt(valArg, 10), pubKey, tag);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(ciphertext, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m FHE Ciphertext saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(ciphertext, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'fhe-decrypt') {
+    const cipherFile = getArgValue('--ciphertext') || getArgValue('-c');
+    const privKeyFile = getArgValue('--privkey') || getArgValue('-k');
+
+    if (!cipherFile || !privKeyFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --ciphertext <cipher.json> or --privkey <keypair.json>');
+      process.exit(1);
+    }
+
+    const ciphertext = JSON.parse(fs.readFileSync(cipherFile, 'utf-8'));
+    const keyData = JSON.parse(fs.readFileSync(privKeyFile, 'utf-8'));
+    const privKey = keyData.privateKey || keyData;
+    const decrypted = core.FHEQueryEngine.decryptValue(ciphertext, privKey);
+
+    console.log(`\x1b[32m✔\x1b[0m Decrypted Integer Value: \x1b[1m\x1b[32m${decrypted}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'fhe-add') {
+    const c1File = getArgValue('--c1');
+    const c2File = getArgValue('--c2');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!c1File || !c2File) {
+      console.error('\x1b[31mError:\x1b[0m Missing --c1 <c1.json> or --c2 <c2.json>');
+      process.exit(1);
+    }
+
+    const c1 = JSON.parse(fs.readFileSync(c1File, 'utf-8'));
+    const c2 = JSON.parse(fs.readFileSync(c2File, 'utf-8'));
+    const sum = core.FHEQueryEngine.addCiphertexts(c1, c2);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(sum, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Homomorphic Sum saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(sum, null, 2));
+    }
+    return;
+  }
+
+  // ========================================================
+  // v16.0.0 FROST Threshold Signature CLI
+  // ========================================================
+
+  if (command === 'frost-dkg') {
+    const threshold = parseInt(getArgValue('--threshold') || getArgValue('-t') || '2', 10);
+    const total = parseInt(getArgValue('--total') || getArgValue('-n') || '3', 10);
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    const dkg = core.FROSTEngine.generateDKGKeyShares(threshold, total);
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(dkg, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m FROST (${threshold}-of-${total}) DKG Packages saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(dkg, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'frost-round1') {
+    const signerId = parseInt(getArgValue('--signer-id') || getArgValue('-i') || '1', 10);
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    const nonces = core.FROSTEngine.round1Commitment(signerId);
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(nonces, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m FROST Round 1 Nonces saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(nonces, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'frost-verify') {
+    const msgArg = getArgValue('--message') || getArgValue('-m');
+    const sigFile = getArgValue('--sig') || getArgValue('-s');
+    const groupPub = getArgValue('--group-key') || getArgValue('-k');
+
+    if (!msgArg || !sigFile || !groupPub) {
+      console.error('\x1b[31mError:\x1b[0m Missing --message <msg>, --sig <sig.json>, or --group-key <pubKeyHex>');
+      process.exit(1);
+    }
+
+    const signature = JSON.parse(fs.readFileSync(sigFile, 'utf-8'));
+    const verifyRes = core.FROSTEngine.verifyThresholdSignature(msgArg, signature, groupPub);
+
+    if (verifyRes.valid) {
+      console.log(`\x1b[32m✔\x1b[0m FROST Threshold Signature is \x1b[1m\x1b[32mVALID & AUTHENTIC\x1b[0m`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m FROST Threshold Signature is \x1b[1m\x1b[31mINVALID\x1b[0m`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // ========================================================
+  // v16.0.0 ZK-PlonK CLI
+  // ========================================================
+
+  if (command === 'plonk-compile') {
+    const circuitFile = getArgValue('--circuit') || getArgValue('-c');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!circuitFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --circuit <circuit.json>');
+      process.exit(1);
+    }
+
+    const circuitDef = JSON.parse(fs.readFileSync(circuitFile, 'utf-8'));
+    const compiled = core.ZKPlonKEngine.compileCircuit(
+      circuitDef.circuitId,
+      circuitDef.gates,
+      circuitDef.publicInputKeys || [],
+      circuitDef.lookupTables || {}
+    );
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(compiled, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Compiled PlonK Circuit saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(compiled, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'plonk-verify') {
+    const proofFile = getArgValue('--proof') || getArgValue('-p');
+    const vkFile = getArgValue('--vk') || getArgValue('-k');
+
+    if (!proofFile || !vkFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --proof <proof.json> or --vk <vk.json>');
+      process.exit(1);
+    }
+
+    const proof = JSON.parse(fs.readFileSync(proofFile, 'utf-8'));
+    const vk = JSON.parse(fs.readFileSync(vkFile, 'utf-8'));
+    const verifyRes = core.ZKPlonKEngine.verifyPlonKProof(proof, vk);
+
+    if (verifyRes.valid) {
+      console.log(`\x1b[32m✔\x1b[0m PlonK Proof is \x1b[1m\x1b[32mVALID & VERIFIED\x1b[0m`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m PlonK Proof is \x1b[1m\x1b[31mINVALID\x1b[0m`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // ========================================================
+  // v16.0.0 Agentic Capability & Delegation CLI
+  // ========================================================
+
+  if (command === 'capability-issue') {
+    const issuerKeyFile = getArgValue('--issuer-key');
+    const audienceDid = getArgValue('--audience');
+    const resource = getArgValue('--resource') || '*';
+    const action = getArgValue('--action') || '*';
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!issuerKeyFile || !audienceDid) {
+      console.error('\x1b[31mError:\x1b[0m Missing --issuer-key <key.json> or --audience <did>');
+      process.exit(1);
+    }
+
+    const issuerKp = JSON.parse(fs.readFileSync(issuerKeyFile, 'utf-8'));
+    const token = core.AgenticCapabilityEngine.issueRootCapability(
+      issuerKp.did,
+      audienceDid,
+      [{ resource, action }],
+      [],
+      3600,
+      issuerKp.privateKeyHex
+    );
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(token, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Root UCAN Capability Token saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(token, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'capability-verify') {
+    const chainFile = getArgValue('--chain') || getArgValue('-c');
+    const resource = getArgValue('--resource') || getArgValue('-r');
+    const action = getArgValue('--action') || getArgValue('-a');
+
+    if (!chainFile || !resource || !action) {
+      console.error('\x1b[31mError:\x1b[0m Missing --chain <chain.json>, --resource <urn>, or --action <action>');
+      process.exit(1);
+    }
+
+    const chain = JSON.parse(fs.readFileSync(chainFile, 'utf-8'));
+    const result = core.AgenticCapabilityEngine.verifyDelegationPath(chain, action, resource);
+
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m UCAN Delegation Chain is \x1b[1m\x1b[32mVALID & AUTHORIZED\x1b[0m`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m Delegation Verification \x1b[1m\x1b[31mFAILED\x1b[0m:`, result.error);
       process.exit(1);
     }
     return;

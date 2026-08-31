@@ -1,5 +1,52 @@
 # 📝 DocuTrust Changelog & Release Notes
 
+## [v16.0.0] - Sovereign Privacy & Threshold Mesh: Fully Homomorphic Encryption (FHE), FROST Threshold Schnorr, ZK-PlonK Arithmetization & Agentic Capability Delegation - 2026-08-31
+
+### 🌟 Release Overview (v16.0.0 - Major Milestone Release)
+DocuTrust 16.0.0 is a landmark evolution in sovereign privacy-preserving computation, distributed multisig threshold cryptography, universal arithmetized zero-knowledge proofs, and decentralized autonomous agent capability delegation:
+
+1. **Fully Homomorphic Encryption (FHE) & Blind Database Query Engine (`@docutrust/core/fhe-query`, `docutrust.fhe_query`)**:
+   - Implemented `FHEQueryEngine` supporting LWE / RLWE homomorphic encryption with customizable dimension parameters and large prime modulus arithmetic ($q = 2^{31} - 1$).
+   - Homomorphic addition (`addCiphertexts`) and homomorphic plaintext-ciphertext scalar multiplication (`multiplyCiphertextPlaintext`) enabling arbitrary linear combinations directly in ciphertext space without data decryption.
+   - Zero-knowledge blinded database query evaluator supporting range comparisons, filters, and encrypted record aggregations.
+   - Signed verifiable query receipts (`DocuTrustFHEQueryReceipt2026`) providing cryptographic provenance over blind computation results and noise budget assertions.
+
+2. **FROST Flexible Round-Optimized Threshold Schnorr Signatures (`@docutrust/core/frost-threshold`, `docutrust.frost_threshold`)**:
+   - Implemented `FROSTEngine` featuring two-round threshold Schnorr signatures over the Secp256k1 elliptic curve (BIP-340 Schnorr compatible).
+   - Verifiable Distributed Key Generation (DKG) with polynomial secret sharing ($t$-of-$n$) and verifiable participant public key shares.
+   - Round 1 commitment phase generating hiding and binding nonce pairs with collision-resistant commitment hashing.
+   - Round 2 partial signature generation with Lagrange interpolation coefficients and single-pass aggregation producing constant-sized group signatures.
+   - Threshold-signed Verifiable Credentials (`DocuTrustThresholdCredential2026`) providing decentralized multi-issuer authority attestations.
+
+3. **Universal ZK-PlonK & Plookup Arithmetization Engine (`@docutrust/core/zk-plonk`, `docutrust.zk_plonk`)**:
+   - Implemented `ZKPlonKEngine` providing PlonKish universal constraint systems with custom gate selectors: $q_L \cdot a + q_R \cdot b + q_O \cdot c + q_M \cdot (a \cdot b) + q_C = 0$.
+   - Permutation argument support enforcing copy constraints across gate wires via grand product polynomials $Z(X)$.
+   - Plookup argument integration for pre-computed table lookups (range checks, S-boxes, authorized identifier sets).
+   - Direct EVM calldata generation for zero-overhead on-chain verification in smart contracts.
+
+4. **Agentic Capability & Delegation Mesh Engine (`@docutrust/core/agentic-capability`, `docutrust.agentic_capability`)**:
+   - Implemented `AgenticCapabilityEngine` supporting UCAN / OCAP-LD capability delegation tokens and decentralized autonomous agent authorization chains.
+   - Monotonic caveat attenuation verifying that child tokens strictly attenuate parent permissions without privilege escalation.
+   - Verifiable agent execution receipts (`DocuTrustAgentExecutionReceipt2026`) cryptographically linking executed actions and payloads to root delegator authorities.
+
+5. **Universal Solidity Verifier Updates (`DocuTrustUniversalVerifier.sol`)**:
+   - Enhanced `DocuTrustUniversalVerifier.sol` with `verifyFROSTSchnorrSignature`, `verifyPlonKProofCalldata`, and `verifyUCANExecution` functions.
+
+6. **Interactive Web Studios (`FHEQueryStudio.jsx`, `FROSTStudio.jsx`, `PlonKStudio.jsx`, `AgenticCapabilityStudio.jsx`)**:
+   - `FHEQueryStudio.jsx`: Interactive homomorphic database vault, range query filter, blind aggregator, and query receipt inspector.
+   - `FROSTStudio.jsx`: DKG ceremony coordinator, 2-round signing ceremony simulator, and threshold signature aggregator.
+   - `PlonKStudio.jsx`: PlonKish constraint arithmetizer, Plookup table verifier, and EVM calldata builder.
+   - `AgenticCapabilityStudio.jsx`: UCAN delegation chain visualizer, caveat attenuation auditor, and verifiable agent execution receipt suite.
+   - Updated `Navbar.jsx` and `App.jsx` with v16.0.0 tabs and branding.
+
+7. **Full-Stack CLI, REST API & Python/TypeScript SDK Parity**:
+   - CLI: Added 11 new commands (`fhe-keypair`, `fhe-encrypt`, `fhe-decrypt`, `fhe-add`, `frost-dkg`, `frost-round1`, `frost-verify`, `plonk-compile`, `plonk-verify`, `capability-issue`, `capability-verify`).
+   - REST API: Added 20 new endpoints across `/api/v1/fhe/*`, `/api/v1/frost/*`, `/api/v1/zk/plonk/*`, `/api/v1/capability/*`.
+   - Python SDK (`docutrust`): Added 4 new engine modules, client wrapper methods, and 93/93 passing unit tests.
+   - TypeScript SDK (`@docutrust/sdk`): Re-exported v16 engines and types, added 19 `DocuTrustClient` wrapper methods, with 100% test coverage.
+
+---
+
 ## [v15.0.0] - Post-Quantum Double Ratchet, Polynomial Commitments & KZG, Hardware TEE Remote Attestation & Cosmos IBC Relayer - 2026-08-31
 
 ### 🌟 Release Overview (v15.0.0 - Major Milestone Release)

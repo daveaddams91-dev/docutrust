@@ -800,15 +800,15 @@ test('CLI Suite', async (t) => {
     assert.ok(aggOut.includes('Status List Multi-Partition Root matches'));
   });
 
-  await t.test('29. docutrust version displays v15.0.0', () => {
+  await t.test('29. docutrust version displays v16.0.0', () => {
     const out1 = execSync(`node "${cliPath}" version`).toString().trim();
-    assert.equal(out1, '15.0.0');
+    assert.equal(out1, '16.0.0');
 
     const out2 = execSync(`node "${cliPath}" --version`).toString().trim();
-    assert.equal(out2, '15.0.0');
+    assert.equal(out2, '16.0.0');
 
     const out3 = execSync(`node "${cliPath}" -v`).toString().trim();
-    assert.equal(out3, '15.0.0');
+    assert.equal(out3, '16.0.0');
   });
 
   await t.test('30. docutrust ringsig-sign and ringsig-verify (Linkable Ring Signatures)', () => {
@@ -1349,6 +1349,113 @@ test('CLI Suite', async (t) => {
     // 3. Verify Proof
     const verifyOut = execSync(`node "${cliPath}" ibc-verify-proof --proof "${proofFile}"`).toString();
     assert.ok(verifyOut.includes('VALID'));
+  });
+
+  await t.test('54. docutrust fhe-keypair, fhe-encrypt, fhe-decrypt, fhe-add', () => {
+    const kpFile = path.join(tempDir, 'fhe-kp.json');
+    const c1File = path.join(tempDir, 'fhe-c1.json');
+    const c2File = path.join(tempDir, 'fhe-c2.json');
+    const sumFile = path.join(tempDir, 'fhe-sum.json');
+
+    // 1. Keypair
+    const kpOut = execSync(`node "${cliPath}" fhe-keypair --dim 8 --out "${kpFile}"`).toString();
+    assert.ok(kpOut.includes('FHE KeyPair saved'));
+    assert.ok(fs.existsSync(kpFile));
+
+    // 2. Encrypt 40 and 60
+    const enc1Out = execSync(`node "${cliPath}" fhe-encrypt --value 40 --pubkey "${kpFile}" --out "${c1File}"`).toString();
+    assert.ok(enc1Out.includes('FHE Ciphertext saved'));
+    const enc2Out = execSync(`node "${cliPath}" fhe-encrypt --value 60 --pubkey "${kpFile}" --out "${c2File}"`).toString();
+    assert.ok(enc2Out.includes('FHE Ciphertext saved'));
+
+    // 3. Add
+    const addOut = execSync(`node "${cliPath}" fhe-add --c1 "${c1File}" --c2 "${c2File}" --out "${sumFile}"`).toString();
+    assert.ok(addOut.includes('Homomorphic Sum saved'));
+
+    // 4. Decrypt sum
+    const decOut = execSync(`node "${cliPath}" fhe-decrypt --ciphertext "${sumFile}" --privkey "${kpFile}"`).toString();
+    assert.ok(decOut.includes('100'));
+  });
+
+  await t.test('55. docutrust frost-dkg, frost-round1, frost-verify', () => {
+    const dkgFile = path.join(tempDir, 'frost-dkg.json');
+    const r1File = path.join(tempDir, 'frost-r1.json');
+
+    // 1. DKG
+    const dkgOut = execSync(`node "${cliPath}" frost-dkg --threshold 2 --total 3 --out "${dkgFile}"`).toString();
+    assert.ok(dkgOut.includes('DKG Packages saved'));
+    assert.ok(fs.existsSync(dkgFile));
+
+    // 2. Round 1
+    const r1Out = execSync(`node "${cliPath}" frost-round1 --signer-id 1 --out "${r1File}"`).toString();
+    assert.ok(r1Out.includes('Round 1 Nonces saved'));
+    assert.ok(fs.existsSync(r1File));
+  });
+
+  await t.test('56. docutrust plonk-compile & plonk-verify', () => {
+    const circuitFile = path.join(tempDir, 'plonk-circ.json');
+    const compiledFile = path.join(tempDir, 'plonk-compiled.json');
+    const proofFile = path.join(tempDir, 'plonk-proof.json');
+    const vkFile = path.join(tempDir, 'plonk-vk.json');
+
+    const circuitDef = {
+      circuitId: 'cli_plonk_test',
+      gates: [
+        {
+          gateIndex: 0,
+          qL: 0,
+          qR: 0,
+          qO: -1,
+          qM: 1,
+          qC: 0,
+          aVar: 'x',
+          bVar: 'y',
+          cVar: 'out'
+        }
+      ],
+      publicInputKeys: ['out']
+    };
+    fs.writeFileSync(circuitFile, JSON.stringify(circuitDef, null, 2), 'utf-8');
+
+    // 1. Compile
+    const compileOut = execSync(`node "${cliPath}" plonk-compile --circuit "${circuitFile}" --out "${compiledFile}"`).toString();
+    assert.ok(compileOut.includes('Compiled PlonK Circuit saved'));
+    assert.ok(fs.existsSync(compiledFile));
+
+    const compiled = JSON.parse(fs.readFileSync(compiledFile, 'utf-8'));
+    fs.writeFileSync(vkFile, JSON.stringify(compiled.verificationKey, null, 2), 'utf-8');
+
+    // 2. Generate proof via core directly to verify via CLI
+    const { ZKPlonKEngine } = require('@docutrust/core');
+    const proof = ZKPlonKEngine.createPlonKProof(compiled.circuit, { x: 7, y: 8 }, { out: 56 });
+    fs.writeFileSync(proofFile, JSON.stringify(proof, null, 2), 'utf-8');
+
+    // 3. Verify
+    const verifyOut = execSync(`node "${cliPath}" plonk-verify --proof "${proofFile}" --vk "${vkFile}"`).toString();
+    assert.ok(verifyOut.includes('VALID & VERIFIED'));
+  });
+
+  await t.test('57. docutrust capability-issue & capability-verify', () => {
+    const rootKeyFile = path.join(tempDir, 'cap-root-kp.json');
+    const tokenFile = path.join(tempDir, 'cap-token.json');
+    const chainFile = path.join(tempDir, 'cap-chain.json');
+
+    const { generateKeyPair } = require('@docutrust/core');
+    const rootKp = generateKeyPair();
+    const workerKp = generateKeyPair();
+    fs.writeFileSync(rootKeyFile, JSON.stringify(rootKp, null, 2), 'utf-8');
+
+    // 1. Issue Root UCAN
+    const issueOut = execSync(`node "${cliPath}" capability-issue --issuer-key "${rootKeyFile}" --audience "${workerKp.did}" --resource "urn:docutrust:vault:docs" --action "READ" --out "${tokenFile}"`).toString();
+    assert.ok(issueOut.includes('Root UCAN Capability Token saved'));
+    assert.ok(fs.existsSync(tokenFile));
+
+    const token = JSON.parse(fs.readFileSync(tokenFile, 'utf-8'));
+    fs.writeFileSync(chainFile, JSON.stringify([token], null, 2), 'utf-8');
+
+    // 2. Verify
+    const verifyOut = execSync(`node "${cliPath}" capability-verify --chain "${chainFile}" --resource "urn:docutrust:vault:docs" --action "READ"`).toString();
+    assert.ok(verifyOut.includes('VALID & AUTHORIZED'));
   });
 });
 

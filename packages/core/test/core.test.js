@@ -173,7 +173,12 @@ const {
   PQRatchetEngine,
   PolynomialCommitmentEngine,
   TEEAttestationEngine,
-  IBCRelayerEngine
+  IBCRelayerEngine,
+  // v16.0.0 Engines
+  FHEQueryEngine,
+  FROSTEngine,
+  ZKPlonKEngine,
+  AgenticCapabilityEngine
 } = require('../dist/index.js');
 
 // 1. Cryptography Tests
@@ -3736,5 +3741,262 @@ test('102. SolidityEngine: Generate v15 Universal Verifier contract containing T
   assert.ok(contractCode.includes('verifyPolynomialBatch'));
   assert.ok(contractCode.includes('verifyIBCPacketCommitment'));
 });
+
+// ========================================================
+// DocuTrust v16.0.0 Sovereign Privacy & Threshold Mesh Evolution
+// ========================================================
+
+// 103. FHE Query Engine: Encrypted DB query, linear combination, encrypted equality, and signed query receipt
+test('103. FHEQueryEngine: Homomorphic encrypted database query, arithmetic, and signed receipt verification', () => {
+  const keyPair = FHEQueryEngine.generateKeyPair();
+  const issuerKp = generateKeyPair();
+
+  // 1. Encrypt salaries/attributes of multiple credentials
+  const c1 = FHEQueryEngine.encryptValue(50000, keyPair.publicKey, 'salary_1');
+  const c2 = FHEQueryEngine.encryptValue(75000, keyPair.publicKey, 'salary_2');
+  const c3 = FHEQueryEngine.encryptValue(60000, keyPair.publicKey, 'salary_3');
+
+  // 2. Homomorphic addition
+  const sumCipher = FHEQueryEngine.addCiphertexts(c1, c2);
+  const decryptedSum = FHEQueryEngine.decryptValue(sumCipher, keyPair.privateKey);
+  assert.equal(decryptedSum, 125000);
+
+  // 3. Homomorphic scalar multiplication & linear combination
+  const scaled = FHEQueryEngine.multiplyScalar(c1, 2);
+  const decryptedScaled = FHEQueryEngine.decryptValue(scaled, keyPair.privateKey);
+  assert.equal(decryptedScaled, 100000);
+
+  // 4. Encrypted database query
+  const records = [
+    { id: 'rec_1', encryptedAttributes: { creditScore: FHEQueryEngine.encryptValue(750, keyPair.publicKey) } },
+    { id: 'rec_2', encryptedAttributes: { creditScore: FHEQueryEngine.encryptValue(800, keyPair.publicKey) } },
+    { id: 'rec_3', encryptedAttributes: { creditScore: FHEQueryEngine.encryptValue(650, keyPair.publicKey) } }
+  ];
+
+  const queryRes = FHEQueryEngine.queryEncryptedDatabase(records, 'creditScore', [1, 1, 1]);
+  assert.equal(queryRes.evaluatedCount, 3);
+  const decryptedAvg = FHEQueryEngine.decryptValue(queryRes.aggregatedResult, keyPair.privateKey);
+  assert.equal(decryptedAvg, 2200);
+
+  // 5. Encrypted equality evaluation
+  const eqCipher = FHEQueryEngine.evaluateEncryptedEquality(c1, c1);
+  const decryptedDiff = FHEQueryEngine.decryptValue(eqCipher, keyPair.privateKey);
+  assert.equal(decryptedDiff, 0);
+
+  // 6. Signed FHE Query Receipt creation & verification
+  const receipt = FHEQueryEngine.createQueryReceipt(
+    'query_abc123',
+    'AGGREGATE_SUM',
+    3,
+    queryRes.aggregatedResult,
+    issuerKp.did,
+    issuerKp.privateKeyHex
+  );
+
+  assert.equal(receipt.type, 'DocuTrustFHEQueryReceipt2026');
+  assert.equal(receipt.filterType, 'AGGREGATE_SUM');
+  assert.ok(receipt.signature);
+
+  const verification = FHEQueryEngine.verifyQueryReceipt(receipt, issuerKp.privateKeyHex);
+  assert.equal(verification.valid, true);
+  assert.equal(verification.noiseAcceptable, true);
+});
+
+// 104. FROST Threshold Schnorr Signatures: DKG, multi-round signing, aggregation, and credential issuance
+test('104. FROSTEngine: Distributed Key Generation, Round 1 nonces, Round 2 signing, and threshold credential', () => {
+  const threshold = 3;
+  const totalSigners = 5;
+
+  // 1. DKG Ceremony
+  const { keyPackages, groupPublicKey } = FROSTEngine.generateDKGKeyShares(threshold, totalSigners);
+  assert.equal(keyPackages.length, 5);
+  assert.ok(groupPublicKey);
+
+  // 2. Select a quorum of signers: signers 1, 2, 4
+  const participantIds = [1, 2, 4];
+  const participants = keyPackages.filter(p => participantIds.includes(p.signerId));
+
+  // 3. Round 1: Generate nonces and commitments
+  const round1Packages = participants.map(p => FROSTEngine.round1Commitment(p.signerId));
+  const commitmentList = round1Packages.map(r => r.commitments);
+
+  // 4. Round 2: Each participant signs message
+  const message = 'DocuTrust Sovereign Threshold Authorization 2026';
+  const signatureShares = participants.map((p, idx) => {
+    return FROSTEngine.round2Sign(
+      message,
+      p.signerId,
+      p.secretShare,
+      round1Packages[idx],
+      commitmentList,
+      groupPublicKey
+    );
+  });
+
+  assert.equal(signatureShares.length, 3);
+
+  // 5. Aggregate shares into threshold Schnorr signature
+  const thresholdSignature = FROSTEngine.aggregateSignatures(
+    message,
+    signatureShares,
+    commitmentList,
+    groupPublicKey,
+    threshold
+  );
+
+  assert.equal(thresholdSignature.type, 'DocuTrustFROSTSchnorrSignature2026');
+  assert.equal(thresholdSignature.participantCount, 3);
+  assert.ok(thresholdSignature.aggregatedZ);
+
+  // 6. Verify threshold signature
+  const sigVerify = FROSTEngine.verifyThresholdSignature(message, thresholdSignature, groupPublicKey);
+  assert.equal(sigVerify.valid, true);
+
+  // 7. Issue & verify FROST Threshold Credential
+  const issuerDid = 'did:frost:mesh2026';
+  const credSubject = { id: 'did:key:alice', clearance: 'TOP_SECRET_ORBITAL', role: 'CHIEF_CRYPTOGRAPHER' };
+  const cred = FROSTEngine.issueThresholdCredential(credSubject, thresholdSignature, issuerDid);
+
+  assert.equal(cred.type.includes('FROSTThresholdCredential2026'), true);
+  assert.ok(cred.proof.thresholdSignature);
+
+  const credVerify = FROSTEngine.verifyThresholdCredential(cred, groupPublicKey);
+  assert.equal(credVerify.valid, true);
+});
+
+// 105. ZK PlonKish Arithmetization & Plookup Table Arguments
+test('105. ZKPlonKEngine: Compile circuit with Plookup table, generate PlonK proof, and verify', () => {
+  // Circuit: a * b = c AND a is in table of allowed tiers [10, 20, 30]
+  const gates = [
+    {
+      qL: 0,
+      qR: 0,
+      qO: -1,
+      qM: 1,
+      qC: 0,
+      aVar: 'tier',
+      bVar: 'multiplier',
+      cVar: 'grantAmount',
+      lookupTable: 'validTiers'
+    }
+  ];
+
+  const lookupTables = {
+    validTiers: [10, 20, 30, 40, 50]
+  };
+
+  // 1. Compile circuit
+  const { circuit, verificationKey } = ZKPlonKEngine.compileCircuit(
+    'circuit_grant_eval',
+    gates,
+    ['grantAmount'],
+    lookupTables
+  );
+
+  assert.equal(circuit.gateCount, 1);
+  assert.ok(verificationKey.vkDigest);
+
+  // 2. Synthesize valid proof (tier=20, multiplier=5, grantAmount=100)
+  const witness = { tier: 20, multiplier: 5 };
+  const publicInputs = { grantAmount: 100 };
+
+  const proof = ZKPlonKEngine.createPlonKProof(circuit, witness, publicInputs);
+  assert.equal(proof.type, 'DocuTrustPlonKProof2026');
+  assert.ok(proof.wireCommitments.aCommit);
+  assert.ok(proof.solidityCalldata);
+
+  // 3. Verify valid proof
+  const verifyRes = ZKPlonKEngine.verifyPlonKProof(proof, verificationKey);
+  assert.equal(verifyRes.valid, true);
+
+  // 4. Invalid witness (not satisfying lookup table) throws
+  const invalidWitness = { tier: 25, multiplier: 4 };
+  assert.throws(() => {
+    ZKPlonKEngine.createPlonKProof(circuit, invalidWitness, { grantAmount: 100 });
+  }, /Plookup assertion failed/);
+});
+
+// 106. Agentic Capability & Delegation Mesh Engine
+test('106. AgenticCapabilityEngine: UCAN root issuance, monotonic attenuation, chain verification, and execution receipt', () => {
+  const rootIssuerKp = generateKeyPair();
+  const orchestratorAgentKp = generateKeyPair();
+  const leafWorkerAgentKp = generateKeyPair();
+
+  // 1. Issue root UCAN capability from root organization to orchestrator agent
+  const rootToken = AgenticCapabilityEngine.issueRootCapability(
+    rootIssuerKp.did,
+    orchestratorAgentKp.did,
+    [
+      { resource: 'urn:docutrust:vault:*', action: '*' },
+      { resource: 'urn:docutrust:compute:zk', action: 'EXECUTE' }
+    ],
+    [{ type: 'maxSpend', value: 1000 }],
+    3600,
+    rootIssuerKp.privateKeyHex
+  );
+
+  assert.equal(rootToken.type, 'DocuTrustUCANToken2026');
+  assert.equal(rootToken.issuer, rootIssuerKp.did);
+  assert.equal(rootToken.audience, orchestratorAgentKp.did);
+
+  // 2. Attenuate capability from orchestrator to leaf worker agent (restricted to vault:read only, maxSpend 100)
+  const workerToken = AgenticCapabilityEngine.attenuateCapability(
+    rootToken,
+    orchestratorAgentKp.did,
+    leafWorkerAgentKp.did,
+    [{ resource: 'urn:docutrust:vault:documents', action: 'READ' }],
+    [{ type: 'maxSpend', value: 100 }],
+    1800,
+    orchestratorAgentKp.privateKeyHex
+  );
+
+  assert.equal(workerToken.parentProofHashes.length, 1);
+  assert.equal(workerToken.audience, leafWorkerAgentKp.did);
+
+  // 3. Verify valid delegation chain
+  const chain = [rootToken, workerToken];
+  const chainValid = AgenticCapabilityEngine.verifyDelegationPath(
+    chain,
+    'READ',
+    'urn:docutrust:vault:documents',
+    { spendAmount: 50 }
+  );
+  assert.equal(chainValid.valid, true);
+
+  // 4. Over-spend caveat failure
+  const spendOver = AgenticCapabilityEngine.verifyDelegationPath(
+    chain,
+    'READ',
+    'urn:docutrust:vault:documents',
+    { spendAmount: 150 }
+  );
+  assert.equal(spendOver.valid, false);
+  assert.ok(spendOver.error.includes('Caveat violation'));
+
+  // 5. Disallowed action fails
+  const actionDisallowed = AgenticCapabilityEngine.verifyDelegationPath(
+    chain,
+    'DELETE',
+    'urn:docutrust:vault:documents'
+  );
+  assert.equal(actionDisallowed.valid, false);
+
+  // 6. Create and verify Agent Execution Receipt
+  const executionPayload = { action: 'FETCH_CREDENTIAL_RECORD', recordId: 'REC-9941', status: 'SUCCESS' };
+  const receipt = AgenticCapabilityEngine.createExecutionReceipt(
+    leafWorkerAgentKp.did,
+    { resource: 'urn:docutrust:vault:documents', action: 'READ' },
+    chain,
+    executionPayload,
+    leafWorkerAgentKp.privateKeyHex
+  );
+
+  assert.equal(receipt.type, 'DocuTrustAgentExecutionReceipt2026');
+  assert.equal(receipt.status, 'EXECUTED_AUTHENTIC');
+
+  const receiptVerify = AgenticCapabilityEngine.verifyExecutionReceipt(receipt, leafWorkerAgentKp.privateKeyHex);
+  assert.equal(receiptVerify.valid, true);
+});
+
 
 

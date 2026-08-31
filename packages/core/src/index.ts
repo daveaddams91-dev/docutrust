@@ -206,4 +206,21 @@ export * from './tee-attestation';
 // Export Inter-Blockchain Communication (IBC) & Light-Client Relayer Mesh (DocuTrust v15.0.0)
 export * from './ibc-relayer';
 
+// ========================================================
+// DocuTrust v16.0.0 Sovereign Privacy & Threshold Mesh Evolution
+// ========================================================
+
+// Export Fully Homomorphic Encrypted Credential Querying Engine (DocuTrust v16.0.0)
+export * from './fhe-query';
+
+// Export FROST Two-Round Threshold Schnorr Signature Engine (DocuTrust v16.0.0)
+export * from './frost-threshold';
+
+// Export PlonKish Arithmetization & Plookup Table Arguments Engine (DocuTrust v16.0.0)
+export * from './zk-plonk';
+
+// Export Verifiable Agentic Capability & Delegation Mesh Engine (DocuTrust v16.0.0)
+export * from './agentic-capability';
+
+
 
