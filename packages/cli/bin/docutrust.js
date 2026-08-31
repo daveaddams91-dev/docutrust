@@ -4857,6 +4857,218 @@ async function main() {
     return;
   }
 
+  // ========================================================
+  // v18.0.0 Zero-Knowledge Machine Learning (zkML) CLI
+  // ========================================================
+
+  if (command === 'zkml-prove') {
+    const modelId = getArgValue('--model-id') || 'zkml_model_01';
+    const arch = getArgValue('--architecture') || 'MLP-Dense-Softmax';
+    const layersFile = getArgValue('--layers') || getArgValue('-l');
+    const inputFile = getArgValue('--input') || getArgValue('-i');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!layersFile || !inputFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --layers <layers.json> or --input <input.json>');
+      process.exit(1);
+    }
+
+    const rawLayers = JSON.parse(fs.readFileSync(layersFile, 'utf-8'));
+    const inputData = JSON.parse(fs.readFileSync(inputFile, 'utf-8'));
+    const weightCommitment = core.ZKMLEngine.commitModelWeights(modelId, arch, rawLayers);
+    const proof = core.ZKMLEngine.proveInference(modelId, weightCommitment, rawLayers, inputData);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(proof, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m ZKML Inference Proof saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(proof, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'zkml-verify') {
+    const proofFile = getArgValue('--proof') || getArgValue('-p');
+    const root = getArgValue('--weight-root') || getArgValue('-r');
+
+    if (!proofFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --proof <proof.json>');
+      process.exit(1);
+    }
+
+    const proof = JSON.parse(fs.readFileSync(proofFile, 'utf-8'));
+    const result = core.ZKMLEngine.verifyInferenceProof(proof, root);
+
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m ZKML Inference Proof is \x1b[1m\x1b[32mVALID & VERIFIED\x1b[0m`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m ZKML Proof Verification \x1b[1m\x1b[31mFAILED\x1b[0m:`, result.error);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // ========================================================
+  // v18.0.0 Multi-Party Computation (MPC) Garbled Circuits CLI
+  // ========================================================
+
+  if (command === 'mpc-garble') {
+    const circuitFile = getArgValue('--circuit') || getArgValue('-c');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!circuitFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --circuit <circuit.json>');
+      process.exit(1);
+    }
+
+    const raw = JSON.parse(fs.readFileSync(circuitFile, 'utf-8'));
+    const res = core.MPCGarbledCircuitEngine.garbleCircuit(
+      raw.circuitId || 'circ_01',
+      raw.inputWiresGarbler || [],
+      raw.inputWiresEvaluator || [],
+      raw.outputWires || [],
+      raw.gates || []
+    );
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(res, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Garbled Circuit package saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(res, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'mpc-evaluate') {
+    const circuitFile = getArgValue('--circuit') || getArgValue('-c');
+    const inputsFile = getArgValue('--inputs') || getArgValue('-i');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!circuitFile || !inputsFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --circuit <circuit.json> or --inputs <inputs.json>');
+      process.exit(1);
+    }
+
+    const rawCirc = JSON.parse(fs.readFileSync(circuitFile, 'utf-8'));
+    const circuit = rawCirc.circuit || rawCirc;
+    const inputs = JSON.parse(fs.readFileSync(inputsFile, 'utf-8'));
+    const receipt = core.MPCGarbledCircuitEngine.evaluateCircuit(circuit, inputs);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(receipt, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m MPC Evaluation Receipt saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(receipt, null, 2));
+    }
+    return;
+  }
+
+  // ========================================================
+  // v18.0.0 Verifiable Swarm Consensus CLI
+  // ========================================================
+
+  if (command === 'swarm-propose') {
+    const swarmId = getArgValue('--swarm-id') || 'swarm_01';
+    const proposerDid = getArgValue('--proposer-did') || 'did:docutrust:proposer';
+    const action = getArgValue('--action') || 'EXECUTE_INTENT';
+    const payloadFile = getArgValue('--payload') || getArgValue('-p');
+    const quorum = parseInt(getArgValue('--quorum') || '50', 10);
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    const payload = payloadFile ? JSON.parse(fs.readFileSync(payloadFile, 'utf-8')) : { action };
+    const proposal = core.SwarmConsensusEngine.proposeIntent(swarmId, proposerDid, action, payload, quorum);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(proposal, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Swarm Proposal saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(proposal, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'swarm-vote-quorum') {
+    const proposalFile = getArgValue('--proposal');
+    const membersFile = getArgValue('--members');
+    const votesFile = getArgValue('--votes');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!proposalFile || !membersFile || !votesFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --proposal, --members, or --votes');
+      process.exit(1);
+    }
+
+    const proposal = JSON.parse(fs.readFileSync(proposalFile, 'utf-8'));
+    const members = JSON.parse(fs.readFileSync(membersFile, 'utf-8'));
+    const votes = JSON.parse(fs.readFileSync(votesFile, 'utf-8'));
+    const proof = core.SwarmConsensusEngine.aggregateSwarmQuorum(proposal, members, votes);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(proof, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Swarm Quorum Proof saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(proof, null, 2));
+    }
+    return;
+  }
+
+  // ========================================================
+  // v18.0.0 Multi-Party Threshold Timelock Encryption CLI
+  // ========================================================
+
+  if (command === 'timelock-seal') {
+    const payloadFile = getArgValue('--payload') || getArgValue('-p');
+    const delay = parseInt(getArgValue('--delay') || '10', 10);
+    const difficulty = parseInt(getArgValue('--difficulty') || '1000', 10);
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!payloadFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --payload <payload.json>');
+      process.exit(1);
+    }
+
+    const payload = JSON.parse(fs.readFileSync(payloadFile, 'utf-8'));
+    const result = core.TimelockEncryptionEngine.sealCredential(payload, delay, difficulty);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(result, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Timelock Sealed Package saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(result, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'timelock-open') {
+    const sealedFile = getArgValue('--sealed') || getArgValue('-s');
+    const proofFile = getArgValue('--proof') || getArgValue('-p');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!sealedFile || !proofFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --sealed <sealed.json> or --proof <proof.json>');
+      process.exit(1);
+    }
+
+    const sealedPkg = JSON.parse(fs.readFileSync(sealedFile, 'utf-8'));
+    const envelope = sealedPkg.envelope || sealedPkg;
+    const vdfProof = JSON.parse(fs.readFileSync(proofFile, 'utf-8'));
+
+    const unsealed = core.TimelockEncryptionEngine.unsealCredential(envelope, vdfProof);
+
+    if (unsealed.success) {
+      if (outFile) {
+        fs.writeFileSync(outFile, JSON.stringify(unsealed.payload, null, 2));
+        console.log(`\x1b[32m✔\x1b[0m Timelock Decrypted Payload saved to \x1b[1m${outFile}\x1b[0m`);
+      } else {
+        console.log(JSON.stringify(unsealed.payload, null, 2));
+      }
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m Timelock Unseal \x1b[1m\x1b[31mFAILED\x1b[0m:`, unsealed.error);
+      process.exit(1);
+    }
+    return;
+  }
+
   console.log(`Unknown command: ${command}. Run 'docutrust help' for usage.`);
 }
 

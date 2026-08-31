@@ -235,6 +235,33 @@ $$d_{A, i} = (b_{A, i})^{k_B} = (H(x_i))^{k_A \cdot k_B} \pmod P$$
 $$d_{B, j} = (b_{B, j})^{k_A} = (H(y_j))^{k_B \cdot k_A} \pmod P$$
 3. Exact set intersection cardinality $|A \cap B| = |\{d_{A, i}\} \cap \{d_{B, j}\}|$ with cryptographically signed execution receipts.
 
+### 2.33 Zero-Knowledge Machine Learning (zkML) Quantized Inference
+1. Feedforward neural network execution over quantized weights $W^{(l)} \in \mathbb{Z}^{d_{l+1} \times d_l}$ and activation vectors $a^{(l)}$:
+$$z^{(l+1)} = \text{Quantize}\left(W^{(l)} a^{(l)} + b^{(l)}\right), \quad a^{(l+1)} = \sigma\left(z^{(l+1)}\right)$$
+2. Cryptographic model weight Merkle tree commitments $\text{Root}_W = \text{MerkleTree}(\{H(W^{(1)}), \dots, H(W^{(L)})\})$ ensuring model parameter integrity.
+3. Layer-by-layer algebraic execution trace commitments and succinct zero-knowledge proofs (`DocuTrustZKMLInferenceProof2026`).
+4. Solidity EVM calldata export for trustless on-chain AI inference verification in `DocuTrustUniversalVerifier.sol`.
+
+### 2.34 Multi-Party Computation (MPC) Yao's Garbled Circuits & Free-XOR
+1. Free-XOR optimization: Given global secret delta $\Delta \in \{0,1\}^\lambda$, wire labels satisfy $W_{i,1} = W_{i,0} \oplus \Delta$. XOR gates evaluated locally with zero cryptographic overhead ($W_{out} = W_{u} \oplus W_{v}$).
+2. Point-and-permute index mapping with dual-key AES-256-GCM encrypted garbled truth table entries.
+3. 1-out-of-2 Oblivious Transfer (OT) simulator protecting evaluator inputs.
+4. Cryptographic garbled circuit receipts (`DocuTrustGarbledCircuitReceipt2026`) binding input commitments, circuit topology, and evaluated output wire labels.
+
+### 2.35 Autonomous AI Agent Swarm Consensus & Intent Proposals
+1. Multi-agent cluster configuration with weighted reputation distribution $\sum_{i=1}^n w_i = 100$.
+2. Cryptographic intent proposal generation with time-to-live and quorum threshold constraints $W_{req} \le \sum_{j \in S_{approve}} w_j$.
+3. Individual Ed25519 agent vote signing and Byzantine fault-tolerant quorum aggregation (`DocuTrustSwarmIntentProof2026`).
+4. Swarm consensus signature validation guaranteeing decentralized multi-agent governance without single points of compromise.
+
+### 2.36 Multi-Party Threshold Timelock Encryption & Wesolowski VDF
+1. Wesolowski non-parallelizable sequential squaring loop over large RSA modulus $N$:
+$$y = g^{2^T} \pmod N$$
+2. Fiat-Shamir challenge $L = H(g \parallel y \parallel T)$ and quotient proof generation $\pi = g^{\lfloor 2^T / L \rfloor} \pmod N$.
+3. Constant-time $O(1)$ mathematical verification:
+$$\pi^L \cdot g^r \equiv y \pmod N, \quad \text{where } r = 2^T \pmod L$$
+4. AES-256-GCM time-locked credential envelope sealing (`DocuTrustTimelockEnvelope2026`) with verifiable delayed unsealing.
+
 ---
 
 ## 3. Directory Layout

@@ -2761,6 +2761,203 @@ test('API Server Suite', async (t) => {
     assert.equal(verifyReceiptRes.status, 200);
     assert.equal(verifyReceiptRes.body.result.valid, true);
   });
+
+  await t.test('77. POST /api/v1/zkml (Commit, Prove, Verify, Solidity Calldata)', async () => {
+    const layers = [
+      {
+        layerIndex: 0,
+        type: 'dense',
+        weights: { shape: [2, 2], data: [256, 0, 0, 256], scale: 256, zeroPoint: 0 },
+        biases: { shape: [2], data: [0, 0], scale: 256, zeroPoint: 0 }
+      },
+      {
+        layerIndex: 1,
+        type: 'relu'
+      },
+      {
+        layerIndex: 2,
+        type: 'softmax'
+      }
+    ];
+
+    // 1. Commit
+    const commitRes = await makeRequest('POST', '/api/v1/zkml/commit', {
+      modelId: 'api_zkml_net',
+      architecture: 'MLP-ReLU-Softmax',
+      layers
+    });
+    assert.equal(commitRes.status, 200);
+    assert.ok(commitRes.body.commitment.weightCommitmentRoot);
+
+    // 2. Prove
+    const proveRes = await makeRequest('POST', '/api/v1/zkml/prove', {
+      modelId: 'api_zkml_net',
+      weightCommitment: commitRes.body.commitment,
+      layers,
+      inputData: [1.0, -0.5]
+    });
+    assert.equal(proveRes.status, 200);
+    assert.ok(proveRes.body.proof.proofBytes);
+
+    // 3. Verify
+    const verifyRes = await makeRequest('POST', '/api/v1/zkml/verify', {
+      proof: proveRes.body.proof,
+      expectedWeightCommitmentRoot: commitRes.body.commitment.weightCommitmentRoot
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.result.valid, true);
+
+    // 4. Calldata
+    const calldataRes = await makeRequest('POST', '/api/v1/zkml/solidity-calldata', {
+      proof: proveRes.body.proof
+    });
+    assert.equal(calldataRes.status, 200);
+    assert.ok(calldataRes.body.calldata.startsWith('0x'));
+  });
+
+  await t.test('78. POST /api/v1/mpc (Garble, OT Init, Evaluate, Verify Receipt)', async () => {
+    const circuitDef = {
+      circuitId: 'mpc_api_01',
+      inputWiresGarbler: ['w0'],
+      inputWiresEvaluator: ['w1'],
+      outputWires: ['w_out'],
+      gates: [
+        { id: 'g0', type: 'AND', inputWires: ['w0', 'w1'], outputWire: 'w_out' }
+      ]
+    };
+
+    // 1. Garble
+    const garbleRes = await makeRequest('POST', '/api/v1/mpc/garble', circuitDef);
+    assert.equal(garbleRes.status, 200);
+    assert.ok(garbleRes.body.result.circuit.garbledTables.length > 0);
+
+    const circuit = garbleRes.body.result.circuit;
+    const wireLabels = garbleRes.body.result.wireLabels;
+
+    // 2. OT Init
+    const otRes = await makeRequest('POST', '/api/v1/mpc/ot/init', {
+      sessionId: 'ot_sess_01',
+      wireZeroLabel: wireLabels['w1'].zeroLabel,
+      wireOneLabel: wireLabels['w1'].oneLabel,
+      evaluatorChoiceBit: 1
+    });
+    assert.equal(otRes.status, 200);
+    assert.equal(otRes.body.otSession.receivedLabel, wireLabels['w1'].oneLabel);
+
+    // 3. Evaluate
+    const activeInputs = {
+      w0: wireLabels['w0'].oneLabel,
+      w1: otRes.body.otSession.receivedLabel
+    };
+    const evalRes = await makeRequest('POST', '/api/v1/mpc/evaluate', {
+      circuit,
+      activeInputLabels: activeInputs
+    });
+    assert.equal(evalRes.status, 200);
+    assert.ok(evalRes.body.receipt.outputValues);
+
+    // 4. Verify Receipt
+    const verifyReceiptRes = await makeRequest('POST', '/api/v1/mpc/verify-receipt', {
+      receipt: evalRes.body.receipt,
+      expectedCircuitHash: circuit.circuitHash
+    });
+    assert.equal(verifyReceiptRes.status, 200);
+    assert.equal(verifyReceiptRes.body.result.valid, true);
+  });
+
+  await t.test('79. POST /api/v1/swarm (Cluster Create, Propose, Vote, Aggregate, Verify)', async () => {
+    const k1 = (await makeRequest('POST', '/api/v1/keys/generate')).body.keyPair;
+    const k2 = (await makeRequest('POST', '/api/v1/keys/generate')).body.keyPair;
+
+    // 1. Cluster Create
+    const clusterRes = await makeRequest('POST', '/api/v1/swarm/cluster/create', {
+      swarmName: 'Sentinel Swarm Alpha',
+      agents: [
+        { agentDid: k1.did, publicKeyHex: k1.publicKeyHex, role: 'coordinator', reputationWeight: 70 },
+        { agentDid: k2.did, publicKeyHex: k2.publicKeyHex, role: 'executor', reputationWeight: 30 }
+      ]
+    });
+    assert.equal(clusterRes.status, 200);
+    const cluster = clusterRes.body.cluster;
+
+    // 2. Propose
+    const propRes = await makeRequest('POST', '/api/v1/swarm/propose', {
+      swarmId: cluster.swarmId,
+      proposerDid: k1.did,
+      intentAction: 'DEPLOY_MODEL',
+      targetPayload: { model: 'GPT-OSS-2026', version: '2.4' },
+      requiredQuorumWeight: 50
+    });
+    assert.equal(propRes.status, 200);
+    const proposal = propRes.body.proposal;
+
+    // 3. Vote
+    const vote1Res = await makeRequest('POST', '/api/v1/swarm/vote', {
+      proposal,
+      agent: cluster.members[0],
+      agentPrivateKeyHex: k1.privateKeyHex,
+      decision: 'APPROVE',
+      reason: 'Model weights validated'
+    });
+    assert.equal(vote1Res.status, 200);
+
+    // 4. Aggregate
+    const aggRes = await makeRequest('POST', '/api/v1/swarm/aggregate', {
+      proposal,
+      members: cluster.members,
+      votes: [vote1Res.body.vote]
+    });
+    assert.equal(aggRes.status, 200);
+    const proof = aggRes.body.proof;
+
+    // 5. Verify
+    const verifyRes = await makeRequest('POST', '/api/v1/swarm/verify', {
+      proof,
+      members: cluster.members
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.result.valid, true);
+  });
+
+  await t.test('80. POST /api/v1/timelock (VDF Params, Evaluate, Verify, Seal, Unseal)', async () => {
+    // 1. VDF Params
+    const paramsRes = await makeRequest('POST', '/api/v1/timelock/vdf/params', { difficultyT: 300 });
+    assert.equal(paramsRes.status, 200);
+    const params = paramsRes.body.params;
+
+    // 2. Evaluate VDF
+    const evalRes = await makeRequest('POST', '/api/v1/timelock/vdf/evaluate', {
+      params,
+      inputSeed: 'seed_2026'
+    });
+    assert.equal(evalRes.status, 200);
+    const vdfProof = evalRes.body.proof;
+
+    // 3. Verify VDF
+    const verifyRes = await makeRequest('POST', '/api/v1/timelock/vdf/verify', { proof: vdfProof });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.result.valid, true);
+
+    // 4. Seal Credential
+    const secretDoc = { message: 'Unlock in 2027', amount: 1000000 };
+    const sealRes = await makeRequest('POST', '/api/v1/timelock/seal', {
+      payload: secretDoc,
+      delaySeconds: 5,
+      difficultyT: 200
+    });
+    assert.equal(sealRes.status, 200);
+    const envelope = sealRes.body.envelope;
+    const sealProof = sealRes.body.vdfProof;
+
+    // 5. Unseal Credential
+    const unsealRes = await makeRequest('POST', '/api/v1/timelock/unseal', {
+      envelope,
+      vdfProof: sealProof
+    });
+    assert.equal(unsealRes.status, 200);
+    assert.equal(unsealRes.body.success, true);
+    assert.deepEqual(unsealRes.body.payload, secretDoc);
+  });
 });
 
 

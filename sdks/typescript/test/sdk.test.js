@@ -466,6 +466,50 @@ describe('DocuTrust TypeScript SDK (@docutrust/sdk)', () => {
     assert.strictEqual(mockCalls[134].url, 'https://test-api.docutrust.org/api/v1/psi/receipt');
     await client.verifyPSIExecutionReceipt({});
     assert.strictEqual(mockCalls[135].url, 'https://test-api.docutrust.org/api/v1/psi/verify');
+
+    // 70. v18.0.0 Zero-Knowledge Machine Learning (zkML)
+    await client.commitModelWeights('m1', 'mlp', []);
+    assert.strictEqual(mockCalls[136].url, 'https://test-api.docutrust.org/api/v1/zkml/commit');
+    await client.proveZKMLInference('m1', {}, [], [1.0]);
+    assert.strictEqual(mockCalls[137].url, 'https://test-api.docutrust.org/api/v1/zkml/prove');
+    await client.verifyZKMLInference({});
+    assert.strictEqual(mockCalls[138].url, 'https://test-api.docutrust.org/api/v1/zkml/verify');
+    await client.exportZKMLSolidityCalldata({});
+    assert.strictEqual(mockCalls[139].url, 'https://test-api.docutrust.org/api/v1/zkml/solidity-calldata');
+
+    // 71. v18.0.0 MPC Garbled Circuits
+    await client.garbleCircuit('c1', [], [], [], []);
+    assert.strictEqual(mockCalls[140].url, 'https://test-api.docutrust.org/api/v1/mpc/garble');
+    await client.initObliviousTransfer('s1', '00', '11', 0);
+    assert.strictEqual(mockCalls[141].url, 'https://test-api.docutrust.org/api/v1/mpc/ot/init');
+    await client.evaluateGarbledCircuit({}, {});
+    assert.strictEqual(mockCalls[142].url, 'https://test-api.docutrust.org/api/v1/mpc/evaluate');
+    await client.verifyGarbledCircuitReceipt({});
+    assert.strictEqual(mockCalls[143].url, 'https://test-api.docutrust.org/api/v1/mpc/verify-receipt');
+
+    // 72. v18.0.0 Verifiable Swarm Consensus
+    await client.createSwarmCluster('Swarm1', []);
+    assert.strictEqual(mockCalls[144].url, 'https://test-api.docutrust.org/api/v1/swarm/cluster/create');
+    await client.proposeSwarmIntent('sw1', 'did:1', 'ACT', {});
+    assert.strictEqual(mockCalls[145].url, 'https://test-api.docutrust.org/api/v1/swarm/propose');
+    await client.signSwarmVote({}, {}, 'sec', 'APPROVE');
+    assert.strictEqual(mockCalls[146].url, 'https://test-api.docutrust.org/api/v1/swarm/vote');
+    await client.aggregateSwarmQuorum({}, [], []);
+    assert.strictEqual(mockCalls[147].url, 'https://test-api.docutrust.org/api/v1/swarm/aggregate');
+    await client.verifySwarmConsensusProof({}, []);
+    assert.strictEqual(mockCalls[148].url, 'https://test-api.docutrust.org/api/v1/swarm/verify');
+
+    // 73. v18.0.0 Threshold Timelock Encryption
+    await client.generateVDFParameters(100);
+    assert.strictEqual(mockCalls[149].url, 'https://test-api.docutrust.org/api/v1/timelock/vdf/params');
+    await client.evaluateVDF({});
+    assert.strictEqual(mockCalls[150].url, 'https://test-api.docutrust.org/api/v1/timelock/vdf/evaluate');
+    await client.verifyVDFProof({});
+    assert.strictEqual(mockCalls[151].url, 'https://test-api.docutrust.org/api/v1/timelock/vdf/verify');
+    await client.sealTimelockCredential({});
+    assert.strictEqual(mockCalls[152].url, 'https://test-api.docutrust.org/api/v1/timelock/seal');
+    await client.unsealTimelockCredential({}, {});
+    assert.strictEqual(mockCalls[153].url, 'https://test-api.docutrust.org/api/v1/timelock/unseal');
   });
 
   test('DocuTrustClient handles HTTP error responses gracefully', async () => {

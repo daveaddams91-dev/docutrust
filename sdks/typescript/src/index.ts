@@ -2519,6 +2519,177 @@ export class DocuTrustClient {
   ): Promise<{ success: boolean; result: any }> {
     return this.request('/psi/verify', 'POST', { receipt });
   }
+
+  // ========================================================
+  // v18.0.0 Zero-Knowledge Machine Learning (zkML) Client Methods
+  // ========================================================
+
+  public async commitModelWeights(
+    modelId: string,
+    architecture: string,
+    layers: any[]
+  ): Promise<{ success: boolean; commitment: any }> {
+    return this.request('/zkml/commit', 'POST', { modelId, architecture, layers });
+  }
+
+  public async proveZKMLInference(
+    modelId: string,
+    weightCommitment: any,
+    layers: any[],
+    inputData: number[]
+  ): Promise<{ success: boolean; proof: any }> {
+    return this.request('/zkml/prove', 'POST', { modelId, weightCommitment, layers, inputData });
+  }
+
+  public async verifyZKMLInference(
+    proof: any,
+    expectedWeightCommitmentRoot?: string
+  ): Promise<{ success: boolean; result: any }> {
+    return this.request('/zkml/verify', 'POST', { proof, expectedWeightCommitmentRoot });
+  }
+
+  public async exportZKMLSolidityCalldata(
+    proof: any
+  ): Promise<{ success: boolean; calldata: string }> {
+    return this.request('/zkml/solidity-calldata', 'POST', { proof });
+  }
+
+  // ========================================================
+  // v18.0.0 Multi-Party Computation (MPC) Garbled Circuits Client Methods
+  // ========================================================
+
+  public async garbleCircuit(
+    circuitId: string,
+    inputWiresGarbler: string[],
+    inputWiresEvaluator: string[],
+    outputWires: string[],
+    gates: any[]
+  ): Promise<{ success: boolean; result: any }> {
+    return this.request('/mpc/garble', 'POST', {
+      circuitId,
+      inputWiresGarbler,
+      inputWiresEvaluator,
+      outputWires,
+      gates
+    });
+  }
+
+  public async initObliviousTransfer(
+    sessionId: string,
+    wireZeroLabel: string,
+    wireOneLabel: string,
+    evaluatorChoiceBit: 0 | 1 = 0
+  ): Promise<{ success: boolean; otSession: any }> {
+    return this.request('/mpc/ot/init', 'POST', { sessionId, wireZeroLabel, wireOneLabel, evaluatorChoiceBit });
+  }
+
+  public async evaluateGarbledCircuit(
+    circuit: any,
+    activeInputLabels: Record<string, string>,
+    garblerDid?: string,
+    evaluatorDid?: string
+  ): Promise<{ success: boolean; receipt: any }> {
+    return this.request('/mpc/evaluate', 'POST', { circuit, activeInputLabels, garblerDid, evaluatorDid });
+  }
+
+  public async verifyGarbledCircuitReceipt(
+    receipt: any,
+    expectedCircuitHash?: string
+  ): Promise<{ success: boolean; result: any }> {
+    return this.request('/mpc/verify-receipt', 'POST', { receipt, expectedCircuitHash });
+  }
+
+  // ========================================================
+  // v18.0.0 Verifiable Swarm Consensus Client Methods
+  // ========================================================
+
+  public async createSwarmCluster(
+    swarmName: string,
+    agents: any[]
+  ): Promise<{ success: boolean; cluster: any }> {
+    return this.request('/swarm/cluster/create', 'POST', { swarmName, agents });
+  }
+
+  public async proposeSwarmIntent(
+    swarmId: string,
+    proposerDid: string,
+    intentAction: string,
+    targetPayload: any,
+    requiredQuorumWeight: number = 50,
+    durationMinutes: number = 60
+  ): Promise<{ success: boolean; proposal: any }> {
+    return this.request('/swarm/propose', 'POST', {
+      swarmId,
+      proposerDid,
+      intentAction,
+      targetPayload,
+      requiredQuorumWeight,
+      durationMinutes
+    });
+  }
+
+  public async signSwarmVote(
+    proposal: any,
+    agent: any,
+    agentPrivateKeyHex: string,
+    decision: 'APPROVE' | 'REJECT' | 'ABSTAIN',
+    reason?: string
+  ): Promise<{ success: boolean; vote: any }> {
+    return this.request('/swarm/vote', 'POST', { proposal, agent, agentPrivateKeyHex, decision, reason });
+  }
+
+  public async aggregateSwarmQuorum(
+    proposal: any,
+    members: any[],
+    votes: any[]
+  ): Promise<{ success: boolean; proof: any }> {
+    return this.request('/swarm/aggregate', 'POST', { proposal, members, votes });
+  }
+
+  public async verifySwarmConsensusProof(
+    proof: any,
+    members: any[]
+  ): Promise<{ success: boolean; result: any }> {
+    return this.request('/swarm/verify', 'POST', { proof, members });
+  }
+
+  // ========================================================
+  // v18.0.0 Multi-Party Threshold Timelock Encryption Client Methods
+  // ========================================================
+
+  public async generateVDFParameters(
+    difficultyT: number = 2000
+  ): Promise<{ success: boolean; params: any }> {
+    return this.request('/timelock/vdf/params', 'POST', { difficultyT });
+  }
+
+  public async evaluateVDF(
+    params: any,
+    inputSeed?: string
+  ): Promise<{ success: boolean; proof: any }> {
+    return this.request('/timelock/vdf/evaluate', 'POST', { params, inputSeed });
+  }
+
+  public async verifyVDFProof(
+    proof: any
+  ): Promise<{ success: boolean; result: any }> {
+    return this.request('/timelock/vdf/verify', 'POST', { proof });
+  }
+
+  public async sealTimelockCredential(
+    payload: any,
+    delaySeconds: number = 10,
+    difficultyT: number = 1000
+  ): Promise<{ success: boolean; envelope: any; vdfProof: any; recoveryKeyHex: string }> {
+    return this.request('/timelock/seal', 'POST', { payload, delaySeconds, difficultyT });
+  }
+
+  public async unsealTimelockCredential(
+    envelope: any,
+    vdfProof: any
+  ): Promise<{ success: boolean; payload?: any; error?: string }> {
+    return this.request('/timelock/unseal', 'POST', { envelope, vdfProof });
+  }
 }
 
 

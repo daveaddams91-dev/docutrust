@@ -237,3 +237,19 @@ export * from './agent-memory';
 
 // Export Private Set Intersection (PSI) & Blind Matching Engine (DocuTrust v17.0.0)
 export * from './psi-engine';
+
+// ========================================================
+// DocuTrust v18.0.0 Sovereign Trust Mesh Evolution
+// ========================================================
+
+// Export Zero-Knowledge Machine Learning (zkML) Inference & Model Attestation Engine (DocuTrust v18.0.0)
+export * from './zkml-inference';
+
+// Export Multi-Party Computation (MPC) Garbled Circuits & Oblivious Transfer Engine (DocuTrust v18.0.0)
+export * from './mpc-garbled-circuits';
+
+// Export Verifiable Agentic Swarm Consensus & Collective Intent Attestation Engine (DocuTrust v18.0.0)
+export * from './swarm-consensus';
+
+// Export Multi-Party Threshold Timelock Encryption & Verifiable Delay Witness Engine (DocuTrust v18.0.0)
+export * from './timelock-encryption';

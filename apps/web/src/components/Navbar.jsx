@@ -27,6 +27,8 @@ import {
   Smartphone,
   Grid,
   Bot,
+  Brain,
+  Hourglass,
   Menu,
   X,
   Compass
@@ -37,6 +39,10 @@ export default function Navbar({ activeTab, setActiveTab }) {
 
   const navItems = [
     { id: 'hero', label: 'Overview', icon: ShieldCheck, cat: 'Core' },
+    { id: 'zkml-studio', label: 'zkML Inference', icon: Brain, cat: 'v18' },
+    { id: 'mpc-studio', label: 'Garbled Circuits', icon: Lock, cat: 'v18' },
+    { id: 'swarm-studio', label: 'Swarm Consensus', icon: Users, cat: 'v18' },
+    { id: 'timelock-studio', label: 'Timelock VDF', icon: Hourglass, cat: 'v18' },
     { id: 'stark-studio', label: 'Transparent STARKs', icon: Cpu, cat: 'v17' },
     { id: 'frost-consensus', label: 'aBFT FROST Mesh', icon: Network, cat: 'v17' },
     { id: 'agent-memory', label: 'Verifiable Memory', icon: Bot, cat: 'v17' },
@@ -95,9 +101,9 @@ export default function Navbar({ activeTab, setActiveTab }) {
             </div>
           </div>
           <div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-bold text-lg tracking-tight text-white font-sans">DocuTrust</span>
-              <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono font-semibold">v17.0.0</span>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-base bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-100 to-gray-400 tracking-tight">DocuTrust</span>
+              <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono font-semibold">v18.0.0</span>
             </div>
             <span className="text-[10px] text-gray-400 tracking-wide block font-mono">Autonomous Sovereign Trust Mesh</span>
           </div>

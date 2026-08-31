@@ -2244,8 +2244,157 @@ class TestDocuTrustPython(unittest.TestCase):
         verify_receipt = PSIEngine.verify_execution_receipt(receipt)
         self.assertTrue(verify_receipt["valid"])
 
+    def test_zkml_inference(self):
+        from docutrust.zkml_inference import ZKMLEngine
+
+        layers = [
+            {
+                "layerIndex": 0,
+                "type": "dense",
+                "weights": ZKMLEngine.quantize([0.5, -0.2, 0.8, 0.4], [2, 2]),
+                "biases": ZKMLEngine.quantize([0.1, -0.1], [2, 1])
+            },
+            {
+                "layerIndex": 1,
+                "type": "relu"
+            },
+            {
+                "layerIndex": 2,
+                "type": "softmax"
+            }
+        ]
+
+        commitment = ZKMLEngine.commit_model_weights("credit_risk_nn_v1", "MLP", layers)
+        self.assertEqual(commitment["type"], "DocuTrustModelWeightCommitment2026")
+        self.assertEqual(commitment["totalLayers"], 3)
+        self.assertTrue(len(commitment["merkleWeightRoot"]) > 0)
+
+        input_data = [1.2, 0.7]
+        proof = ZKMLEngine.prove_inference("credit_risk_nn_v1", commitment, layers, input_data)
+        self.assertEqual(proof["type"], "DocuTrustZKMLInferenceProof2026")
+        self.assertEqual(len(proof["layerStepEvaluations"]), 3)
+        self.assertTrue(proof["predictedClass"] is not None)
+
+        ver = ZKMLEngine.verify_inference_proof(proof, commitment["merkleWeightRoot"])
+        self.assertTrue(ver["valid"])
+
+        calldata = ZKMLEngine.export_solidity_calldata(proof)
+        self.assertTrue(calldata["weightCommitmentBytes32"].startswith("0x"))
+        self.assertTrue(calldata["proofHashBytes32"].startswith("0x"))
+
+    def test_mpc_garbled_circuits(self):
+        from docutrust.mpc_garbled_circuits import MPCGarbledCircuitEngine
+
+        circuit_id = "circuit_and_gate_01"
+        in_garbler = ["w0"]
+        in_evaluator = ["w1"]
+        out_wires = ["w2"]
+        gates = [
+            {"id": "g0", "type": "AND", "inputWires": ["w0", "w1"], "outputWire": "w2"}
+        ]
+
+        garbled_pkg = MPCGarbledCircuitEngine.garble_circuit(
+            circuit_id, in_garbler, in_evaluator, out_wires, gates
+        )
+        self.assertEqual(garbled_pkg["circuit"]["circuitId"], circuit_id)
+        self.assertEqual(len(garbled_pkg["circuit"]["garbledTables"]), 1)
+
+        # Garbler input bit = 1, Evaluator input bit = 1
+        active_w0 = garbled_pkg["wireLabels"]["w0"]["oneLabel"]
+
+        ot_session = MPCGarbledCircuitEngine.init_oblivious_transfer(
+            "ot_sess_01",
+            garbled_pkg["wireLabels"]["w1"]["zeroLabel"],
+            garbled_pkg["wireLabels"]["w1"]["oneLabel"],
+            1
+        )
+        active_w1 = ot_session["receivedLabel"]
+
+        receipt = MPCGarbledCircuitEngine.evaluate_circuit(
+            garbled_pkg["circuit"],
+            {"w0": active_w0, "w1": active_w1},
+            "did:docutrust:bankA",
+            "did:docutrust:bankB"
+        )
+        self.assertEqual(receipt["type"], "DocuTrustGarbledCircuitReceipt2026")
+        self.assertTrue(receipt["receiptHash"])
+
+        ver_rec = MPCGarbledCircuitEngine.verify_receipt(receipt, garbled_pkg["circuit"]["circuitHash"])
+        self.assertTrue(ver_rec["valid"])
+
+    def test_swarm_consensus(self):
+        from docutrust.swarm_consensus import SwarmConsensusEngine
+        from docutrust.crypto import generate_key_pair
+
+        k1 = generate_key_pair()
+        k2 = generate_key_pair()
+        k3 = generate_key_pair()
+
+        agents = [
+            {"did": "did:docutrust:agent_sec", "pubKey": k1["publicKeyHex"], "role": "security", "weight": 40},
+            {"did": "did:docutrust:agent_risk", "pubKey": k2["publicKeyHex"], "role": "risk", "weight": 35},
+            {"did": "did:docutrust:agent_exec", "pubKey": k3["publicKeyHex"], "role": "execution", "weight": 25}
+        ]
+
+        cluster = SwarmConsensusEngine.create_swarm_cluster("defi_execution_swarm", agents)
+        self.assertEqual(cluster["totalWeight"], 100)
+
+        proposal = SwarmConsensusEngine.propose_intent(
+            cluster["swarmId"],
+            "did:docutrust:agent_sec",
+            "EXECUTE_CROSS_VAULT_REBALANCE",
+            {"amountUsd": 500000, "destVault": "vault_alpha"},
+            60,
+            30
+        )
+        self.assertEqual(proposal["requiredQuorumWeight"], 60)
+
+        v1 = SwarmConsensusEngine.sign_vote(proposal, cluster["members"][0], k1["privateKeyHex"], "APPROVE")
+        v2 = SwarmConsensusEngine.sign_vote(proposal, cluster["members"][1], k2["privateKeyHex"], "APPROVE")
+
+        quorum_proof = SwarmConsensusEngine.aggregate_swarm_quorum(proposal, cluster["members"], [v1, v2])
+        self.assertEqual(quorum_proof["type"], "DocuTrustSwarmIntentProof2026")
+        self.assertEqual(quorum_proof["consensusOutcome"], "CONSENSUS_REACHED")
+        self.assertEqual(quorum_proof["achievedQuorumWeight"], 75)
+
+        ver_swarm = SwarmConsensusEngine.verify_swarm_proof(quorum_proof, cluster["members"])
+        self.assertTrue(ver_swarm["valid"])
+
+    def test_timelock_encryption(self):
+        from docutrust.timelock_encryption import TimelockEncryptionEngine
+
+        params = TimelockEncryptionEngine.generate_vdf_parameters(1500)
+        self.assertEqual(params["difficultyT"], 1500)
+
+        proof = TimelockEncryptionEngine.evaluate_vdf(params, "test_timelock_seed_01")
+        self.assertEqual(proof["type"], "DocuTrustVDFProof2026")
+
+        ver = TimelockEncryptionEngine.verify_vdf_proof(proof)
+        self.assertTrue(ver["valid"])
+
+        credential_payload = {
+            "id": "urn:uuid:timelock-vc-999",
+            "issuer": "did:docutrust:treasury",
+            "unlockCondition": "Maturity Date 2028-01-01"
+        }
+        sealed = TimelockEncryptionEngine.seal_timelock_credential(credential_payload, 5, 800)
+        self.assertEqual(sealed["envelope"]["type"], "DocuTrustTimelockEnvelope2026")
+
+        unsealed = TimelockEncryptionEngine.unseal_timelock_credential(sealed["envelope"], sealed["vdfProof"])
+        self.assertTrue(unsealed["success"])
+        self.assertEqual(unsealed["payload"]["issuer"], "did:docutrust:treasury")
+
+    def test_client_v18_methods(self):
+        client = DocuTrustClient()
+        self.assertTrue(hasattr(client, "zkml_commit_model"))
+        self.assertTrue(hasattr(client, "mpc_garble_circuit"))
+        self.assertTrue(hasattr(client, "swarm_create_cluster"))
+        self.assertTrue(hasattr(client, "timelock_generate_vdf_parameters"))
+
+
 if __name__ == '__main__':
     unittest.main()
+
 
 
 

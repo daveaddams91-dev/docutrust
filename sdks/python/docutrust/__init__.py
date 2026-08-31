@@ -85,8 +85,12 @@ from .stark_fri import STARKEngine
 from .frost_consensus import FROSTConsensusEngine
 from .agent_memory import AgentMemoryEngine
 from .psi_engine import PSIEngine
+from .zkml_inference import ZKMLEngine
+from .mpc_garbled_circuits import MPCGarbledCircuitEngine
+from .swarm_consensus import SwarmConsensusEngine
+from .timelock_encryption import TimelockEncryptionEngine
 
-__version__ = "17.0.0"
+__version__ = "18.0.0"
 __all__ = [
     "DocuTrustClient",
     "canonicalize_json",
@@ -186,5 +190,9 @@ __all__ = [
     "STARKEngine",
     "FROSTConsensusEngine",
     "AgentMemoryEngine",
-    "PSIEngine"
+    "PSIEngine",
+    "ZKMLEngine",
+    "MPCGarbledCircuitEngine",
+    "SwarmConsensusEngine",
+    "TimelockEncryptionEngine"
 ]

@@ -2414,6 +2414,209 @@ class DocuTrustClient:
         from .psi_engine import PSIEngine
         return PSIEngine.verify_execution_receipt(receipt)
 
+    # ========================================================
+    # v18.0.0 Zero-Knowledge Machine Learning (zkML) Methods
+    # ========================================================
+
+    def zkml_commit_model(
+        self,
+        model_id: str,
+        architecture: str,
+        layers: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Commits neural network weights and architecture into a Merkle-like root."""
+        from .zkml_inference import ZKMLEngine
+        return ZKMLEngine.commit_model_weights(model_id, architecture, layers)
+
+    def zkml_prove_inference(
+        self,
+        model_id: str,
+        weight_commitment: Dict[str, Any],
+        layers: List[Dict[str, Any]],
+        input_data: List[float]
+    ) -> Dict[str, Any]:
+        """Generates a zero-knowledge inference trace and proof."""
+        from .zkml_inference import ZKMLEngine
+        return ZKMLEngine.prove_inference(model_id, weight_commitment, layers, input_data)
+
+    def zkml_verify_inference(
+        self,
+        proof: Dict[str, Any],
+        expected_weight_root: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Verifies a zkML inference proof."""
+        from .zkml_inference import ZKMLEngine
+        return ZKMLEngine.verify_inference_proof(proof, expected_weight_root)
+
+    def zkml_export_solidity_calldata(
+        self,
+        proof: Dict[str, Any]
+    ) -> Dict[str, str]:
+        """Synthesizes EVM calldata for on-chain verification."""
+        from .zkml_inference import ZKMLEngine
+        return ZKMLEngine.export_solidity_calldata(proof)
+
+    # ========================================================
+    # v18.0.0 Multi-Party Computation (MPC) Garbled Circuits Methods
+    # ========================================================
+
+    def mpc_garble_circuit(
+        self,
+        circuit_id: str,
+        input_wires_garbler: List[str],
+        input_wires_evaluator: List[str],
+        output_wires: List[str],
+        gates: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Garbles a Boolean logic circuit using Yao's Garbled Circuits protocol."""
+        from .mpc_garbled_circuits import MPCGarbledCircuitEngine
+        return MPCGarbledCircuitEngine.garble_circuit(
+            circuit_id, input_wires_garbler, input_wires_evaluator, output_wires, gates
+        )
+
+    def mpc_init_oblivious_transfer(
+        self,
+        session_id: str,
+        wire_zero_label: str,
+        wire_one_label: str,
+        evaluator_choice_bit: int = 0
+    ) -> Dict[str, Any]:
+        """Initializes a 1-out-of-2 Oblivious Transfer session for an evaluator input bit."""
+        from .mpc_garbled_circuits import MPCGarbledCircuitEngine
+        return MPCGarbledCircuitEngine.init_oblivious_transfer(
+            session_id, wire_zero_label, wire_one_label, evaluator_choice_bit
+        )
+
+    def mpc_evaluate_circuit(
+        self,
+        circuit: Dict[str, Any],
+        active_input_labels: Dict[str, str],
+        garbler_did: str = "did:docutrust:garbler",
+        evaluator_did: str = "did:docutrust:evaluator"
+    ) -> Dict[str, Any]:
+        """Evaluates a garbled circuit given active input wire labels."""
+        from .mpc_garbled_circuits import MPCGarbledCircuitEngine
+        return MPCGarbledCircuitEngine.evaluate_circuit(
+            circuit, active_input_labels, garbler_did, evaluator_did
+        )
+
+    def mpc_verify_receipt(
+        self,
+        receipt: Dict[str, Any],
+        expected_circuit_hash: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Verifies an MPC Garbled Circuit execution receipt."""
+        from .mpc_garbled_circuits import MPCGarbledCircuitEngine
+        return MPCGarbledCircuitEngine.verify_receipt(receipt, expected_circuit_hash)
+
+    # ========================================================
+    # v18.0.0 Verifiable Swarm Consensus Methods
+    # ========================================================
+
+    def swarm_create_cluster(
+        self,
+        swarm_name: str,
+        agents: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Creates a registered Swarm Agent Cluster."""
+        from .swarm_consensus import SwarmConsensusEngine
+        return SwarmConsensusEngine.create_swarm_cluster(swarm_name, agents)
+
+    def swarm_propose_intent(
+        self,
+        swarm_id: str,
+        proposer_did: str,
+        intent_action: str,
+        target_payload: Dict[str, Any],
+        required_quorum_weight: int = 50,
+        duration_minutes: int = 60
+    ) -> Dict[str, Any]:
+        """Proposes an intent action for collective swarm voting."""
+        from .swarm_consensus import SwarmConsensusEngine
+        return SwarmConsensusEngine.propose_intent(
+            swarm_id, proposer_did, intent_action, target_payload, required_quorum_weight, duration_minutes
+        )
+
+    def swarm_sign_vote(
+        self,
+        proposal: Dict[str, Any],
+        agent: Dict[str, Any],
+        agent_private_key_hex: str,
+        decision: str = "APPROVE",
+        reason: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Generates a signed vote attestation from an agent member."""
+        from .swarm_consensus import SwarmConsensusEngine
+        return SwarmConsensusEngine.sign_vote(proposal, agent, agent_private_key_hex, decision, reason)
+
+    def swarm_aggregate_quorum(
+        self,
+        proposal: Dict[str, Any],
+        members: List[Dict[str, Any]],
+        votes: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Aggregates member votes and produces a verifiable Swarm Intent Proof."""
+        from .swarm_consensus import SwarmConsensusEngine
+        return SwarmConsensusEngine.aggregate_swarm_quorum(proposal, members, votes)
+
+    def swarm_verify_proof(
+        self,
+        proof: Dict[str, Any],
+        members: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Verifies a Swarm Intent Consensus Proof."""
+        from .swarm_consensus import SwarmConsensusEngine
+        return SwarmConsensusEngine.verify_swarm_proof(proof, members)
+
+    # ========================================================
+    # v18.0.0 Multi-Party Threshold Timelock Encryption Methods
+    # ========================================================
+
+    def timelock_generate_vdf_parameters(
+        self,
+        difficulty_t: int = 2000
+    ) -> Dict[str, Any]:
+        """Generates publicly auditable VDF parameters."""
+        from .timelock_encryption import TimelockEncryptionEngine
+        return TimelockEncryptionEngine.generate_vdf_parameters(difficulty_t)
+
+    def timelock_evaluate_vdf(
+        self,
+        params: Dict[str, Any],
+        input_seed: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Evaluates the sequential squaring VDF loop."""
+        from .timelock_encryption import TimelockEncryptionEngine
+        return TimelockEncryptionEngine.evaluate_vdf(params, input_seed)
+
+    def timelock_verify_vdf_proof(
+        self,
+        proof: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Verifies a Wesolowski VDF proof in O(1) group multiplications."""
+        from .timelock_encryption import TimelockEncryptionEngine
+        return TimelockEncryptionEngine.verify_vdf_proof(proof)
+
+    def timelock_seal_credential(
+        self,
+        payload: Any,
+        delay_seconds: int = 10,
+        difficulty_t: int = 1000
+    ) -> Dict[str, Any]:
+        """Locks a credential payload until the required VDF work or unlock time is elapsed."""
+        from .timelock_encryption import TimelockEncryptionEngine
+        return TimelockEncryptionEngine.seal_timelock_credential(payload, delay_seconds, difficulty_t)
+
+    def timelock_unseal_credential(
+        self,
+        envelope: Dict[str, Any],
+        vdf_proof: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Unlocks and decrypts a timelocked credential using a valid VDF proof."""
+        from .timelock_encryption import TimelockEncryptionEngine
+        return TimelockEncryptionEngine.unseal_timelock_credential(envelope, vdf_proof)
+
+
 
 
 

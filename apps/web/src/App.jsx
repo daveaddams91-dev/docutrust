@@ -55,6 +55,10 @@ import STARKStudio from './components/STARKStudio.jsx';
 import FROSTConsensusStudio from './components/FROSTConsensusStudio.jsx';
 import AgentMemoryStudio from './components/AgentMemoryStudio.jsx';
 import PSIStudio from './components/PSIStudio.jsx';
+import ZKMLStudio from './components/ZKMLStudio.jsx';
+import MPCStudio from './components/MPCStudio.jsx';
+import SwarmStudio from './components/SwarmStudio.jsx';
+import TimelockStudio from './components/TimelockStudio.jsx';
 import Footer from './components/Footer.jsx';
 
 export default function App() {
@@ -72,6 +76,10 @@ export default function App() {
 
       <main className="flex-1">
         {activeTab === 'hero' && <HeroSection setActiveTab={setActiveTab} />}
+        {activeTab === 'zkml-studio' && <ZKMLStudio />}
+        {activeTab === 'mpc-studio' && <MPCStudio />}
+        {activeTab === 'swarm-studio' && <SwarmStudio />}
+        {activeTab === 'timelock-studio' && <TimelockStudio />}
         {activeTab === 'stark-studio' && <STARKStudio />}
         {activeTab === 'frost-consensus' && <FROSTConsensusStudio />}
         {activeTab === 'agent-memory' && <AgentMemoryStudio />}

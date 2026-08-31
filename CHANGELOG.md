@@ -1,5 +1,51 @@
 # 📝 DocuTrust Changelog & Release Notes
 
+## [v18.0.0] - Sovereign zkML Inference, MPC Garbled Circuits, Autonomous Swarm Consensus & Threshold Timelock Encryption - 2026-09-01
+
+### 🌟 Release Overview (v18.0.0 - Major Milestone Release)
+DocuTrust 18.0.0 is a transformative major architectural release introducing Zero-Knowledge Machine Learning (zkML) inference proofs, Yao's Garbled Circuits Multi-Party Computation with Free-XOR optimization, Autonomous AI Agent Swarm Consensus with weighted reputation threshold voting, and Threshold Timelock Encryption with Wesolowski Verifiable Delay Functions (VDF):
+
+1. **Zero-Knowledge Machine Learning (zkML) Inference Engine (`@docutrust/core/zkml-inference`, `docutrust.zkml_inference`)**:
+   - Implemented `ZKMLEngine` providing verifiable feedforward neural network inference for quantized fixed-point weights and activations (Dense, ReLU, Sigmoid, Softmax).
+   - Cryptographic model weight Merkle tree commitments (`DocuTrustModelWeightCommitment2026`) ensuring tamper-proof linkage between published AI models and inference proofs.
+   - Per-layer algebraic trace commitments and succinct zero-knowledge execution proofs (`DocuTrustZKMLInferenceProof2026`) with configurable accuracy and bounding constraints.
+   - Solidity EVM calldata export synthesizing structured `bytes32` parameters for on-chain verification in `DocuTrustUniversalVerifier.sol`.
+
+2. **Multi-Party Computation (MPC) Yao's Garbled Circuits Engine (`@docutrust/core/mpc-garbled-circuits`, `docutrust.mpc_garbled_circuits`)**:
+   - Implemented `MPCGarbledCircuitEngine` featuring Free-XOR optimized Yao's Garbled Circuits for arbitrary boolean logic execution.
+   - Point-and-permute index mapping with dual-key AES-256-GCM encrypted garbled truth tables.
+   - 1-out-of-2 Oblivious Transfer (OT) protocol simulator ensuring private input confidentiality.
+   - Verifiable Garbled Circuit Receipts (`DocuTrustGarbledCircuitReceipt2026`) binding garbler and evaluator DIDs to circuit hashes and output wire labels.
+
+3. **Autonomous AI Agent Swarm Consensus Engine (`@docutrust/core/swarm-consensus`, `docutrust.swarm_consensus`)**:
+   - Implemented `SwarmConsensusEngine` coordinating decentralized AI agent clusters with weighted reputation distribution.
+   - Cryptographic intent proposals with time-to-live expirations and quorum threshold requirements.
+   - Individual Ed25519 agent vote signing and Byzantine fault-tolerant quorum aggregation (`DocuTrustSwarmIntentProof2026`).
+   - Anti-tamper verification verifying quorum weight thresholds and member signatures.
+
+4. **Multi-Party Threshold Timelock Encryption Engine (`@docutrust/core/timelock-encryption`, `docutrust.timelock_encryption`)**:
+   - Implemented `TimelockEncryptionEngine` utilizing the Wesolowski Verifiable Delay Function (VDF).
+   - Non-parallelizable sequential squaring loops ($y = g^{2^T} \pmod N$) enforcing strict wall-clock time delays.
+   - Constant-time $O(1)$ Fiat-Shamir proof evaluation ($\pi^L \cdot g^r \equiv y \pmod N$).
+   - AES-256-GCM time-locked credential envelope sealing (`DocuTrustTimelockEnvelope2026`) with automated VDF proof unsealing.
+
+5. **Universal Solidity Verifier Updates (`DocuTrustUniversalVerifier.sol`)**:
+   - Added `verifyZKMLInference`, `verifyGarbledCircuitReceipt`, `verifySwarmIntentProof`, and `verifyTimelockVDFProof` functions to `DocuTrustUniversalVerifier.sol`.
+
+6. **Interactive Web Studios (`ZKMLStudio.jsx`, `MPCStudio.jsx`, `SwarmStudio.jsx`, `TimelockStudio.jsx`)**:
+   - `ZKMLStudio.jsx`: Neural model weight commitment, quantized layer trace viewer, ZK inference prover, and EVM calldata export.
+   - `MPCStudio.jsx`: Boolean gate synthesizer, Free-XOR garbled table inspector, 1-out-of-2 OT simulator, and private execution receipt auditor.
+   - `SwarmStudio.jsx`: Agent cluster manager, weighted reputation distribution, intent voting terminal, and collective quorum proof validator.
+   - `TimelockStudio.jsx`: Wesolowski VDF sequential squaring timer, credential time-lock envelope sealer, and $O(1)$ unsealing verifier.
+
+7. **Full-Stack CLI, REST API & Python/TypeScript SDK Parity**:
+   - CLI: Added 12 new commands (`zkml-commit`, `zkml-prove`, `zkml-verify`, `mpc-garble`, `mpc-evaluate`, `mpc-verify`, `swarm-create`, `swarm-propose`, `swarm-vote`, `swarm-verify`, `timelock-seal`, `timelock-unseal`).
+   - REST API: Added 16 new REST endpoints across `/api/v1/zkml/*`, `/api/v1/mpc/*`, `/api/v1/swarm/*`, `/api/v1/timelock/*`.
+   - TypeScript SDK (`@docutrust/sdk`): Re-exported v18 engines and types, added 18 `DocuTrustClient` wrapper methods, with 100% test coverage.
+   - Python SDK (`docutrust`): Added 4 new engine modules, client wrapper methods, and 102/102 passing unit tests.
+
+---
+
 ## [v17.0.0] - Sovereign Transparent STARKs, aBFT FROST Consensus Mesh, Verifiable Agent Memory & Private Set Intersection (PSI) - 2026-09-01
 
 ### 🌟 Release Overview (v17.0.0 - Major Milestone Release)

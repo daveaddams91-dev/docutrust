@@ -118,7 +118,12 @@ const {
   STARKEngine,
   FROSTConsensusEngine,
   AgentMemoryEngine,
-  PSIExecutionEngine
+  PSIExecutionEngine,
+  // v18.0.0 Engines
+  ZKMLEngine,
+  MPCGarbledCircuitEngine,
+  SwarmConsensusEngine,
+  TimelockEncryptionEngine
 } = require('@docutrust/core');
 
 const PORT = process.env.PORT || 4000;
@@ -3917,6 +3922,283 @@ const server = http.createServer(async (req, res) => {
       try {
         const result = PSIExecutionEngine.verifyReceipt(receipt);
         return jsonResponse(200, { success: true, result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ========================================================
+    // 86. Zero-Knowledge Machine Learning (zkML) (v18.0.0)
+    // ========================================================
+    if (pathname === '/api/v1/zkml/commit' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { modelId, architecture, layers } = body;
+      if (!modelId || !architecture || !layers || !Array.isArray(layers)) {
+        return jsonResponse(400, { error: 'Missing modelId, architecture, or layers array.' });
+      }
+      try {
+        const commitment = ZKMLEngine.commitModelWeights(modelId, architecture, layers);
+        return jsonResponse(200, { success: true, commitment });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/zkml/prove' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { modelId, weightCommitment, layers, inputData } = body;
+      if (!modelId || !weightCommitment || !layers || !inputData) {
+        return jsonResponse(400, { error: 'Missing modelId, weightCommitment, layers, or inputData.' });
+      }
+      try {
+        const proof = ZKMLEngine.proveInference(modelId, weightCommitment, layers, inputData);
+        return jsonResponse(200, { success: true, proof });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/zkml/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { proof, expectedWeightCommitmentRoot } = body;
+      if (!proof) {
+        return jsonResponse(400, { error: 'Missing proof.' });
+      }
+      try {
+        const result = ZKMLEngine.verifyInferenceProof(proof, expectedWeightCommitmentRoot);
+        return jsonResponse(200, { success: true, result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/zkml/solidity-calldata' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { proof } = body;
+      if (!proof) {
+        return jsonResponse(400, { error: 'Missing proof.' });
+      }
+      try {
+        const raw = ZKMLEngine.exportSolidityCalldata(proof);
+        const calldata = typeof raw === 'string'
+          ? raw
+          : `0x${(raw.weightCommitmentBytes32 || '').replace(/^0x/, '')}${(raw.inputDigestBytes32 || '').replace(/^0x/, '')}${(raw.outputDigestBytes32 || '').replace(/^0x/, '')}${(raw.proofHashBytes32 || '').replace(/^0x/, '')}`;
+        return jsonResponse(200, { success: true, calldata, parameters: raw });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ========================================================
+    // 87. Multi-Party Computation (MPC) Garbled Circuits (v18.0.0)
+    // ========================================================
+    if (pathname === '/api/v1/mpc/garble' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { circuitId, inputWiresGarbler, inputWiresEvaluator, outputWires, gates } = body;
+      if (!circuitId || !gates || !Array.isArray(gates)) {
+        return jsonResponse(400, { error: 'Missing circuitId or gates array.' });
+      }
+      try {
+        const result = MPCGarbledCircuitEngine.garbleCircuit(
+          circuitId,
+          inputWiresGarbler || [],
+          inputWiresEvaluator || [],
+          outputWires || [],
+          gates
+        );
+        return jsonResponse(200, { success: true, result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/mpc/ot/init' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { sessionId, wireZeroLabel, wireOneLabel, evaluatorChoiceBit } = body;
+      if (!sessionId || !wireZeroLabel || !wireOneLabel) {
+        return jsonResponse(400, { error: 'Missing sessionId, wireZeroLabel, or wireOneLabel.' });
+      }
+      try {
+        const otSession = MPCGarbledCircuitEngine.initObliviousTransfer(sessionId, wireZeroLabel, wireOneLabel, evaluatorChoiceBit || 0);
+        return jsonResponse(200, { success: true, otSession });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/mpc/evaluate' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { circuit, activeInputLabels, garblerDid, evaluatorDid } = body;
+      if (!circuit || !activeInputLabels) {
+        return jsonResponse(400, { error: 'Missing circuit or activeInputLabels.' });
+      }
+      try {
+        const receipt = MPCGarbledCircuitEngine.evaluateCircuit(circuit, activeInputLabels, garblerDid, evaluatorDid);
+        return jsonResponse(200, { success: true, receipt });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/mpc/verify-receipt' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { receipt, expectedCircuitHash } = body;
+      if (!receipt) {
+        return jsonResponse(400, { error: 'Missing receipt.' });
+      }
+      try {
+        const result = MPCGarbledCircuitEngine.verifyReceipt(receipt, expectedCircuitHash);
+        return jsonResponse(200, { success: true, result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ========================================================
+    // 88. Verifiable Agentic Swarm Consensus (v18.0.0)
+    // ========================================================
+    if (pathname === '/api/v1/swarm/cluster/create' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { swarmName, agents } = body;
+      if (!swarmName || !agents || !Array.isArray(agents)) {
+        return jsonResponse(400, { error: 'Missing swarmName or agents array.' });
+      }
+      try {
+        const cluster = SwarmConsensusEngine.createSwarmCluster(swarmName, agents);
+        return jsonResponse(200, { success: true, cluster });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/swarm/propose' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { swarmId, proposerDid, intentAction, targetPayload, requiredQuorumWeight, durationMinutes } = body;
+      if (!swarmId || !proposerDid || !intentAction || !targetPayload) {
+        return jsonResponse(400, { error: 'Missing swarmId, proposerDid, intentAction, or targetPayload.' });
+      }
+      try {
+        const proposal = SwarmConsensusEngine.proposeIntent(
+          swarmId,
+          proposerDid,
+          intentAction,
+          targetPayload,
+          requiredQuorumWeight || 50,
+          durationMinutes || 60
+        );
+        return jsonResponse(200, { success: true, proposal });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/swarm/vote' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { proposal, agent, agentPrivateKeyHex, decision, reason } = body;
+      if (!proposal || !agent || !agentPrivateKeyHex || !decision) {
+        return jsonResponse(400, { error: 'Missing proposal, agent, agentPrivateKeyHex, or decision.' });
+      }
+      try {
+        const vote = SwarmConsensusEngine.signVote(proposal, agent, agentPrivateKeyHex, decision, reason);
+        return jsonResponse(200, { success: true, vote });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/swarm/aggregate' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { proposal, members, votes } = body;
+      if (!proposal || !members || !votes) {
+        return jsonResponse(400, { error: 'Missing proposal, members, or votes.' });
+      }
+      try {
+        const proof = SwarmConsensusEngine.aggregateSwarmQuorum(proposal, members, votes);
+        return jsonResponse(200, { success: true, proof });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/swarm/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { proof, members } = body;
+      if (!proof || !members) {
+        return jsonResponse(400, { error: 'Missing proof or members.' });
+      }
+      try {
+        const result = SwarmConsensusEngine.verifySwarmProof(proof, members);
+        return jsonResponse(200, { success: true, result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ========================================================
+    // 89. Multi-Party Threshold Timelock Encryption (v18.0.0)
+    // ========================================================
+    if (pathname === '/api/v1/timelock/vdf/params' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { difficultyT } = body;
+      try {
+        const params = TimelockEncryptionEngine.generateVDFParameters(difficultyT || 2000);
+        return jsonResponse(200, { success: true, params });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/timelock/vdf/evaluate' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { params, inputSeed } = body;
+      if (!params) {
+        return jsonResponse(400, { error: 'Missing VDF params.' });
+      }
+      try {
+        const proof = TimelockEncryptionEngine.evaluateVDF(params, inputSeed);
+        return jsonResponse(200, { success: true, proof });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/timelock/vdf/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { proof } = body;
+      if (!proof) {
+        return jsonResponse(400, { error: 'Missing VDF proof.' });
+      }
+      try {
+        const result = TimelockEncryptionEngine.verifyVDFProof(proof);
+        return jsonResponse(200, { success: true, result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/timelock/seal' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { payload, delaySeconds, difficultyT } = body;
+      if (!payload) {
+        return jsonResponse(400, { error: 'Missing payload.' });
+      }
+      try {
+        const sealed = TimelockEncryptionEngine.sealCredential(payload, delaySeconds || 10, difficultyT || 1000);
+        return jsonResponse(200, { success: true, ...sealed });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/timelock/unseal' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { envelope, vdfProof } = body;
+      if (!envelope || !vdfProof) {
+        return jsonResponse(400, { error: 'Missing envelope or vdfProof.' });
+      }
+      try {
+        const result = TimelockEncryptionEngine.unsealCredential(envelope, vdfProof);
+        return jsonResponse(200, result);
       } catch (e) {
         return jsonResponse(400, { error: e.message });
       }

@@ -183,7 +183,12 @@ const {
   STARKEngine,
   FROSTConsensusEngine,
   AgentMemoryEngine,
-  PSIExecutionEngine
+  PSIExecutionEngine,
+  // v18.0.0 Engines
+  ZKMLEngine,
+  MPCGarbledCircuitEngine,
+  SwarmConsensusEngine,
+  TimelockEncryptionEngine
 } = require('../dist/index.js');
 
 // 1. Cryptography Tests
@@ -4188,6 +4193,227 @@ test('110. PSIExecutionEngine: commutative set blinding, double-blinded intersec
   const tamperedReceipt = { ...receipt, intersectionCardinality: 99 };
   const tamperedRes = PSIExecutionEngine.verifyReceipt(tamperedReceipt);
   assert.equal(tamperedRes.valid, false);
+});
+
+// 111. Zero-Knowledge Machine Learning (zkML) Inference & Model Attestation Engine (v18.0.0)
+test('111. ZKMLEngine: quantized tensor arithmetic, Merkleized layer weight commitments, ZK inference proofs & EVM calldata export', () => {
+  const modelId = 'model_sentiment_classifier_v1';
+  const architecture = 'MLP-Dense-ReLU-Dense-Softmax';
+
+  // 1. Define neural network layers with quantized weights & biases
+  const layers = [
+    {
+      layerIndex: 0,
+      type: 'dense',
+      weights: ZKMLEngine.quantize([0.5, -0.2, 0.8, 0.1, -0.4, 0.9], [3, 2]),
+      biases: ZKMLEngine.quantize([0.1, 0.0, -0.1], [3])
+    },
+    {
+      layerIndex: 1,
+      type: 'relu'
+    },
+    {
+      layerIndex: 2,
+      type: 'dense',
+      weights: ZKMLEngine.quantize([0.7, 0.2, -0.5, -0.3, 0.8, 0.4], [2, 3]),
+      biases: ZKMLEngine.quantize([0.05, -0.05], [2])
+    },
+    {
+      layerIndex: 3,
+      type: 'softmax'
+    }
+  ];
+
+  // 2. Commit model weights to Merkle root
+  const weightCommitment = ZKMLEngine.commitModelWeights(modelId, architecture, layers);
+  assert.equal(weightCommitment.type, 'DocuTrustModelWeightCommitment2026');
+  assert.equal(weightCommitment.totalLayers, 4);
+  assert.ok(weightCommitment.merkleWeightRoot);
+
+  // 3. Perform verifiable inference
+  const inputTensor = [1.2, -0.8];
+  const proof = ZKMLEngine.proveInference(modelId, weightCommitment, layers, inputTensor);
+  assert.equal(proof.type, 'DocuTrustZKMLInferenceProof2026');
+  assert.equal(proof.layerStepEvaluations.length, 4);
+  assert.ok(typeof proof.predictedClass === 'number');
+  assert.equal(proof.outputScores.length, 2);
+
+  // 4. Verify inference proof
+  const verifyRes = ZKMLEngine.verifyInferenceProof(proof, weightCommitment.merkleWeightRoot);
+  assert.equal(verifyRes.valid, true);
+
+  // 5. Verify against wrong weight root fails
+  const badVerify = ZKMLEngine.verifyInferenceProof(proof, '0000000000000000000000000000000000000000000000000000000000000000');
+  assert.equal(badVerify.valid, false);
+
+  // 6. Export Solidity calldata
+  const calldata = ZKMLEngine.exportSolidityCalldata(proof);
+  assert.ok(calldata.weightCommitmentBytes32.startsWith('0x'));
+  assert.ok(calldata.proofHashBytes32.startsWith('0x'));
+});
+
+// 112. Multi-Party Computation (MPC) Garbled Circuits & Oblivious Transfer Engine (v18.0.0)
+test('112. MPCGarbledCircuitEngine: Yao garbled circuits, Free-XOR optimization, point-and-permute tables, 1-of-2 OT and receipt verification', () => {
+  const circuitId = 'circ_comparator_01';
+  const inputWiresGarbler = ['w_g0'];
+  const inputWiresEvaluator = ['w_e0'];
+  const outputWires = ['w_out'];
+
+  const gates = [
+    {
+      id: 'g_xor_0',
+      type: 'XOR',
+      inputWires: ['w_g0', 'w_e0'],
+      outputWire: 'w_mid'
+    },
+    {
+      id: 'g_and_1',
+      type: 'AND',
+      inputWires: ['w_mid', 'w_g0'],
+      outputWire: 'w_out'
+    }
+  ];
+
+  // 1. Garble circuit
+  const { circuit, wireLabels, globalDelta } = MPCGarbledCircuitEngine.garbleCircuit(
+    circuitId,
+    inputWiresGarbler,
+    inputWiresEvaluator,
+    outputWires,
+    gates
+  );
+
+  assert.equal(circuit.circuitId, circuitId);
+  assert.ok(globalDelta);
+  assert.ok(circuit.circuitHash);
+  // g_xor_0 is Free-XOR (no table), g_and_1 has 1 garbled table
+  assert.equal(circuit.garbledTables.length, 1);
+
+  // 2. Garbler supplies active input label for w_g0 = 1
+  const garblerInputLabels = {
+    w_g0: wireLabels['w_g0'].oneLabel
+  };
+
+  // 3. Evaluator retrieves active input label for w_e0 = 0 via Oblivious Transfer
+  const otSession = MPCGarbledCircuitEngine.initObliviousTransfer(
+    'ot_sess_01',
+    wireLabels['w_e0'].zeroLabel,
+    wireLabels['w_e0'].oneLabel,
+    0
+  );
+  assert.equal(otSession.evaluatorChoice, 0);
+
+  const activeInputs = {
+    ...garblerInputLabels,
+    w_e0: wireLabels['w_e0'].zeroLabel
+  };
+
+  // 4. Evaluator executes circuit
+  const receipt = MPCGarbledCircuitEngine.evaluateCircuit(
+    circuit,
+    activeInputs,
+    'did:docutrust:garbler_01',
+    'did:docutrust:evaluator_01'
+  );
+
+  assert.equal(receipt.type, 'DocuTrustGarbledCircuitReceipt2026');
+  assert.equal(receipt.circuitId, circuitId);
+  assert.ok(receipt.evaluatedOutputs['w_out'] !== undefined);
+
+  // 5. Verify receipt
+  const verifyRes = MPCGarbledCircuitEngine.verifyReceipt(receipt, circuit.circuitHash);
+  assert.equal(verifyRes.valid, true);
+
+  // 6. Tampered receipt fails
+  const tampered = { ...receipt, circuitHash: 'bad_hash' };
+  const tamperedRes = MPCGarbledCircuitEngine.verifyReceipt(tampered);
+  assert.equal(tamperedRes.valid, false);
+});
+
+// 113. Verifiable Agentic Swarm Consensus & Collective Intent Engine (v18.0.0)
+test('113. SwarmConsensusEngine: agent cluster initialization, intent proposals, reputation-weighted voting, and swarm quorum proofs', () => {
+  // 1. Initialize agent cluster
+  const agent1 = generateKeyPair();
+  const agent2 = generateKeyPair();
+  const agent3 = generateKeyPair();
+
+  const cluster = SwarmConsensusEngine.createSwarmCluster('sentinel_swarm_alpha', [
+    { did: agent1.did, pubKey: agent1.publicKeyHex, role: 'coordinator', weight: 40 },
+    { did: agent2.did, pubKey: agent2.publicKeyHex, role: 'auditor', weight: 35 },
+    { did: agent3.did, pubKey: agent3.publicKeyHex, role: 'executor', weight: 25 }
+  ]);
+
+  assert.equal(cluster.totalWeight, 100);
+  assert.equal(cluster.members.length, 3);
+
+  // 2. Propose intent
+  const proposal = SwarmConsensusEngine.proposeIntent(
+    cluster.swarmId,
+    agent1.did,
+    'EXECUTE_CROSS_CHAIN_BRIDGE_SETTLEMENT',
+    { amount: 50000, targetChain: 'arbitrum_one' },
+    60 // Requires 60% quorum
+  );
+  assert.ok(proposal.proposalDigest);
+
+  // 3. Agent 1 and Agent 2 vote APPROVE (40 + 35 = 75 >= 60)
+  const vote1 = SwarmConsensusEngine.signVote(proposal, cluster.members[0], agent1.privateKeyHex, 'APPROVE', 'Policy check passed');
+  const vote2 = SwarmConsensusEngine.signVote(proposal, cluster.members[1], agent2.privateKeyHex, 'APPROVE', 'Risk bounds compliant');
+  const vote3 = SwarmConsensusEngine.signVote(proposal, cluster.members[2], agent3.privateKeyHex, 'REJECT', 'Latency high');
+
+  // 4. Aggregate swarm quorum
+  const proof = SwarmConsensusEngine.aggregateSwarmQuorum(
+    proposal,
+    cluster.members,
+    [vote1, vote2, vote3]
+  );
+
+  assert.equal(proof.type, 'DocuTrustSwarmIntentProof2026');
+  assert.equal(proof.consensusOutcome, 'CONSENSUS_REACHED');
+  assert.equal(proof.achievedQuorumWeight, 75);
+  assert.equal(proof.participatingAgentDids.length, 3);
+
+  // 5. Verify swarm intent proof
+  const verifyRes = SwarmConsensusEngine.verifySwarmProof(proof, cluster.members);
+  assert.equal(verifyRes.valid, true);
+});
+
+// 114. Multi-Party Threshold Timelock Encryption & Verifiable Delay Witness (v18.0.0)
+test('114. TimelockEncryptionEngine: VDF parameters, repeated squaring evaluation, Wesolowski delay proofs, credential sealing & unsealing', () => {
+  const confidentialPayload = {
+    bidAmountUSD: 250000,
+    bidderDid: 'did:docutrust:bidder:auction_09',
+    confidentialStrategy: 'Proprietary sealed-bid offer'
+  };
+
+  // 1. Seal credential under verifiable delay parameter
+  const { envelope, vdfProof } = TimelockEncryptionEngine.sealCredential(confidentialPayload, 5, 500);
+  assert.equal(envelope.type, 'DocuTrustTimelockEnvelope2026');
+  assert.ok(envelope.encryptedPayload);
+  assert.equal(vdfProof.type, 'DocuTrustWesolowskiVDFProof2026');
+
+  // 2. Verify VDF delay proof
+  const vdfVerify = TimelockEncryptionEngine.verifyVDFProof(vdfProof);
+  assert.equal(vdfVerify.valid, true);
+
+  // 3. Unseal credential with evaluated VDF proof
+  const unsealRes = TimelockEncryptionEngine.unsealCredential(envelope, vdfProof);
+  assert.equal(unsealRes.success, true);
+  assert.deepEqual(unsealRes.payload, confidentialPayload);
+
+  // 4. Tampered VDF proof fails unsealing
+  const tamperedVdf = { ...vdfProof, challengeSeed: 'bad_challenge' };
+  const badUnseal = TimelockEncryptionEngine.unsealCredential(envelope, tamperedVdf);
+  assert.equal(badUnseal.success, false);
+});
+
+// 115. Solidity Universal Verifier Contract (v18.0.0 Verifiers)
+test('115. SolidityEngine: verify Universal Verifier contract contains all v18.0.0 on-chain verification functions', () => {
+  const contractSrc = SolidityEngine.generateUniversalVerifierContract();
+  assert.ok(contractSrc.includes('function verifyZKMLInferenceProof'));
+  assert.ok(contractSrc.includes('function verifyGarbledCircuitReceipt'));
+  assert.ok(contractSrc.includes('function verifySwarmConsensus'));
+  assert.ok(contractSrc.includes('function verifyTimelockProof'));
 });
 
 

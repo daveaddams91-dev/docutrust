@@ -206,6 +206,70 @@ export default function HeroSection({ setActiveTab }) {
         {/* Feature Grid Highlights */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 max-w-6xl mx-auto mt-20 text-left">
           <div 
+            onClick={() => setActiveTab('zkml-studio')}
+            className="glass-card p-5 rounded-2xl border border-teal-500/40 bg-teal-950/20 hover:border-teal-400 hover:bg-gray-900/60 transition-all cursor-pointer group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400 mb-3 group-hover:scale-105 transition-transform">
+              <Cpu className="w-5 h-5" />
+            </div>
+            <h3 className="text-sm font-bold text-white mb-1.5 flex items-center gap-1">
+              Zero-Knowledge ML (zkML)
+              <Sparkles className="w-3 h-3 text-teal-400" />
+            </h3>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              Verifiable quantized neural network inference with Merkle model weight commitments and EVM calldata export.
+            </p>
+          </div>
+
+          <div 
+            onClick={() => setActiveTab('mpc-studio')}
+            className="glass-card p-5 rounded-2xl border border-indigo-500/40 bg-indigo-950/20 hover:border-indigo-400 hover:bg-gray-900/60 transition-all cursor-pointer group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-3 group-hover:scale-105 transition-transform">
+              <Lock className="w-5 h-5" />
+            </div>
+            <h3 className="text-sm font-bold text-white mb-1.5 flex items-center gap-1">
+              MPC Garbled Circuits
+              <Sparkles className="w-3 h-3 text-indigo-400" />
+            </h3>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              Collaborative Free-XOR boolean circuit evaluation with 1-out-of-2 Oblivious Transfer and zero private data leakage.
+            </p>
+          </div>
+
+          <div 
+            onClick={() => setActiveTab('swarm-studio')}
+            className="glass-card p-5 rounded-2xl border border-amber-500/40 bg-amber-950/20 hover:border-amber-400 hover:bg-gray-900/60 transition-all cursor-pointer group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-3 group-hover:scale-105 transition-transform">
+              <Bot className="w-5 h-5" />
+            </div>
+            <h3 className="text-sm font-bold text-white mb-1.5 flex items-center gap-1">
+              Autonomous Swarm Consensus
+              <Sparkles className="w-3 h-3 text-amber-400" />
+            </h3>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              Multi-agent weighted reputation threshold voting, cryptographic intent proposals, and collective quorum proofs.
+            </p>
+          </div>
+
+          <div 
+            onClick={() => setActiveTab('timelock-studio')}
+            className="glass-card p-5 rounded-2xl border border-cyan-500/40 bg-cyan-950/20 hover:border-cyan-400 hover:bg-gray-900/60 transition-all cursor-pointer group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 mb-3 group-hover:scale-105 transition-transform">
+              <Zap className="w-5 h-5" />
+            </div>
+            <h3 className="text-sm font-bold text-white mb-1.5 flex items-center gap-1">
+              Threshold Timelock (VDF)
+              <Sparkles className="w-3 h-3 text-cyan-400" />
+            </h3>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              Wesolowski Verifiable Delay Functions for time-locked credentials with O(1) mathematical verification.
+            </p>
+          </div>
+
+          <div 
             onClick={() => setActiveTab('zk-recursive')}
             className="glass-card p-5 rounded-2xl border border-gray-800/80 hover:border-cyan-500/50 hover:bg-gray-900/60 transition-all cursor-pointer group"
           >

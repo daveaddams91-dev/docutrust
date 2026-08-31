@@ -1555,6 +1555,126 @@ test('CLI Suite', async (t) => {
     const verifyOut = execSync(`node "${cliPath}" psi-verify --receipt "${receiptFile}"`).toString();
     assert.ok(verifyOut.includes('VALID & VERIFIED'));
   });
+
+  await t.test('62. docutrust zkml-prove & zkml-verify', () => {
+    const layersFile = path.join(tempDir, 'zkml-layers.json');
+    const inputFile = path.join(tempDir, 'zkml-input.json');
+    const proofFile = path.join(tempDir, 'zkml-proof.json');
+
+    const layers = [
+      {
+        layerIndex: 0,
+        type: 'dense',
+        weights: { shape: [2, 2], data: [128, -64, 256, 128], scale: 256, zeroPoint: 0 },
+        biases: { shape: [2], data: [0, 0], scale: 256, zeroPoint: 0 }
+      },
+      {
+        layerIndex: 1,
+        type: 'softmax'
+      }
+    ];
+    fs.writeFileSync(layersFile, JSON.stringify(layers, null, 2), 'utf-8');
+    fs.writeFileSync(inputFile, JSON.stringify([0.5, -0.5], null, 2), 'utf-8');
+
+    // 1. Prove
+    const proveOut = execSync(`node "${cliPath}" zkml-prove --model-id "cli_test_model" --layers "${layersFile}" --input "${inputFile}" --out "${proofFile}"`).toString();
+    assert.ok(proveOut.includes('ZKML Inference Proof saved'));
+    assert.ok(fs.existsSync(proofFile));
+
+    // 2. Verify
+    const verifyOut = execSync(`node "${cliPath}" zkml-verify --proof "${proofFile}"`).toString();
+    assert.ok(verifyOut.includes('VALID & VERIFIED'));
+  });
+
+  await t.test('63. docutrust mpc-garble & mpc-evaluate', () => {
+    const circuitFile = path.join(tempDir, 'mpc-circuit.json');
+    const garbledFile = path.join(tempDir, 'mpc-garbled.json');
+    const inputsFile = path.join(tempDir, 'mpc-inputs.json');
+    const receiptFile = path.join(tempDir, 'mpc-receipt.json');
+
+    const circuitDef = {
+      circuitId: 'cli_circ_01',
+      inputWiresGarbler: ['w_g0'],
+      inputWiresEvaluator: ['w_e0'],
+      outputWires: ['w_out'],
+      gates: [
+        { id: 'g0', type: 'XOR', inputWires: ['w_g0', 'w_e0'], outputWire: 'w_out' }
+      ]
+    };
+    fs.writeFileSync(circuitFile, JSON.stringify(circuitDef, null, 2), 'utf-8');
+
+    // 1. Garble
+    const garbleOut = execSync(`node "${cliPath}" mpc-garble --circuit "${circuitFile}" --out "${garbledFile}"`).toString();
+    assert.ok(garbleOut.includes('Garbled Circuit package saved'));
+    assert.ok(fs.existsSync(garbledFile));
+
+    const garbledPkg = JSON.parse(fs.readFileSync(garbledFile, 'utf-8'));
+    const inputLabels = {
+      w_g0: garbledPkg.wireLabels['w_g0'].oneLabel,
+      w_e0: garbledPkg.wireLabels['w_e0'].zeroLabel
+    };
+    fs.writeFileSync(inputsFile, JSON.stringify(inputLabels, null, 2), 'utf-8');
+
+    // 2. Evaluate
+    const evalOut = execSync(`node "${cliPath}" mpc-evaluate --circuit "${garbledFile}" --inputs "${inputsFile}" --out "${receiptFile}"`).toString();
+    assert.ok(evalOut.includes('MPC Evaluation Receipt saved'));
+    assert.ok(fs.existsSync(receiptFile));
+  });
+
+  await t.test('64. docutrust swarm-propose & swarm-vote-quorum', () => {
+    const proposalFile = path.join(tempDir, 'swarm-prop.json');
+    const membersFile = path.join(tempDir, 'swarm-members.json');
+    const votesFile = path.join(tempDir, 'swarm-votes.json');
+    const proofFile = path.join(tempDir, 'swarm-proof.json');
+
+    const { SwarmConsensusEngine, generateKeyPair } = require('@docutrust/core');
+    const kp1 = generateKeyPair();
+    const kp2 = generateKeyPair();
+
+    const members = [
+      { agentDid: kp1.did, publicKeyHex: kp1.publicKeyHex, role: 'coordinator', reputationWeight: 60, registeredEpoch: 1 },
+      { agentDid: kp2.did, publicKeyHex: kp2.publicKeyHex, role: 'auditor', reputationWeight: 40, registeredEpoch: 1 }
+    ];
+    fs.writeFileSync(membersFile, JSON.stringify(members, null, 2), 'utf-8');
+
+    // 1. Propose
+    const propOut = execSync(`node "${cliPath}" swarm-propose --swarm-id "swarm_cli" --proposer-did "${kp1.did}" --action "TRANSFER_ASSET" --quorum 50 --out "${proposalFile}"`).toString();
+    assert.ok(propOut.includes('Swarm Proposal saved'));
+
+    const proposal = JSON.parse(fs.readFileSync(proposalFile, 'utf-8'));
+    const vote1 = SwarmConsensusEngine.signVote(proposal, members[0], kp1.privateKeyHex, 'APPROVE');
+    fs.writeFileSync(votesFile, JSON.stringify([vote1], null, 2), 'utf-8');
+
+    // 2. Aggregate Quorum
+    const quorumOut = execSync(`node "${cliPath}" swarm-vote-quorum --proposal "${proposalFile}" --members "${membersFile}" --votes "${votesFile}" --out "${proofFile}"`).toString();
+    assert.ok(quorumOut.includes('Swarm Quorum Proof saved'));
+    assert.ok(fs.existsSync(proofFile));
+  });
+
+  await t.test('65. docutrust timelock-seal & timelock-open', () => {
+    const payloadFile = path.join(tempDir, 'tlock-payload.json');
+    const sealedFile = path.join(tempDir, 'tlock-sealed.json');
+    const proofFile = path.join(tempDir, 'tlock-proof.json');
+    const decryptedFile = path.join(tempDir, 'tlock-decrypted.json');
+
+    const secretData = { secretKey: 'TOP_SECRET_TIMELOCK_KEY_2026' };
+    fs.writeFileSync(payloadFile, JSON.stringify(secretData, null, 2), 'utf-8');
+
+    // 1. Seal
+    const sealOut = execSync(`node "${cliPath}" timelock-seal --payload "${payloadFile}" --delay 2 --difficulty 200 --out "${sealedFile}"`).toString();
+    assert.ok(sealOut.includes('Timelock Sealed Package saved'));
+
+    const sealedPkg = JSON.parse(fs.readFileSync(sealedFile, 'utf-8'));
+    fs.writeFileSync(proofFile, JSON.stringify(sealedPkg.vdfProof, null, 2), 'utf-8');
+
+    // 2. Open
+    const openOut = execSync(`node "${cliPath}" timelock-open --sealed "${sealedFile}" --proof "${proofFile}" --out "${decryptedFile}"`).toString();
+    assert.ok(openOut.includes('Timelock Decrypted Payload saved'));
+    assert.ok(fs.existsSync(decryptedFile));
+
+    const decrypted = JSON.parse(fs.readFileSync(decryptedFile, 'utf-8'));
+    assert.deepEqual(decrypted, secretData);
+  });
 });
 
 

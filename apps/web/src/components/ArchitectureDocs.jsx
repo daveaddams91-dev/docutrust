@@ -223,6 +223,58 @@ export default function ArchitectureDocs() {
           Cryptographically binds autonomous AI agent tool executions and decisions to model card metadata fingerprints, Merkle hash-chained execution traces, committed output artifacts, and strict deterministic safety guardrail compliance evaluation.
         </p>
       </div>
+
+      {/* 16. Zero-Knowledge Machine Learning (zkML) */}
+      <div className="glass-card p-6 sm:p-8 rounded-2xl border border-gray-800 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-teal-500/10 text-teal-400 flex items-center justify-center">
+            <Layers className="w-4 h-4" />
+          </div>
+          <h3 className="text-lg font-bold text-white">16. Zero-Knowledge Machine Learning (zkML) Engine</h3>
+        </div>
+        <p className="text-sm text-gray-300 leading-relaxed">
+          Provides verifiable feedforward neural network inference for quantized weights and activations (Dense, ReLU, Sigmoid, Softmax). Model weights are bound to a cryptographic Merkle root commitment, allowing consumers to verify that AI predictions originate from exact audited parameters without revealing proprietary model weights.
+        </p>
+      </div>
+
+      {/* 17. Multi-Party Computation (MPC) Garbled Circuits */}
+      <div className="glass-card p-6 sm:p-8 rounded-2xl border border-gray-800 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
+            <Lock className="w-4 h-4" />
+          </div>
+          <h3 className="text-lg font-bold text-white">17. MPC Yao's Garbled Circuits & Oblivious Transfer</h3>
+        </div>
+        <p className="text-sm text-gray-300 leading-relaxed">
+          Implements Free-XOR optimized Yao's Garbled Circuits and 1-out-of-2 Oblivious Transfer (OT). Multiple distrusting entities collaboratively evaluate arbitrary boolean logic circuits over private inputs with mathematical zero-knowledge privacy and verifiable execution receipts.
+        </p>
+      </div>
+
+      {/* 18. Autonomous AI Agent Swarm Consensus */}
+      <div className="glass-card p-6 sm:p-8 rounded-2xl border border-gray-800 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center">
+            <CheckCircle2 className="w-4 h-4" />
+          </div>
+          <h3 className="text-lg font-bold text-white">18. Autonomous AI Agent Swarm Consensus Engine</h3>
+        </div>
+        <p className="text-sm text-gray-300 leading-relaxed">
+          Coordinates decentralized AI agent clusters using weighted reputation threshold voting. Cryptographic intent proposals, Ed25519 agent vote signatures, and quorum aggregation proofs guarantee resilient autonomous execution without centralized key custody.
+        </p>
+      </div>
+
+      {/* 19. Threshold Timelock Encryption & Wesolowski VDF */}
+      <div className="glass-card p-6 sm:p-8 rounded-2xl border border-gray-800 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center">
+            <Lock className="w-4 h-4" />
+          </div>
+          <h3 className="text-lg font-bold text-white">19. Threshold Timelock Encryption & Wesolowski VDF</h3>
+        </div>
+        <p className="text-sm text-gray-300 leading-relaxed">
+          Enables verifiable time-delayed credential release via Wesolowski Verifiable Delay Functions (VDF). Encrypted credential envelopes cannot be decrypted before a fixed number of non-parallelizable sequential squaring steps ($T$) elapse, while verification is evaluated in constant $O(1)$ time on-chain or off-chain.
+        </p>
+      </div>
     </div>
   );
 }
