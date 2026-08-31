@@ -1,5 +1,50 @@
 # 📝 DocuTrust Changelog & Release Notes
 
+## [v17.0.0] - Sovereign Transparent STARKs, aBFT FROST Consensus Mesh, Verifiable Agent Memory & Private Set Intersection (PSI) - 2026-09-01
+
+### 🌟 Release Overview (v17.0.0 - Major Milestone Release)
+DocuTrust 17.0.0 is a premier major architectural leap in transparent post-quantum zero-knowledge proof systems, Byzantine fault-tolerant threshold consensus meshes, verifiable AI agent long-term memory graph attestations, and zero-knowledge private set intersection (PSI):
+
+1. **Transparent STARK & Fast Reed-Solomon IOP of Proximity (FRI) Engine (`@docutrust/core/stark-fri`, `docutrust.stark_fri`)**:
+   - Implemented `STARKEngine` providing post-quantum secure Algebraic Intermediate Representation (AIR) execution trace generation without trusted setups.
+   - Mersenne-31 modular arithmetic field ($\mathbb{F}_{2^{31}-1}$), boundary quotients, transition quotients, and Fast Reed-Solomon IOP of Proximity (FRI) polynomial folding query layers.
+   - Low-degree testing with Merkle tree commitments achieving $O(\log^2 N)$ verifier complexity and succinct proof sizes.
+   - EVM-compatible Solidity calldata synthesis for direct on-chain verification.
+
+2. **Asynchronous Byzantine Fault Tolerant (aBFT) FROST Consensus Mesh (`@docutrust/core/frost-consensus`, `docutrust.frost_consensus`)**:
+   - Implemented `FROSTConsensusEngine` providing asynchronous Byzantine fault-tolerant threshold signing and decentralized consensus.
+   - Weighted participant committee configuration with threshold quorum calculations ($t$-of-$n$ or $2f+1$).
+   - Round signing and single-pass aggregation producing constant-size Secp256k1 Schnorr commitments.
+   - Proactive Secret Sharing (PSS) epoch rotation for dynamic committee share refreshing without changing the group public key.
+   - Equivocation & double-signing detection engine generating verifiable cryptographic fraud proofs (`DocuTrustEquivocationSlashingProof2026`).
+
+3. **Verifiable Agent Memory & Knowledge Attestation Engine (`@docutrust/core/agent-memory`, `docutrust.agent_memory`)**:
+   - Implemented `AgentMemoryEngine` providing episodic memory vector graph Merkle commitments and semantic centroid tracking.
+   - Zero-Knowledge Cosine Distance bounds proof generation and verification (`DocuTrustZKEmbeddingSimilarityProof2026`) for privacy-preserving semantic retrieval without leaking raw memory text or full embeddings.
+   - Automated adversarial prompt-injection and memory poisoning audit defense detecting adversarial system prompt overrides and out-of-distribution vector anomalies.
+
+4. **Private Set Intersection (PSI) & Blind Matching Engine (`@docutrust/core/psi-engine`, `docutrust.psi_engine`)**:
+   - Implemented `PSIExecutionEngine` utilizing commutative exponentiation dataset blinding $(H(x)^{k_A})^{k_B} = (H(x)^{k_B})^{k_A} \pmod P$.
+   - Two-party double-blind matching computing set intersection cardinality $|A \cap B|$ without decrypting or revealing non-intersecting records.
+   - Cryptographically signed execution receipts (`DocuTrustPSIReceipt2026`) providing auditable, tamper-proof proof of computation.
+
+5. **Universal Solidity Verifier Updates (`DocuTrustUniversalVerifier.sol`)**:
+   - Added `verifySTARKProof`, `verifyFROSTConsensusCommitment`, `verifyAgentMemoryProof`, and `verifyPSICardinality` functions to `DocuTrustUniversalVerifier.sol`.
+
+6. **Interactive Web Studios (`STARKStudio.jsx`, `FROSTConsensusStudio.jsx`, `AgentMemoryStudio.jsx`, `PSIStudio.jsx`)**:
+   - `STARKStudio.jsx`: Visual AIR execution trace table, FRI query configuration, STARK proof generation, and $O(\log^2 N)$ verification terminal.
+   - `FROSTConsensusStudio.jsx`: aBFT committee coordinator, partial round share collector, Schnorr aggregator, and PSS epoch refresher.
+   - `AgentMemoryStudio.jsx`: Episodic memory graph builder, ZK cosine similarity bounds prover, and prompt injection defense auditor.
+   - `PSIStudio.jsx`: Interactive commutative dataset blinder, double-blind matcher, cardinality calculator, and verifiable receipt generator.
+
+7. **Full-Stack CLI, REST API & Python/TypeScript SDK Parity**:
+   - CLI: Added 9 new commands (`stark-trace`, `stark-prove`, `stark-verify`, `frost-consensus-init`, `frost-consensus-verify`, `agent-memory-commit`, `agent-memory-verify`, `psi-blind`, `psi-verify`).
+   - REST API: Added 16 new REST endpoints across `/api/v1/stark/*`, `/api/v1/frost/consensus/*`, `/api/v1/agent/memory/*`, `/api/v1/psi/*`.
+   - TypeScript SDK (`@docutrust/sdk`): Re-exported v17 engines and types, added 15 `DocuTrustClient` wrapper methods, with 100% test coverage.
+   - Python SDK (`docutrust`): Added 4 new engine modules, client wrapper methods, and 97/97 passing unit tests.
+
+---
+
 ## [v16.0.0] - Sovereign Privacy & Threshold Mesh: Fully Homomorphic Encryption (FHE), FROST Threshold Schnorr, ZK-PlonK Arithmetization & Agentic Capability Delegation - 2026-08-31
 
 ### 🌟 Release Overview (v16.0.0 - Major Milestone Release)

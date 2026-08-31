@@ -424,6 +424,48 @@ describe('DocuTrust TypeScript SDK (@docutrust/sdk)', () => {
     assert.strictEqual(mockCalls[117].url, 'https://test-api.docutrust.org/api/v1/capability/receipt/create');
     await client.verifyAgentExecutionReceipt({});
     assert.strictEqual(mockCalls[118].url, 'https://test-api.docutrust.org/api/v1/capability/receipt/verify');
+
+    // 66. v17.0.0 Transparent STARKs
+    await client.generateSTARKTrace(8, [1, 1], 'fibonacci');
+    assert.strictEqual(mockCalls[119].url, 'https://test-api.docutrust.org/api/v1/stark/trace');
+    await client.generateSTARKProof({}, 4);
+    assert.strictEqual(mockCalls[120].url, 'https://test-api.docutrust.org/api/v1/stark/prove');
+    await client.verifySTARKProof({});
+    assert.strictEqual(mockCalls[121].url, 'https://test-api.docutrust.org/api/v1/stark/verify');
+
+    // 67. v17.0.0 aBFT FROST Consensus Mesh
+    await client.initFROSTConsensusCommittee([{ id: 'v1', weight: 1 }], 1);
+    assert.strictEqual(mockCalls[122].url, 'https://test-api.docutrust.org/api/v1/frost/consensus/init');
+    await client.generateFROSTConsensusRoundShare({}, 'v1', 'sec1', 'r1', {});
+    assert.strictEqual(mockCalls[123].url, 'https://test-api.docutrust.org/api/v1/frost/consensus/share');
+    await client.aggregateFROSTConsensusCommitment({}, 'r1', {}, []);
+    assert.strictEqual(mockCalls[124].url, 'https://test-api.docutrust.org/api/v1/frost/consensus/aggregate');
+    await client.verifyFROSTConsensusCommitment({}, {});
+    assert.strictEqual(mockCalls[125].url, 'https://test-api.docutrust.org/api/v1/frost/consensus/verify');
+    await client.generateFROSTEquivocationSlashingProof({}, {}, {});
+    assert.strictEqual(mockCalls[126].url, 'https://test-api.docutrust.org/api/v1/frost/consensus/equivocation');
+
+    // 68. v17.0.0 Verifiable Agent Memory & Poisoning Defense
+    await client.commitAgentMemoryGraph('did:agent:1', []);
+    assert.strictEqual(mockCalls[127].url, 'https://test-api.docutrust.org/api/v1/agent/memory/commit');
+    await client.generateAgentMemorySimilarityProof([0.1], {}, 0, {}, 0.75);
+    assert.strictEqual(mockCalls[128].url, 'https://test-api.docutrust.org/api/v1/agent/memory/prove-similarity');
+    await client.verifyAgentMemorySimilarityProof({}, {});
+    assert.strictEqual(mockCalls[129].url, 'https://test-api.docutrust.org/api/v1/agent/memory/verify-similarity');
+    await client.auditAgentMemoryPoisoning({}, 'prompt', [0.1]);
+    assert.strictEqual(mockCalls[130].url, 'https://test-api.docutrust.org/api/v1/agent/memory/audit');
+
+    // 69. v17.0.0 Private Set Intersection (PSI)
+    await client.blindPSIDataset('org_a', ['a']);
+    assert.strictEqual(mockCalls[131].url, 'https://test-api.docutrust.org/api/v1/psi/blind');
+    await client.doubleBlindPSIDataset(['a'], 'key2');
+    assert.strictEqual(mockCalls[132].url, 'https://test-api.docutrust.org/api/v1/psi/double-blind');
+    await client.computePSIIntersection('org_a', 'org_b', [], []);
+    assert.strictEqual(mockCalls[133].url, 'https://test-api.docutrust.org/api/v1/psi/intersect');
+    await client.createPSIExecutionReceipt({}, {}, {});
+    assert.strictEqual(mockCalls[134].url, 'https://test-api.docutrust.org/api/v1/psi/receipt');
+    await client.verifyPSIExecutionReceipt({});
+    assert.strictEqual(mockCalls[135].url, 'https://test-api.docutrust.org/api/v1/psi/verify');
   });
 
   test('DocuTrustClient handles HTTP error responses gracefully', async () => {

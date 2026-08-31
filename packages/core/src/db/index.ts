@@ -41,7 +41,7 @@ export interface VaultMetrics {
 }
 
 function atomicWriteFileSync(filePath: string, data: string): void {
-  const tmpPath = `${filePath}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
+  const tmpPath = `${filePath}.${Date.now()}.${crypto.randomBytes(8).toString('hex')}.tmp`;
   fs.writeFileSync(tmpPath, data, 'utf-8');
   fs.renameSync(tmpPath, filePath);
 }

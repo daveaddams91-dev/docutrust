@@ -2372,6 +2372,153 @@ export class DocuTrustClient {
   ): Promise<{ success: boolean; result: any }> {
     return this.request('/capability/receipt/verify', 'POST', { receipt, agentPublicKeyHex });
   }
+
+  // ========================================================
+  // v17.0.0 Transparent STARK Client Methods
+  // ========================================================
+
+  public async generateSTARKTrace(
+    steps: number = 8,
+    initialState: number[] = [1, 1],
+    transitionType: string = 'fibonacci'
+  ): Promise<{ success: boolean; trace: any }> {
+    return this.request('/stark/trace', 'POST', { steps, initialState, transitionType });
+  }
+
+  public async generateSTARKProof(
+    trace: any,
+    numQueries: number = 4
+  ): Promise<{ success: boolean; proof: any }> {
+    return this.request('/stark/prove', 'POST', { trace, numQueries });
+  }
+
+  public async verifySTARKProof(
+    proof: any
+  ): Promise<{ success: boolean; result: any }> {
+    return this.request('/stark/verify', 'POST', { proof });
+  }
+
+  // ========================================================
+  // v17.0.0 aBFT FROST Consensus Mesh Client Methods
+  // ========================================================
+
+  public async initFROSTConsensusCommittee(
+    participants: Array<{ id: string; weight: number }>,
+    threshold: number
+  ): Promise<{ success: boolean; committee: any }> {
+    return this.request('/frost/consensus/init', 'POST', { participants, threshold });
+  }
+
+  public async generateFROSTConsensusRoundShare(
+    committee: any,
+    participantId: string,
+    secretShareHex: string,
+    roundId: string,
+    proposalPayload: any
+  ): Promise<{ success: boolean; share: any }> {
+    return this.request('/frost/consensus/share', 'POST', { committee, participantId, secretShareHex, roundId, proposalPayload });
+  }
+
+  public async aggregateFROSTConsensusCommitment(
+    committee: any,
+    roundId: string,
+    proposalPayload: any,
+    roundShares: any[]
+  ): Promise<{ success: boolean; commitment: any }> {
+    return this.request('/frost/consensus/aggregate', 'POST', { committee, roundId, proposalPayload, roundShares });
+  }
+
+  public async verifyFROSTConsensusCommitment(
+    committee: any,
+    commitment: any
+  ): Promise<{ success: boolean; result: any }> {
+    return this.request('/frost/consensus/verify', 'POST', { committee, commitment });
+  }
+
+  public async generateFROSTEquivocationSlashingProof(
+    committee: any,
+    share1: any,
+    share2: any
+  ): Promise<{ success: boolean; fraudProof: any }> {
+    return this.request('/frost/consensus/equivocation', 'POST', { committee, share1, share2 });
+  }
+
+  // ========================================================
+  // v17.0.0 Verifiable Agent Memory & Poisoning Defense Client Methods
+  // ========================================================
+
+  public async commitAgentMemoryGraph(
+    agentDid: string,
+    memoryNodes: any[]
+  ): Promise<{ success: boolean; graphCommitment: any }> {
+    return this.request('/agent/memory/commit', 'POST', { agentDid, memoryNodes });
+  }
+
+  public async generateAgentMemorySimilarityProof(
+    queryEmbedding: number[],
+    targetNode: any,
+    targetNodeIndex: number,
+    graphCommitment: any,
+    similarityThreshold: number = 0.75
+  ): Promise<{ success: boolean; proof: any }> {
+    return this.request('/agent/memory/prove-similarity', 'POST', { queryEmbedding, targetNode, targetNodeIndex, graphCommitment, similarityThreshold });
+  }
+
+  public async verifyAgentMemorySimilarityProof(
+    graphCommitment: any,
+    proof: any
+  ): Promise<{ success: boolean; result: any }> {
+    return this.request('/agent/memory/verify-similarity', 'POST', { graphCommitment, proof });
+  }
+
+  public async auditAgentMemoryPoisoning(
+    graphCommitment: any,
+    candidatePrompt: string,
+    candidateEmbedding: number[]
+  ): Promise<{ success: boolean; audit: any }> {
+    return this.request('/agent/memory/audit', 'POST', { graphCommitment, candidatePrompt, candidateEmbedding });
+  }
+
+  // ========================================================
+  // v17.0.0 Private Set Intersection (PSI) Client Methods
+  // ========================================================
+
+  public async blindPSIDataset(
+    partyId: string,
+    items: string[]
+  ): Promise<{ success: boolean; dataset: any; secretKeyHex: string }> {
+    return this.request('/psi/blind', 'POST', { partyId, items });
+  }
+
+  public async doubleBlindPSIDataset(
+    blindedElements: string[],
+    secondKeyHex: string
+  ): Promise<{ success: boolean; doubleBlindedElements: string[] }> {
+    return this.request('/psi/double-blind', 'POST', { blindedElements, secondKeyHex });
+  }
+
+  public async computePSIIntersection(
+    partyAId: string,
+    partyBId: string,
+    doubleBlindedElementsA: string[],
+    doubleBlindedElementsB: string[]
+  ): Promise<{ success: boolean; result: any }> {
+    return this.request('/psi/intersect', 'POST', { partyAId, partyBId, doubleBlindedElementsA, doubleBlindedElementsB });
+  }
+
+  public async createPSIExecutionReceipt(
+    datasetA: any,
+    datasetB: any,
+    intersectionResult: any
+  ): Promise<{ success: boolean; receipt: any }> {
+    return this.request('/psi/receipt', 'POST', { datasetA, datasetB, intersectionResult });
+  }
+
+  public async verifyPSIExecutionReceipt(
+    receipt: any
+  ): Promise<{ success: boolean; result: any }> {
+    return this.request('/psi/verify', 'POST', { receipt });
+  }
 }
 
 

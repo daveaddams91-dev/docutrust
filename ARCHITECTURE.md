@@ -209,6 +209,32 @@ $$\mathbf{c}_{\text{sum}} = \mathbf{c}_1 + \mathbf{c}_2 \pmod q, \quad \mathbf{c
 2. Strict monotonic caveat attenuation preventing privilege escalation.
 3. Cryptographically signed execution receipts (`DocuTrustAgentExecutionReceipt2026`).
 
+### 2.29 Transparent STARK & Fast Reed-Solomon IOP of Proximity (FRI)
+1. Algebraic Intermediate Representation (AIR) trace execution table $T \in \mathbb{F}_{2^{31}-1}^{N \times W}$ without trusted setups.
+2. Boundary quotient $Q_B(X) = \frac{P(X) - V(X)}{Z_B(X)}$ and transition quotient $Q_T(X) = \frac{T(gX) - f(T(X))}{Z_T(X)}$.
+3. Fast Reed-Solomon IOP of Proximity (FRI) polynomial folding query layers:
+$$f^{(i+1)}(x^2) = \frac{f^{(i)}(x) + f^{(i)}(-x)}{2} + \alpha_i \frac{f^{(i)}(x) - f^{(i)}(-x)}{2x}$$
+4. Succinct $O(\log^2 N)$ verification complexity with Merkle decommitments over low-degree queries.
+
+### 2.30 Asynchronous Byzantine Fault Tolerant (aBFT) FROST Consensus Mesh
+1. Weighted participant committee configuration with quorum threshold $\sum_{i \in Q} w_i \ge T$.
+2. Single-pass round signing and aggregation producing constant-size group Schnorr commitments.
+3. Proactive Secret Sharing (PSS) epoch rotation for dynamic share refreshing without modifying the group master key.
+4. Cryptographic equivocation and double-signing detection with automated slashing proofs (`DocuTrustEquivocationSlashingProof2026`).
+
+### 2.31 Verifiable Agent Memory & Knowledge Attestations
+1. Episodic memory vector graph Merkle root commitment $\text{Root} = \text{MerkleTree}(\{\text{NodeCommitment}_1, \dots, \text{NodeCommitment}_n\})$.
+2. Zero-Knowledge Cosine Distance bounds proofs:
+$$\cos(\theta) = \frac{\mathbf{u} \cdot \mathbf{v}}{\|\mathbf{u}\|_2 \|\mathbf{v}\|_2} \ge \tau$$
+3. Automated prompt-injection pattern audits and semantic embedding centroid deviation tracking.
+
+### 2.32 Private Set Intersection (PSI) via Commutative Exponentiation
+1. Dataset blinding over prime field $\mathbb{F}_P$: $b_{A, i} = (H(x_i))^{k_A} \pmod P$.
+2. Commutative double-blinding:
+$$d_{A, i} = (b_{A, i})^{k_B} = (H(x_i))^{k_A \cdot k_B} \pmod P$$
+$$d_{B, j} = (b_{B, j})^{k_A} = (H(y_j))^{k_B \cdot k_A} \pmod P$$
+3. Exact set intersection cardinality $|A \cap B| = |\{d_{A, i}\} \cap \{d_{B, j}\}|$ with cryptographically signed execution receipts.
+
 ---
 
 ## 3. Directory Layout
@@ -216,8 +242,8 @@ $$\mathbf{c}_{\text{sum}} = \mathbf{c}_1 + \mathbf{c}_2 \pmod q, \quad \mathbf{c
 ```
 docutrust/
 ├── packages/
-│   ├── core/            # Cryptographic & W3C VC engine (Ed25519, Merkle, DIDs, ZK SD)
-│   └── cli/             # Command-line tool ('docutrust keygen', 'issue', 'verify')
+│   ├── core/            # Cryptographic & W3C VC engine (STARK, FROST, Memory, PSI, Ed25519)
+│   └── cli/             # Command-line tool ('docutrust stark-prove', 'frost-consensus-verify', etc.)
 ├── apps/
 │   ├── api/             # High-performance Node.js REST API
 │   └── web/             # Modern React/Tailwind Web Studio & Verification Explorer

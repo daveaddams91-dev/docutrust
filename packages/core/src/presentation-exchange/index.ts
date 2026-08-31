@@ -4,6 +4,7 @@
  * Conforms to Decentralized Identity Foundation (DIF) Presentation Exchange 2.0.0 Specification.
  */
 
+import * as crypto from 'crypto';
 import { canonicalizeJson, sha256Hex } from '../crypto/index.js';
 import { SchemaValidator } from '../schema/index.js';
 
@@ -132,7 +133,7 @@ export class PresentationExchangeEngine {
     id?: string
   ): PresentationSubmission {
     return {
-      id: id || `submission_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      id: id || `submission_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`,
       definition_id: definitionId,
       descriptor_map: descriptorMap
     };

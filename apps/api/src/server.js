@@ -113,7 +113,12 @@ const {
   FHEQueryEngine,
   FROSTEngine,
   ZKPlonKEngine,
-  AgenticCapabilityEngine
+  AgenticCapabilityEngine,
+  // v17.0.0 Engines
+  STARKEngine,
+  FROSTConsensusEngine,
+  AgentMemoryEngine,
+  PSIExecutionEngine
 } = require('@docutrust/core');
 
 const PORT = process.env.PORT || 4000;
@@ -210,10 +215,17 @@ const server = http.createServer(async (req, res) => {
       return jsonResponse(200, {
         status: 'healthy',
         service: 'DocuTrust Sovereign Verifiable Credentials Engine',
-        version: '15.0.0',
+        version: '17.0.0',
         features: [
           'W3C VC 2.0',
           'DID Key Ed25519',
+          'Post-Quantum Transparent STARKs & FRI Polynomial Proximity',
+          'aBFT FROST Consensus Mesh & Proactive Secret Sharing',
+          'Verifiable Agent Memory & Zero-Knowledge Cosine Similarity Bounds',
+          'Private Set Intersection (PSI) & Blind Matching Engine',
+          'FHE Encrypted Homomorphic Query Engine',
+          'ZK-PlonK with Plookup Constraint System',
+          'UCAN Verifiable Agentic Capability & Delegation Mesh',
           'Quantitative Multi-Vector Trust & Risk Scoring Engine',
           'Verifiable Off-Chain Compute VM & Execution Receipts',
           'Ephemeral Forward-Secret Vanish Credentials',
@@ -227,17 +239,12 @@ const server = http.createServer(async (req, res) => {
           'Zero-Knowledge Predicates & Range Proofs',
           'BBS+ Unlinkable Multi-Message Signatures',
           'Verifiable PDF 2.0 with Steganographic Metadata',
-          'Persistent Vault & Auto-Batch Anchoring Worker',
           'W3C Bitstring StatusList2024',
           'DIF Presentation Exchange 2.0',
           'RSA Accumulator Non-Membership Witnesses',
           'Recursive Zero-Knowledge Predicate Graphs',
-          'M-of-N MultiSig Threshold Credentials',
-          'Universal DID Resolution',
           'Linkable Ring Signatures (LSAG)',
-          '256-bit Sparse Merkle Trees (SMT)',
-          'Solidity SMT Verifier Generator',
-          'Solidity Cross-Chain Bridge Relayer & Groth16 Verifier Generators'
+          '256-bit Sparse Merkle Trees (SMT)'
         ],
         systemDid: systemKeyPair.did,
         uptime: process.uptime()
@@ -3668,6 +3675,253 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // ========================================================
+    // 82. Transparent Post-Quantum STARK FRI Engine (v17.0.0)
+    // ========================================================
+    if (pathname === '/api/v1/stark/trace' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { steps = 8, initialState = [1, 1], transitionType = 'fibonacci' } = body;
+      try {
+        const trace = STARKEngine.generateTrace(steps, initialState, transitionType);
+        return jsonResponse(200, { success: true, trace });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/stark/prove' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { trace, numQueries = 4 } = body;
+      if (!trace) {
+        return jsonResponse(400, { error: 'Missing execution trace.' });
+      }
+      try {
+        const proof = STARKEngine.proveExecution(trace, numQueries);
+        return jsonResponse(200, { success: true, proof });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/stark/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { proof } = body;
+      if (!proof) {
+        return jsonResponse(400, { error: 'Missing STARK proof.' });
+      }
+      try {
+        const result = STARKEngine.verifyProof(proof);
+        return jsonResponse(200, { success: true, result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ========================================================
+    // 83. aBFT FROST Consensus Mesh Engine (v17.0.0)
+    // ========================================================
+    if (pathname === '/api/v1/frost/consensus/init' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { participants, threshold = 2, epoch = 1 } = body;
+      if (!participants || !Array.isArray(participants)) {
+        return jsonResponse(400, { error: 'Missing participants array.' });
+      }
+      try {
+        const committee = FROSTConsensusEngine.initCommittee(participants, threshold, epoch);
+        return jsonResponse(200, { success: true, committee });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/frost/consensus/share' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { committee, participantId, secretShareHex, roundId, proposalPayload } = body;
+      if (!committee || !participantId || !secretShareHex || !roundId || !proposalPayload) {
+        return jsonResponse(400, { error: 'Missing committee, participantId, secretShareHex, roundId, or proposalPayload.' });
+      }
+      try {
+        const share = FROSTConsensusEngine.generateRoundShare(committee, participantId, secretShareHex, roundId, proposalPayload);
+        return jsonResponse(200, { success: true, share });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/frost/consensus/aggregate' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { committee, roundId, proposalPayload, roundShares } = body;
+      if (!committee || !roundId || !proposalPayload || !roundShares || !Array.isArray(roundShares)) {
+        return jsonResponse(400, { error: 'Missing committee, roundId, proposalPayload, or roundShares.' });
+      }
+      try {
+        const commitment = FROSTConsensusEngine.aggregateRound(committee, roundId, proposalPayload, roundShares);
+        return jsonResponse(200, { success: true, commitment });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/frost/consensus/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { committee, commitment } = body;
+      if (!committee || !commitment) {
+        return jsonResponse(400, { error: 'Missing committee or commitment.' });
+      }
+      try {
+        const result = FROSTConsensusEngine.verifyCommitment(committee, commitment);
+        return jsonResponse(200, { success: true, result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/frost/consensus/equivocation' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { committee, share1, share2 } = body;
+      if (!committee || !share1 || !share2) {
+        return jsonResponse(400, { error: 'Missing committee, share1, or share2.' });
+      }
+      try {
+        const fraudProof = FROSTConsensusEngine.detectEquivocation(committee, share1, share2);
+        return jsonResponse(200, { success: true, fraudProof });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ========================================================
+    // 84. Verifiable Agent Memory & Knowledge Attestation (v17.0.0)
+    // ========================================================
+    if (pathname === '/api/v1/agent/memory/commit' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { agentDid, memoryNodes, version = 1 } = body;
+      if (!agentDid || !memoryNodes || !Array.isArray(memoryNodes)) {
+        return jsonResponse(400, { error: 'Missing agentDid or memoryNodes array.' });
+      }
+      try {
+        const graphCommitment = AgentMemoryEngine.commitMemoryGraph(agentDid, memoryNodes, version);
+        return jsonResponse(200, { success: true, graphCommitment });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/agent/memory/prove-similarity' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { queryEmbedding, targetNode, targetNodeIndex, graphCommitment, similarityThreshold = 0.75 } = body;
+      if (!queryEmbedding || !targetNode || targetNodeIndex === undefined || !graphCommitment) {
+        return jsonResponse(400, { error: 'Missing required similarity proof parameters.' });
+      }
+      try {
+        const proof = AgentMemoryEngine.generateSimilarityProof(queryEmbedding, targetNode, targetNodeIndex, graphCommitment, similarityThreshold);
+        return jsonResponse(200, { success: true, proof });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/agent/memory/verify-similarity' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { graphCommitment, proof } = body;
+      if (!graphCommitment || !proof) {
+        return jsonResponse(400, { error: 'Missing graphCommitment or proof.' });
+      }
+      try {
+        const result = AgentMemoryEngine.verifySimilarityProof(graphCommitment, proof);
+        return jsonResponse(200, { success: true, result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/agent/memory/audit' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { graphCommitment, candidatePrompt, candidateEmbedding } = body;
+      if (!graphCommitment || !candidatePrompt || !candidateEmbedding) {
+        return jsonResponse(400, { error: 'Missing graphCommitment, candidatePrompt, or candidateEmbedding.' });
+      }
+      try {
+        const audit = AgentMemoryEngine.auditMemoryPoisoning(graphCommitment, candidatePrompt, candidateEmbedding);
+        return jsonResponse(200, { success: true, audit });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ========================================================
+    // 85. Private Set Intersection (PSI) Engine (v17.0.0)
+    // ========================================================
+    if (pathname === '/api/v1/psi/blind' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { partyId, items } = body;
+      if (!partyId || !items || !Array.isArray(items)) {
+        return jsonResponse(400, { error: 'Missing partyId or items array.' });
+      }
+      try {
+        const blinded = PSIExecutionEngine.blindDataset(partyId, items);
+        return jsonResponse(200, { success: true, ...blinded });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/psi/double-blind' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { blindedElements, secondKeyHex } = body;
+      if (!blindedElements || !Array.isArray(blindedElements) || !secondKeyHex) {
+        return jsonResponse(400, { error: 'Missing blindedElements or secondKeyHex.' });
+      }
+      try {
+        const doubleBlinded = PSIExecutionEngine.doubleBlindElements(blindedElements, secondKeyHex);
+        return jsonResponse(200, { success: true, doubleBlindedElements: doubleBlinded });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/psi/intersect' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { partyAId, partyBId, doubleBlindedElementsA, doubleBlindedElementsB } = body;
+      if (!partyAId || !partyBId || !doubleBlindedElementsA || !doubleBlindedElementsB) {
+        return jsonResponse(400, { error: 'Missing partyAId, partyBId, doubleBlindedElementsA, or doubleBlindedElementsB.' });
+      }
+      try {
+        const result = PSIExecutionEngine.computeIntersection(partyAId, partyBId, doubleBlindedElementsA, doubleBlindedElementsB);
+        return jsonResponse(200, { success: true, result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/psi/receipt' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { datasetA, datasetB, intersectionResult, privateKeyHex } = body;
+      if (!datasetA || !datasetB || !intersectionResult) {
+        return jsonResponse(400, { error: 'Missing datasetA, datasetB, or intersectionResult.' });
+      }
+      try {
+        const receipt = PSIExecutionEngine.generateReceipt(datasetA, datasetB, intersectionResult, privateKeyHex);
+        return jsonResponse(200, { success: true, receipt });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/psi/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { receipt } = body;
+      if (!receipt) {
+        return jsonResponse(400, { error: 'Missing PSI receipt.' });
+      }
+      try {
+        const result = PSIExecutionEngine.verifyReceipt(receipt);
+        return jsonResponse(200, { success: true, result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
     // Default 404
     jsonResponse(404, { error: 'Route not found' });
   } catch (err) {
@@ -3677,7 +3931,7 @@ const server = http.createServer(async (req, res) => {
 
 if (require.main === module) {
   server.listen(PORT, () => {
-    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v16.0.0 running on http://localhost:${PORT}`);
+    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v17.0.0 running on http://localhost:${PORT}`);
   });
 }
 

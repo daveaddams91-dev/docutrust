@@ -2225,6 +2225,195 @@ class DocuTrustClient:
         from .agentic_capability import AgenticCapabilityEngine
         return AgenticCapabilityEngine.verify_execution_receipt(receipt, expected_agent_private_key_hex)
 
+    # ========================================================
+    # v17.0.0 Transparent STARK Methods
+    # ========================================================
+
+    def stark_generate_trace(
+        self,
+        steps: int = 8,
+        initial_state: Optional[List[int]] = None,
+        transition_type: str = "fibonacci"
+    ) -> Dict[str, Any]:
+        """Generates an AIR execution trace table for STARK synthesis."""
+        from .stark_fri import STARKEngine
+        return STARKEngine.generate_air_trace(steps, initial_state, transition_type)
+
+    def stark_generate_proof(
+        self,
+        trace: Dict[str, Any],
+        num_queries: int = 4
+    ) -> Dict[str, Any]:
+        """Generates a Transparent STARK proof with FRI polynomial folding layers."""
+        from .stark_fri import STARKEngine
+        return STARKEngine.generate_stark_proof(trace, num_queries)
+
+    def stark_verify_proof(
+        self,
+        proof: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Verifies a Transparent STARK proof."""
+        from .stark_fri import STARKEngine
+        return STARKEngine.verify_stark_proof(proof)
+
+    # ========================================================
+    # v17.0.0 aBFT FROST Consensus Mesh Methods
+    # ========================================================
+
+    def frost_consensus_init(
+        self,
+        participants: List[Dict[str, Any]],
+        threshold: int,
+        epoch: int = 1
+    ) -> Dict[str, Any]:
+        """Initializes an aBFT FROST consensus committee."""
+        from .frost_consensus import FROSTConsensusEngine
+        return FROSTConsensusEngine.init_committee(participants, threshold, epoch)
+
+    def frost_consensus_share(
+        self,
+        committee: Dict[str, Any],
+        participant_id: str,
+        secret_share_hex: str,
+        round_id: str,
+        proposal_payload: Any
+    ) -> Dict[str, Any]:
+        """Generates a partial round consensus signature share."""
+        from .frost_consensus import FROSTConsensusEngine
+        return FROSTConsensusEngine.generate_round_share(
+            committee, participant_id, secret_share_hex, round_id, proposal_payload
+        )
+
+    def frost_consensus_aggregate(
+        self,
+        committee: Dict[str, Any],
+        round_id: str,
+        proposal_payload: Any,
+        round_shares: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Aggregates round shares into a threshold Schnorr consensus commitment."""
+        from .frost_consensus import FROSTConsensusEngine
+        return FROSTConsensusEngine.aggregate_consensus(
+            committee, round_id, proposal_payload, round_shares
+        )
+
+    def frost_consensus_verify(
+        self,
+        committee: Dict[str, Any],
+        commitment: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Verifies an aggregated FROST consensus commitment."""
+        from .frost_consensus import FROSTConsensusEngine
+        return FROSTConsensusEngine.verify_consensus(committee, commitment)
+
+    def frost_consensus_equivocation_proof(
+        self,
+        committee: Dict[str, Any],
+        share1: Dict[str, Any],
+        share2: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Generates an equivocation slashing fraud proof for double-signing."""
+        from .frost_consensus import FROSTConsensusEngine
+        return FROSTConsensusEngine.generate_equivocation_fraud_proof(committee, share1, share2)
+
+    # ========================================================
+    # v17.0.0 Verifiable Agent Memory & Poisoning Defense Methods
+    # ========================================================
+
+    def agent_memory_commit(
+        self,
+        agent_did: str,
+        memory_nodes: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Creates a cryptographic Merkle commitment over an agent's memory graph."""
+        from .agent_memory import AgentMemoryEngine
+        return AgentMemoryEngine.commit_memory_graph(agent_did, memory_nodes)
+
+    def agent_memory_prove_similarity(
+        self,
+        query_embedding: List[float],
+        target_node: Dict[str, Any],
+        node_index: int = 0,
+        graph_commitment: Optional[Dict[str, Any]] = None,
+        min_cosine_threshold: float = 0.75
+    ) -> Dict[str, Any]:
+        """Generates a ZK Cosine Similarity bounds proof for a memory retrieval."""
+        from .agent_memory import AgentMemoryEngine
+        return AgentMemoryEngine.generate_similarity_proof(
+            query_embedding, target_node, node_index, graph_commitment, min_cosine_threshold
+        )
+
+    def agent_memory_verify_similarity(
+        self,
+        graph_commitment: Dict[str, Any],
+        proof: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Verifies a ZK embedding similarity proof."""
+        from .agent_memory import AgentMemoryEngine
+        return AgentMemoryEngine.verify_similarity_proof(graph_commitment, proof)
+
+    def agent_memory_audit(
+        self,
+        graph: Dict[str, Any],
+        incoming_content: str,
+        incoming_embedding: List[float]
+    ) -> Dict[str, Any]:
+        """Audits incoming memory for prompt injection or poisoning anomalies."""
+        from .agent_memory import AgentMemoryEngine
+        return AgentMemoryEngine.audit_memory_poisoning(graph, incoming_content, incoming_embedding)
+
+    # ========================================================
+    # v17.0.0 Private Set Intersection (PSI) Methods
+    # ========================================================
+
+    def psi_blind_dataset(
+        self,
+        party_id: str,
+        items: List[str],
+        secret_key_hex: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Blinds a dataset using commutative exponentiation."""
+        from .psi_engine import PSIEngine
+        return PSIEngine.blind_dataset(party_id, items, secret_key_hex)
+
+    def psi_double_blind_dataset(
+        self,
+        blinded_elements: List[str],
+        second_key_hex: str
+    ) -> List[str]:
+        """Applies a second party's secret blinding key to pre-blinded elements."""
+        from .psi_engine import PSIEngine
+        return PSIEngine.double_blind_dataset(blinded_elements, second_key_hex)
+
+    def psi_compute_intersection(
+        self,
+        party_a_id: str,
+        party_b_id: str,
+        double_blinded_a: List[str],
+        double_blinded_b: List[str]
+    ) -> Dict[str, Any]:
+        """Computes matching intersection cardinality between double-blinded sets."""
+        from .psi_engine import PSIEngine
+        return PSIEngine.compute_intersection(party_a_id, party_b_id, double_blinded_a, double_blinded_b)
+
+    def psi_create_receipt(
+        self,
+        dataset_a: Dict[str, Any],
+        dataset_b: Dict[str, Any],
+        intersection_result: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Generates a cryptographic execution receipt for a completed PSI run."""
+        from .psi_engine import PSIEngine
+        return PSIEngine.create_execution_receipt(dataset_a, dataset_b, intersection_result)
+
+    def psi_verify_receipt(
+        self,
+        receipt: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Verifies a PSI execution receipt."""
+        from .psi_engine import PSIEngine
+        return PSIEngine.verify_execution_receipt(receipt)
+
 
 
 

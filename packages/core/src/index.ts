@@ -222,5 +222,18 @@ export * from './zk-plonk';
 // Export Verifiable Agentic Capability & Delegation Mesh Engine (DocuTrust v16.0.0)
 export * from './agentic-capability';
 
+// ========================================================
+// DocuTrust v17.0.0 Sovereign Trust Mesh Evolution
+// ========================================================
 
+// Export Transparent STARK FRI Proof Engine (DocuTrust v17.0.0)
+export * from './stark-fri';
 
+// Export aBFT FROST Consensus Mesh Engine (DocuTrust v17.0.0)
+export * from './frost-consensus';
+
+// Export Verifiable Agent Memory & Knowledge Attestation Engine (DocuTrust v17.0.0)
+export * from './agent-memory';
+
+// Export Private Set Intersection (PSI) & Blind Matching Engine (DocuTrust v17.0.0)
+export * from './psi-engine';

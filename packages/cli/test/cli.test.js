@@ -800,15 +800,15 @@ test('CLI Suite', async (t) => {
     assert.ok(aggOut.includes('Status List Multi-Partition Root matches'));
   });
 
-  await t.test('29. docutrust version displays v16.0.0', () => {
+  await t.test('29. docutrust version displays v17.0.0', () => {
     const out1 = execSync(`node "${cliPath}" version`).toString().trim();
-    assert.equal(out1, '16.0.0');
+    assert.equal(out1, '17.0.0');
 
     const out2 = execSync(`node "${cliPath}" --version`).toString().trim();
-    assert.equal(out2, '16.0.0');
+    assert.equal(out2, '17.0.0');
 
     const out3 = execSync(`node "${cliPath}" -v`).toString().trim();
-    assert.equal(out3, '16.0.0');
+    assert.equal(out3, '17.0.0');
   });
 
   await t.test('30. docutrust ringsig-sign and ringsig-verify (Linkable Ring Signatures)', () => {
@@ -1456,6 +1456,104 @@ test('CLI Suite', async (t) => {
     // 2. Verify
     const verifyOut = execSync(`node "${cliPath}" capability-verify --chain "${chainFile}" --resource "urn:docutrust:vault:docs" --action "READ"`).toString();
     assert.ok(verifyOut.includes('VALID & AUTHORIZED'));
+  });
+
+  await t.test('58. docutrust stark-trace, stark-prove, stark-verify', () => {
+    const traceFile = path.join(tempDir, 'stark-trace.json');
+    const proofFile = path.join(tempDir, 'stark-proof.json');
+
+    // 1. Trace
+    const traceOut = execSync(`node "${cliPath}" stark-trace --steps 8 --transition fibonacci --out "${traceFile}"`).toString();
+    assert.ok(traceOut.includes('STARK AIR Execution Trace saved'));
+    assert.ok(fs.existsSync(traceFile));
+
+    // 2. Prove
+    const proveOut = execSync(`node "${cliPath}" stark-prove --trace "${traceFile}" --queries 4 --out "${proofFile}"`).toString();
+    assert.ok(proveOut.includes('Transparent STARK FRI Proof saved'));
+    assert.ok(fs.existsSync(proofFile));
+
+    // 3. Verify
+    const verifyOut = execSync(`node "${cliPath}" stark-verify --proof "${proofFile}"`).toString();
+    assert.ok(verifyOut.includes('VALID & VERIFIED'));
+  });
+
+  await t.test('59. docutrust frost-consensus-init & frost-consensus-verify', () => {
+    const commFile = path.join(tempDir, 'frost-comm.json');
+    const commitFile = path.join(tempDir, 'frost-commit.json');
+
+    // 1. Init
+    const initOut = execSync(`node "${cliPath}" frost-consensus-init --participants "node1:2,node2:2,node3:1" --threshold 3 --out "${commFile}"`).toString();
+    assert.ok(initOut.includes('FROST Consensus Committee initialized'));
+    assert.ok(fs.existsSync(commFile));
+
+    // 2. Create and aggregate commitment via core for verification via CLI
+    const { FROSTConsensusEngine } = require('@docutrust/core');
+    const committee = JSON.parse(fs.readFileSync(commFile, 'utf-8'));
+    const payload = { height: 500, hash: '0xabc' };
+    const s1 = FROSTConsensusEngine.generateRoundShare(committee, 'node1', 'secret1', 'r1', payload);
+    const s2 = FROSTConsensusEngine.generateRoundShare(committee, 'node2', 'secret2', 'r1', payload);
+    const commitment = FROSTConsensusEngine.aggregateRound(committee, 'r1', payload, [s1, s2]);
+    fs.writeFileSync(commitFile, JSON.stringify(commitment, null, 2), 'utf-8');
+
+    // 3. Verify
+    const verifyOut = execSync(`node "${cliPath}" frost-consensus-verify --committee "${commFile}" --commitment "${commitFile}"`).toString();
+    assert.ok(verifyOut.includes('VALID & VERIFIED'));
+  });
+
+  await t.test('60. docutrust agent-memory-commit & agent-memory-verify', () => {
+    const nodesFile = path.join(tempDir, 'mem-nodes.json');
+    const graphFile = path.join(tempDir, 'mem-graph.json');
+    const proofFile = path.join(tempDir, 'mem-proof.json');
+
+    const nodes = [
+      {
+        id: 'node_1',
+        content: 'Agent learned zero-knowledge proof verification on-chain.',
+        embedding: [0.1, 0.5, 0.8, 0.2],
+        tags: ['learning'],
+        timestamp: new Date().toISOString()
+      }
+    ];
+    fs.writeFileSync(nodesFile, JSON.stringify(nodes, null, 2), 'utf-8');
+
+    // 1. Commit
+    const commitOut = execSync(`node "${cliPath}" agent-memory-commit --agent-did "did:docutrust:agent:test" --nodes "${nodesFile}" --out "${graphFile}"`).toString();
+    assert.ok(commitOut.includes('Agent Memory Graph Commitment saved'));
+    assert.ok(fs.existsSync(graphFile));
+
+    // 2. Generate proof via core
+    const { AgentMemoryEngine } = require('@docutrust/core');
+    const graph = JSON.parse(fs.readFileSync(graphFile, 'utf-8'));
+    const proof = AgentMemoryEngine.generateSimilarityProof([0.1, 0.49, 0.81, 0.2], nodes[0], 0, graph, 0.8);
+    fs.writeFileSync(proofFile, JSON.stringify(proof, null, 2), 'utf-8');
+
+    // 3. Verify
+    const verifyOut = execSync(`node "${cliPath}" agent-memory-verify --graph "${graphFile}" --proof "${proofFile}"`).toString();
+    assert.ok(verifyOut.includes('VALID & AUTHENTIC'));
+  });
+
+  await t.test('61. docutrust psi-blind & psi-verify', () => {
+    const blindOutFile = path.join(tempDir, 'psi-blind.json');
+    const receiptFile = path.join(tempDir, 'psi-receipt.json');
+
+    // 1. Blind
+    const blindOut = execSync(`node "${cliPath}" psi-blind --party-id "alpha" --items "apple,banana,cherry" --out "${blindOutFile}"`).toString();
+    assert.ok(blindOut.includes('Blinded Dataset saved'));
+    assert.ok(fs.existsSync(blindOutFile));
+
+    // 2. Generate receipt via core
+    const { PSIExecutionEngine } = require('@docutrust/core');
+    const blindA = JSON.parse(fs.readFileSync(blindOutFile, 'utf-8'));
+    const blindB = PSIExecutionEngine.blindDataset('beta', ['banana', 'date']);
+    const doubleA = PSIExecutionEngine.doubleBlindElements(blindA.dataset.blindedElements, blindB.secretKeyHex);
+    const doubleB = PSIExecutionEngine.doubleBlindElements(blindB.dataset.blindedElements, blindA.secretKeyHex);
+    const intersect = PSIExecutionEngine.computeIntersection('alpha', 'beta', doubleA, doubleB);
+    const receipt = PSIExecutionEngine.generateReceipt(blindA.dataset, blindB.dataset, intersect);
+    fs.writeFileSync(receiptFile, JSON.stringify(receipt, null, 2), 'utf-8');
+
+    // 3. Verify
+    const verifyOut = execSync(`node "${cliPath}" psi-verify --receipt "${receiptFile}"`).toString();
+    assert.ok(verifyOut.includes('VALID & VERIFIED'));
   });
 });
 

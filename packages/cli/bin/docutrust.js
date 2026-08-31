@@ -510,7 +510,7 @@ async function runDemoWizard() {
 
 async function main() {
   if (command === 'version' || command === '--version' || command === '-v') {
-    console.log('16.0.0');
+    console.log('17.0.0');
     return;
   }
 
@@ -4652,6 +4652,206 @@ async function main() {
       console.log(`\x1b[32m✔\x1b[0m UCAN Delegation Chain is \x1b[1m\x1b[32mVALID & AUTHORIZED\x1b[0m`);
     } else {
       console.error(`\x1b[31m✖\x1b[0m Delegation Verification \x1b[1m\x1b[31mFAILED\x1b[0m:`, result.error);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // ========================================================
+  // v17.0.0 STARK FRI CLI
+  // ========================================================
+
+  if (command === 'stark-trace') {
+    const steps = parseInt(getArgValue('--steps') || '8', 10);
+    const transition = getArgValue('--transition') || 'fibonacci';
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    const trace = core.STARKEngine.generateTrace(steps, [1, 1], transition);
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(trace, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m STARK AIR Execution Trace saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(trace, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'stark-prove') {
+    const traceFile = getArgValue('--trace') || getArgValue('-t');
+    const queries = parseInt(getArgValue('--queries') || '4', 10);
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!traceFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --trace <trace.json>');
+      process.exit(1);
+    }
+
+    const trace = JSON.parse(fs.readFileSync(traceFile, 'utf-8'));
+    const proof = core.STARKEngine.proveExecution(trace, queries);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(proof, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Transparent STARK FRI Proof saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(proof, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'stark-verify') {
+    const proofFile = getArgValue('--proof') || getArgValue('-p');
+    if (!proofFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --proof <proof.json>');
+      process.exit(1);
+    }
+
+    const proof = JSON.parse(fs.readFileSync(proofFile, 'utf-8'));
+    const verifyRes = core.STARKEngine.verifyProof(proof);
+
+    if (verifyRes.valid) {
+      console.log(`\x1b[32m✔\x1b[0m STARK FRI Proof is \x1b[1m\x1b[32mVALID & VERIFIED\x1b[0m`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m STARK Proof Verification \x1b[1m\x1b[31mFAILED\x1b[0m:`, verifyRes.error);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // ========================================================
+  // v17.0.0 aBFT FROST Consensus CLI
+  // ========================================================
+
+  if (command === 'frost-consensus-init') {
+    const participantsStr = getArgValue('--participants') || 'val1:2,val2:2,val3:1';
+    const threshold = parseInt(getArgValue('--threshold') || '3', 10);
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    const participants = participantsStr.split(',').map(p => {
+      const [id, weight] = p.split(':');
+      return { id: id.trim(), weight: parseInt(weight || '1', 10) };
+    });
+
+    const committee = core.FROSTConsensusEngine.initCommittee(participants, threshold);
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(committee, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m FROST Consensus Committee initialized and saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(committee, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'frost-consensus-verify') {
+    const committeeFile = getArgValue('--committee') || getArgValue('-c');
+    const commitmentFile = getArgValue('--commitment') || getArgValue('-m');
+
+    if (!committeeFile || !commitmentFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --committee <comm.json> or --commitment <commit.json>');
+      process.exit(1);
+    }
+
+    const committee = JSON.parse(fs.readFileSync(committeeFile, 'utf-8'));
+    const commitment = JSON.parse(fs.readFileSync(commitmentFile, 'utf-8'));
+    const result = core.FROSTConsensusEngine.verifyCommitment(committee, commitment);
+
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m aBFT FROST Consensus Commitment is \x1b[1m\x1b[32mVALID & VERIFIED\x1b[0m`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m Consensus Verification \x1b[1m\x1b[31mFAILED\x1b[0m:`, result.error);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // ========================================================
+  // v17.0.0 Verifiable Agent Memory CLI
+  // ========================================================
+
+  if (command === 'agent-memory-commit') {
+    const agentDid = getArgValue('--agent-did') || 'did:docutrust:agent:sentinel';
+    const nodesFile = getArgValue('--nodes') || getArgValue('-n');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!nodesFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --nodes <nodes.json>');
+      process.exit(1);
+    }
+
+    const nodes = JSON.parse(fs.readFileSync(nodesFile, 'utf-8'));
+    const graphCommitment = core.AgentMemoryEngine.commitMemoryGraph(agentDid, nodes);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(graphCommitment, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Agent Memory Graph Commitment saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(graphCommitment, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'agent-memory-verify') {
+    const graphFile = getArgValue('--graph') || getArgValue('-g');
+    const proofFile = getArgValue('--proof') || getArgValue('-p');
+
+    if (!graphFile || !proofFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --graph <graph.json> or --proof <proof.json>');
+      process.exit(1);
+    }
+
+    const graph = JSON.parse(fs.readFileSync(graphFile, 'utf-8'));
+    const proof = JSON.parse(fs.readFileSync(proofFile, 'utf-8'));
+    const result = core.AgentMemoryEngine.verifySimilarityProof(graph, proof);
+
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m ZK Agent Memory Proof is \x1b[1m\x1b[32mVALID & AUTHENTIC\x1b[0m`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m Memory Proof Verification \x1b[1m\x1b[31mFAILED\x1b[0m:`, result.error);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // ========================================================
+  // v17.0.0 Private Set Intersection CLI
+  // ========================================================
+
+  if (command === 'psi-blind') {
+    const partyId = getArgValue('--party-id') || 'party_alpha';
+    const itemsStr = getArgValue('--items') || getArgValue('-i');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!itemsStr) {
+      console.error('\x1b[31mError:\x1b[0m Missing --items <item1,item2,...>');
+      process.exit(1);
+    }
+
+    const items = itemsStr.split(',').map(s => s.trim());
+    const { dataset, secretKeyHex } = core.PSIExecutionEngine.blindDataset(partyId, items);
+
+    const outObj = { dataset, secretKeyHex };
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(outObj, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Blinded Dataset saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(outObj, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'psi-verify') {
+    const receiptFile = getArgValue('--receipt') || getArgValue('-r');
+    if (!receiptFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --receipt <receipt.json>');
+      process.exit(1);
+    }
+
+    const receipt = JSON.parse(fs.readFileSync(receiptFile, 'utf-8'));
+    const result = core.PSIExecutionEngine.verifyReceipt(receipt);
+
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m PSI Receipt is \x1b[1m\x1b[32mVALID & VERIFIED\x1b[0m`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m PSI Receipt Verification \x1b[1m\x1b[31mFAILED\x1b[0m:`, result.error);
       process.exit(1);
     }
     return;

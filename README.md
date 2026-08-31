@@ -2,20 +2,20 @@
 
 # 🛡️ DocuTrust
 
-### The Open-Source Sovereign Trust Fabric for Verifiable Credentials, Fully Homomorphic Encryption (FHE), FROST Threshold Schnorr, ZK-PlonK Arithmetization & Agentic Capability Delegation
+### The Open-Source Sovereign Trust Fabric for Verifiable Credentials, Transparent STARKs, aBFT FROST Consensus, Verifiable Agent Memory & Private Set Intersection (PSI)
 
-[![Version](https://img.shields.io/badge/Version-v16.0.0-cyan.svg)]()
+[![Version](https://img.shields.io/badge/Version-v17.0.0-cyan.svg)]()
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CI Status](https://img.shields.io/badge/CI-100%25%20Passing-brightgreen.svg)]()
-[![FHE Queries](https://img.shields.io/badge/FHE-LWE%20%2F%20RLWE%20Encrypted%20Queries-emerald.svg)]()
-[![FROST Threshold](https://img.shields.io/badge/FROST-Secp256k1%20Schnorr%20DKG-cyan.svg)]()
-[![ZK PlonK](https://img.shields.io/badge/ZK--PlonK-Universal%20Permutation%20%2B%20Plookup-amber.svg)]()
-[![Agentic Capability](https://img.shields.io/badge/Agentic-UCAN%20%2F%20OCAP--LD%20Mesh-rose.svg)]()
+[![Transparent STARKs](https://img.shields.io/badge/STARK-Transparent%20FRI%20%2B%20Mersenne--31-emerald.svg)]()
+[![aBFT FROST Mesh](https://img.shields.io/badge/FROST-aBFT%20Consensus%20%2B%20PSS-cyan.svg)]()
+[![Verifiable Memory](https://img.shields.io/badge/Agent%20Memory-ZK%20Cosine%20Similarity-amber.svg)]()
+[![Private Set Intersection](https://img.shields.io/badge/PSI-Commutative%20Double--Blind%20Matching-purple.svg)]()
 [![Python SDK](https://img.shields.io/badge/Python-3.8+-3776AB?logo=python&logoColor=white)]()
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)]()
 
 <p align="center">
-  <b>DocuTrust</b> enables universities, enterprises, AI systems, and decentralized networks to issue tamper-proof academic degrees, credentials, and autonomous agent attestations with <b>Fully Homomorphic Encryption (FHE) blind database queries & encrypted range filtering</b>, <b>FROST 2-round threshold Schnorr signatures over Secp256k1</b>, <b>Universal ZK-PlonK arithmetization with custom gate selectors, permutation arguments & Plookup tables</b>, <b>Agentic UCAN / OCAP-LD capability delegation tokens & verifiable execution receipts</b>, <b>Post-Quantum ML-KEM-768 Double Ratchet Forward Secrecy</b>, <b>BN254 Kate-Zaverucha-Goldberg (KZG) Polynomial Commitments</b>, <b>Intel SGX / AMD SEV Confidential Computing Remote Attestation</b>, and <b>Cosmos IBC ICS-04 / ICS-23 Cross-Chain Packet Relayers</b>.
+  <b>DocuTrust</b> enables universities, enterprises, AI systems, and decentralized networks to issue tamper-proof academic degrees, credentials, and autonomous agent attestations with <b>Transparent STARKs & FRI low-degree polynomial proximity testing</b>, <b>Asynchronous Byzantine Fault Tolerant (aBFT) FROST Consensus & Proactive Secret Sharing (PSS)</b>, <b>Verifiable Agent Memory Graph Merkle Commitments & ZK Cosine Similarity Bounds</b>, <b>Private Set Intersection (PSI) & Commutative Blind Set Matching</b>, <b>Fully Homomorphic Encryption (FHE) blind queries</b>, <b>Universal ZK-PlonK arithmetization</b>, and <b>Agentic UCAN capability delegation tokens</b>.
 </p>
 
 [Quickstart Demo](#-10-second-quickstart-demo) • [Architecture](#-system-architecture--workflow) • [Security Hardening](#-defense-in-depth-security-hardening-uncrackable-guarantee) • [CLI Toolkit](#-cli-toolkit) • [Python SDK](#-python-sdk-docutrust) • [REST API](#-rest-api-endpoints)

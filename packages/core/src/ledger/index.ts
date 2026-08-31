@@ -1,3 +1,4 @@
+import * as crypto from 'crypto';
 import { sha256Hex } from '../crypto';
 
 export interface AnchorReceipt {
@@ -78,7 +79,7 @@ export class MockEVMAnchor implements LedgerAnchorAdapter {
 
   public async anchorRoot(rootHash: string, leafCount: number = 1): Promise<AnchorReceipt> {
     const timestamp = Date.now();
-    const blockNumber = 54890123 + Math.floor(Math.random() * 1000);
+    const blockNumber = 54890123 + crypto.randomInt(0, 1000);
     const txHash = '0x' + sha256Hex(`evm:${this.network}:${rootHash}:${timestamp}`);
     const blockHash = '0x' + sha256Hex(`block:${blockNumber}:${this.contractAddress}`);
 

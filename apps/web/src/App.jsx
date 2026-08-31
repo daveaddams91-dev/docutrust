@@ -51,6 +51,10 @@ import FHEQueryStudio from './components/FHEQueryStudio.jsx';
 import FROSTStudio from './components/FROSTStudio.jsx';
 import PlonKStudio from './components/PlonKStudio.jsx';
 import AgenticCapabilityStudio from './components/AgenticCapabilityStudio.jsx';
+import STARKStudio from './components/STARKStudio.jsx';
+import FROSTConsensusStudio from './components/FROSTConsensusStudio.jsx';
+import AgentMemoryStudio from './components/AgentMemoryStudio.jsx';
+import PSIStudio from './components/PSIStudio.jsx';
 import Footer from './components/Footer.jsx';
 
 export default function App() {
@@ -68,6 +72,10 @@ export default function App() {
 
       <main className="flex-1">
         {activeTab === 'hero' && <HeroSection setActiveTab={setActiveTab} />}
+        {activeTab === 'stark-studio' && <STARKStudio />}
+        {activeTab === 'frost-consensus' && <FROSTConsensusStudio />}
+        {activeTab === 'agent-memory' && <AgentMemoryStudio />}
+        {activeTab === 'psi-studio' && <PSIStudio />}
         {activeTab === 'fhe-query' && <FHEQueryStudio />}
         {activeTab === 'frost-studio' && <FROSTStudio />}
         {activeTab === 'plonk-studio' && <PlonKStudio />}

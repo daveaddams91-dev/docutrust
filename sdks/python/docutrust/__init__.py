@@ -1,5 +1,5 @@
 from __future__ import annotations
-__version__ = "16.0.0"
+__version__ = "17.0.0"
 from .client import DocuTrustClient
 from .crypto import canonicalize_json, sha256_hex, MerkleTree, encode_base58, decode_base58
 from .pqc import generate_pqc_hybrid_keys
@@ -81,8 +81,12 @@ from .fhe_query import FHEQueryEngine
 from .frost_threshold import FROSTEngine
 from .zk_plonk import ZKPlonKEngine
 from .agentic_capability import AgenticCapabilityEngine
+from .stark_fri import STARKEngine
+from .frost_consensus import FROSTConsensusEngine
+from .agent_memory import AgentMemoryEngine
+from .psi_engine import PSIEngine
 
-__version__ = "16.0.0"
+__version__ = "17.0.0"
 __all__ = [
     "DocuTrustClient",
     "canonicalize_json",
@@ -178,7 +182,9 @@ __all__ = [
     "FHEQueryEngine",
     "FROSTEngine",
     "ZKPlonKEngine",
-    "AgenticCapabilityEngine"
+    "AgenticCapabilityEngine",
+    "STARKEngine",
+    "FROSTConsensusEngine",
+    "AgentMemoryEngine",
+    "PSIEngine"
 ]
-
-
