@@ -2,22 +2,22 @@
 
 # 🛡️ DocuTrust
 
-### The Open-Source Sovereign Trust Fabric for Verifiable Credentials, NIST FIPS 205 SLH-DSA, WebAuthn Passkeys, Multi-Chain Bridge & BN254 Groth16 ZK-SNARKs
+### The Open-Source Sovereign Trust Fabric for Verifiable Credentials, Quantitative Trust Scoring, Verifiable Compute VM, Ephemeral Vanish Tokens & Universal EVM Verifiers
 
-[![Version](https://img.shields.io/badge/Version-v11.0.0-cyan.svg)]()
+[![Version](https://img.shields.io/badge/Version-v12.0.0-cyan.svg)]()
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CI Status](https://img.shields.io/badge/CI-100%25%20Passing-brightgreen.svg)]()
+[![Trust Score Engine](https://img.shields.io/badge/Risk--Engine-Quantitative%20Trust%200--1000-emerald.svg)]()
+[![Verifiable Compute](https://img.shields.io/badge/VM-Verifiable%20Off--Chain%20Compute-indigo.svg)]()
+[![Vanish Tokens](https://img.shields.io/badge/Ephemeral-Time--Decayed%20Forward--Secret-rose.svg)]()
+[![Universal Verifier](https://img.shields.io/badge/EVM-Master%20Universal%20Verifier-amber.svg)]()
 [![NIST FIPS 205](https://img.shields.io/badge/Post--Quantum-NIST%20FIPS%20205%20SLH--DSA-purple.svg)]()
 [![WebAuthn Passkeys](https://img.shields.io/badge/Hardware-FIDO2%20WebAuthn%20Passkeys-blue.svg)]()
-[![Cross-Chain Bridge](https://img.shields.io/badge/Bridge-Multi--Chain%20Verifiable%20Relayer-indigo.svg)]()
-[![Groth16 ZK-SNARK](https://img.shields.io/badge/Zero--Knowledge-BN254%20Groth16%20SNARKs-emerald.svg)]()
-[![Linkable Ring Signatures](https://img.shields.io/badge/Privacy-1--of--N%20LSAG%20Ring%20Signatures-purple.svg)]()
-[![Sparse Merkle Trees](https://img.shields.io/badge/Ledger-256--Bit%20SMT%20Key%20Transparency-cyan.svg)]()
 [![Python SDK](https://img.shields.io/badge/Python-3.8+-3776AB?logo=python&logoColor=white)]()
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)]()
 
 <p align="center">
-  <b>DocuTrust</b> enables universities, enterprises, and governments to issue tamper-proof academic degrees, employment certificates, and licenses with <b>sub-50ms instant verification</b>, <b>NIST FIPS 205 Stateless Hash-Based Signatures (SLH-DSA-SHA2-128s) & did:slh:z...</b>, <b>WebAuthn / FIDO2 Hardware Passkeys with Secure Enclave P-256 attestation & did:webauthn:z...</b>, <b>Multi-Chain Verifiable Attestation Bridge & Relayer Quorum with Nonce Replay Protection</b>, <b>BN254 Groth16 Zero-Knowledge SNARK engine & Solidity Pairing Verifiers</b>, <b>1-of-N Linkable Ring Signatures (LSAG)</b>, <b>256-bit Sparse Merkle Tree (SMT) key transparency ledgers</b>, <b>composable AST Policy Engine with signed cryptographic receipts</b>, <b>W3C did:peer RFC 0627 & did:jwk sovereign resolution</b>, <b>Open Badges 3.0 verifiable vector SVG rendering</b>, <b>Paillier additive homomorphic confidential computation</b>, <b>W3C VC 2.0 URDNA2015 Linked Data Signatures</b>, <b>hierarchical verifiable trust chains</b>, <b>post-quantum Dual Hybrid KEM armor (X25519 + NIST ML-KEM-768)</b>, <b>AnonCreds 2.0 blind issuance</b>, <b>FROST distributed key generation (DKG)</b>, <b>EVM Solidity smart contracts</b>, and <b>IETF SD-JWT mobile wallet interoperability</b>.
+  <b>DocuTrust</b> enables universities, enterprises, and governments to issue tamper-proof academic degrees, employment certificates, and licenses with <b>sub-50ms instant verification</b>, <b>Quantitative Multi-Vector Trust & Risk Scoring (0-1000 rating, AAA-F risk tiers, Ed25519 Signed Risk Receipts)</b>, <b>Verifiable Off-Chain Deterministic Compute VM with execution step hashing, Merkle trace roots & compute receipts</b>, <b>Ephemeral Forward-Secret Vanish Credentials with time-decay window commitments & AES-256-GCM</b>, <b>Compact O(Δ) Cross-Ledger State Synchronization and Reconciliation</b>, <b>Master Universal EVM Verifier Smart Contracts (Binary Merkle, SMT-256, Cross-Chain Quorum & BN254 Groth16 pairings)</b>, <b>NIST FIPS 205 Stateless Hash-Based Signatures (SLH-DSA-SHA2-128s) & did:slh:z...</b>, <b>WebAuthn / FIDO2 Hardware Passkeys with Secure Enclave P-256 attestation</b>, <b>Multi-Chain Verifiable Attestation Bridges</b>, <b>BN254 Groth16 Zero-Knowledge SNARKs</b>, and <b>1-of-N Linkable Ring Signatures (LSAG)</b>.
 </p>
 
 [Quickstart Demo](#-10-second-quickstart-demo) • [Architecture](#-system-architecture--workflow) • [Security Hardening](#-defense-in-depth-security-hardening-uncrackable-guarantee) • [CLI Toolkit](#-cli-toolkit) • [Python SDK](#-python-sdk-docutrust) • [REST API](#-rest-api-endpoints)

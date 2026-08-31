@@ -1,5 +1,50 @@
 # 📝 DocuTrust Changelog & Release Notes
 
+## [v12.0.0] - Autonomous Sovereign Trust Mesh, Quantitative Risk Scoring, Verifiable Compute & Ephemeral Credentials - 2026-08-31
+
+### 🌟 Release Overview (v12.0.0 - Major Milestone Release)
+DocuTrust 12.0.0 introduces the next major evolutionary leap in sovereign trust infrastructure, establishing an end-to-end framework for multi-vector risk evaluation, verifiable off-chain deterministic execution, time-decay forward-secret credentials, cross-ledger state synchronization, and a unified universal EVM verifier:
+
+1. **Quantitative Multi-Vector Trust & Risk Scoring Engine (`@docutrust/core/trust-score`, `docutrust.trust_score`)**:
+   - Implemented `TrustScoreEngine` delivering an objective 0-1000 quantitative risk scoring algorithm.
+   - Evaluates 5 orthogonal security vectors: Cryptographic Suite (Post-Quantum vs Classical), Issuer Accreditation Tier, Revocation/Status Freshness, Temporal Validity/Epoch Distance, and Schema Compliance.
+   - Computes industry-standard Risk Tiers (`AAA`, `AA`, `A`, `BBB`, `BB`, `B`, `C`, `F`).
+   - Issues and verifies Ed25519-signed `DocuTrustRiskReceipt2026` cryptographic risk receipts for auditing and policy gating.
+
+2. **Verifiable Off-Chain Compute Engine & Virtual Machine (`@docutrust/core/compute`, `docutrust.verifiable_compute`)**:
+   - Implemented `VerifiableComputeEngine` featuring a lightweight deterministic Abstract Syntax Tree (AST) opcode execution VM.
+   - Supports opcodes: `ADD`, `SUB`, `MUL`, `DIV`, `WEIGHTED_SUM`, `THRESHOLD_CHECK`, `RANGE_CHECK`, and `HASH_CHAIN`.
+   - Computes deterministic step-by-step cryptographic execution traces, generating a tamper-proof Merkle Trace Root.
+   - Issues cryptographically signed `DocuTrustComputeReceipt2026` receipts proving off-chain computation integrity without re-running heavy computations on-chain.
+
+3. **Ephemeral Forward-Secret Vanish Credentials (`@docutrust/core/vanish`, `docutrust.vanish_cred`)**:
+   - Implemented `VanishCredEngine` providing time-decaying forward-secret credentials that automatically expire and decay.
+   - Combines AES-256-GCM symmetric encryption with ephemeral keys and cryptographic key commitments linked to discrete epoch time windows.
+   - Guarantees zero-residual data retention once the TTL window lapses (`DocuTrustVanishToken2026`).
+
+4. **Compact $O(\Delta)$ Cross-Ledger State Synchronization (`@docutrust/core/statesync`, `docutrust.state_sync`)**:
+   - Implemented `StateSyncEngine` enabling ultra-efficient cross-chain state synchronization using delta-only updates.
+   - Computes Merkle state roots from key-value dictionaries and computes diff operations (`UPSERT`, `DELETE`).
+   - Generates compact `DocuTrustStateDeltaProof2026` delta proofs that can be verified and reconciled across heterogeneous ledgers with $O(\Delta)$ network and compute overhead.
+
+5. **Master Universal EVM Verifier Smart Contract (`@docutrust/core/solidity`, `docutrust.solidity`)**:
+   - Implemented `generateUniversalVerifierContract` producing `DocuTrustUniversalVerifier.sol`.
+   - Unifies Binary Merkle inclusion proofs, 256-bit Sparse Merkle Trees (`SMT-256`), Cross-Chain Bridge Quorum verification, and BN254 Groth16 Zero-Knowledge SNARK pairing precompile execution (`0x08`) into a single gas-optimized Solidity smart contract.
+
+6. **Interactive Web Studios (`TrustScoreStudio.jsx`, `VerifiableComputeStudio.jsx`, `VanishCredStudio.jsx`, `UniversalVerifierStudio.jsx`)**:
+   - Built `TrustScoreStudio.jsx`: Interactive multi-vector risk weighting sliders, dynamic tier computation, receipt generation, and signature verification.
+   - Built `VerifiableComputeStudio.jsx`: Visual AST opcode program editor, live execution trace inspector, Merkle trace root visualizer, and signed compute receipt verification.
+   - Built `VanishCredStudio.jsx`: Ephemeral claims editor, TTL decay slider, real-time countdown timer, and forward-secret decryption viewer.
+   - Built `UniversalVerifierStudio.jsx`: State delta proof generator, multi-ledger reconciliation viewer, and master Solidity universal contract generator with one-click copy and download.
+
+7. **Full-Stack CLI, REST API & Multi-Language SDK Parity**:
+   - CLI: Added `trustscore-eval`, `trustscore-verify`, `compute-run`, `compute-verify`, `vanish-issue`, `vanish-verify`, `statesync-delta`, `statesync-verify`, and `solidity-export-universal`.
+   - REST API: Added `/api/v1/trustscore/*`, `/api/v1/compute/*`, `/api/v1/vanish/*`, `/api/v1/statesync/*`, and `/api/v1/solidity/export-universal`.
+   - Python SDK (`docutrust`): Added `TrustScoreEngine`, `VerifiableComputeEngine`, `VanishCredEngine`, `StateSyncEngine`, and master Solidity generator (76/76 unit tests passing).
+   - TypeScript SDK (`@docutrust/sdk`): Added complete client methods for all v12 features with 100% test coverage.
+
+---
+
 ## [v11.0.0] - NIST FIPS 205 SLH-DSA, WebAuthn Hardware Passkeys, Multi-Chain Bridge Relayer & BN254 Groth16 ZK-SNARKs - 2026-08-31
 
 ### 🌟 Release Overview (v11.0.0 - Major Milestone Release)

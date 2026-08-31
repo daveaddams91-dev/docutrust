@@ -800,15 +800,15 @@ test('CLI Suite', async (t) => {
     assert.ok(aggOut.includes('Status List Multi-Partition Root matches'));
   });
 
-  await t.test('29. docutrust version displays v11.0.0', () => {
+  await t.test('29. docutrust version displays v12.0.0', () => {
     const out1 = execSync(`node "${cliPath}" version`).toString().trim();
-    assert.equal(out1, '11.0.0');
+    assert.equal(out1, '12.0.0');
 
     const out2 = execSync(`node "${cliPath}" --version`).toString().trim();
-    assert.equal(out2, '11.0.0');
+    assert.equal(out2, '12.0.0');
 
     const out3 = execSync(`node "${cliPath}" -v`).toString().trim();
-    assert.equal(out3, '11.0.0');
+    assert.equal(out3, '12.0.0');
   });
 
   await t.test('30. docutrust ringsig-sign and ringsig-verify (Linkable Ring Signatures)', () => {
@@ -940,6 +940,104 @@ test('CLI Suite', async (t) => {
     const gOut = execSync(`node "${cliPath}" solidity-export-groth16 --out "${grothSol}"`).toString();
     assert.ok(gOut.includes('Solidity Groth16 Verifier smart contract exported'));
     assert.ok(fs.existsSync(grothSol));
+  });
+
+  await t.test('38. docutrust trustscore-eval & trustscore-verify', () => {
+    const credFile = path.join(tempDir, 'score-cred.json');
+    const evalKeyFile = path.join(tempDir, 'eval-keys.json');
+    const receiptFile = path.join(tempDir, 'score-receipt.json');
+
+    execSync(`node "${cliPath}" keygen --out "${evalKeyFile}"`);
+    const cred = {
+      id: 'urn:uuid:cred-cli-001',
+      issuer: 'did:key:z6MkuIssuer',
+      validFrom: new Date().toISOString(),
+      proof: { type: 'Ed25519Signature2020', proofValue: 'signature' }
+    };
+    fs.writeFileSync(credFile, JSON.stringify(cred, null, 2), 'utf-8');
+
+    const evalOut = execSync(`node "${cliPath}" trustscore-eval --credential "${credFile}" --min-score 500 --key "${evalKeyFile}" --out "${receiptFile}"`).toString();
+    assert.ok(evalOut.includes('Trust & Risk Score Evaluation Completed'));
+    assert.ok(fs.existsSync(receiptFile));
+
+    const verifyOut = execSync(`node "${cliPath}" trustscore-verify --receipt "${receiptFile}" --evaluator-key "${evalKeyFile}"`).toString();
+    assert.ok(verifyOut.includes('DocuTrust Risk Receipt is'));
+    assert.ok(verifyOut.includes('CRYPTOGRAPHICALLY VALID'));
+  });
+
+  await t.test('39. docutrust compute-run & compute-verify', () => {
+    const progFile = path.join(tempDir, 'prog.json');
+    const inputFile = path.join(tempDir, 'inputs.json');
+    const proverKeyFile = path.join(tempDir, 'prover-keys.json');
+    const receiptFile = path.join(tempDir, 'compute-receipt.json');
+
+    execSync(`node "${cliPath}" keygen --out "${proverKeyFile}"`);
+    const prog = {
+      programId: 'CLIComputeTest',
+      version: '1.0.0',
+      instructions: [
+        { op: 'ADD', args: ['$x', '$y'], outputVar: 'sum' },
+        { op: 'THRESHOLD_CHECK', args: ['$sum', 50], outputVar: 'isAbove50' }
+      ]
+    };
+    fs.writeFileSync(progFile, JSON.stringify(prog, null, 2), 'utf-8');
+    fs.writeFileSync(inputFile, JSON.stringify({ x: 30, y: 40 }, null, 2), 'utf-8');
+
+    const runOut = execSync(`node "${cliPath}" compute-run --program "${progFile}" --inputs "${inputFile}" --key "${proverKeyFile}" --out "${receiptFile}"`).toString();
+    assert.ok(runOut.includes('Verifiable Compute execution finished'));
+    assert.ok(fs.existsSync(receiptFile));
+
+    const verifyOut = execSync(`node "${cliPath}" compute-verify --receipt "${receiptFile}" --prover-key "${proverKeyFile}" --inputs "${inputFile}"`).toString();
+    assert.ok(verifyOut.includes('Verifiable Compute Receipt is'));
+    assert.ok(verifyOut.includes('CRYPTOGRAPHICALLY VALID'));
+  });
+
+  await t.test('40. docutrust vanish-issue & vanish-verify', () => {
+    const claimsFile = path.join(tempDir, 'vanish-claims.json');
+    const issuerKeyFile = path.join(tempDir, 'vanish-issuer-keys.json');
+    const outFile = path.join(tempDir, 'vanish-out.json');
+
+    execSync(`node "${cliPath}" keygen --out "${issuerKeyFile}"`);
+    fs.writeFileSync(claimsFile, JSON.stringify({ secretCode: 'SECRET-CLI-123' }, null, 2), 'utf-8');
+
+    const issueOut = execSync(`node "${cliPath}" vanish-issue --claims "${claimsFile}" --key "${issuerKeyFile}" --subject "did:key:z6MkuSubject" --ttl 600 --out "${outFile}"`).toString();
+    assert.ok(issueOut.includes('Ephemeral Vanish Token issued successfully'));
+    assert.ok(fs.existsSync(outFile));
+
+    const tokenData = JSON.parse(fs.readFileSync(outFile, 'utf-8'));
+    const verifyOut = execSync(`node "${cliPath}" vanish-verify --token "${outFile}" --ephemeral-key "${tokenData.ephemeralKey}" --issuer-key "${issuerKeyFile}"`).toString();
+    assert.ok(verifyOut.includes('ACTIVE & VALID'));
+    assert.ok(verifyOut.includes('SECRET-CLI-123'));
+  });
+
+  await t.test('41. docutrust statesync-delta & statesync-verify', () => {
+    const baseFile = path.join(tempDir, 'sync-base.json');
+    const targetFile = path.join(tempDir, 'sync-target.json');
+    const relayerKeyFile = path.join(tempDir, 'sync-relayer-keys.json');
+    const deltaFile = path.join(tempDir, 'sync-delta.json');
+    const updatedStateFile = path.join(tempDir, 'sync-updated.json');
+
+    execSync(`node "${cliPath}" keygen --out "${relayerKeyFile}"`);
+    const baseState = { 'did:key:z1': { entityDid: 'did:key:z1', status: 'ACTIVE', accreditationLevel: 1, updatedEpoch: 1000, metadataHash: '00' } };
+    const targetState = { ...baseState, 'did:key:z2': { entityDid: 'did:key:z2', status: 'ACTIVE', accreditationLevel: 2, updatedEpoch: 2000, metadataHash: '11' } };
+
+    fs.writeFileSync(baseFile, JSON.stringify(baseState, null, 2), 'utf-8');
+    fs.writeFileSync(targetFile, JSON.stringify(targetState, null, 2), 'utf-8');
+
+    const deltaOut = execSync(`node "${cliPath}" statesync-delta --base "${baseFile}" --target "${targetFile}" --key "${relayerKeyFile}" --out "${deltaFile}"`).toString();
+    assert.ok(deltaOut.includes('StateSync Delta Proof generated successfully'));
+    assert.ok(fs.existsSync(deltaFile));
+
+    const verifyOut = execSync(`node "${cliPath}" statesync-verify --base "${baseFile}" --delta "${deltaFile}" --relayer-key "${relayerKeyFile}" --out "${updatedStateFile}"`).toString();
+    assert.ok(verifyOut.includes('AUTHENTICATED & RECONCILED'));
+    assert.ok(fs.existsSync(updatedStateFile));
+  });
+
+  await t.test('42. docutrust solidity-export-universal', () => {
+    const universalSol = path.join(tempDir, 'DocuTrustUniversalVerifier.sol');
+    const uOut = execSync(`node "${cliPath}" solidity-export-universal --out "${universalSol}"`).toString();
+    assert.ok(uOut.includes('Master Universal EVM Solidity Smart Contract exported'));
+    assert.ok(fs.existsSync(universalSol));
   });
 });
 

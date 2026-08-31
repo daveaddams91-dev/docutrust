@@ -1437,5 +1437,99 @@ class DocuTrustClient:
         from .solidity import SolidityEngine
         return SolidityEngine.generate_groth16_verifier_contract(contract_name, solidity_version)
 
+    # ========================================================
+    # v12.0.0 Sovereign Trust Mesh & Verifiable Compute Methods
+    # ========================================================
+
+    def evaluate_trust_score(
+        self,
+        credential: Dict[str, Any],
+        evaluator_key_pair: Optional[Dict[str, Any]] = None,
+        options: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Evaluates multi-vector trust score and optionally issues a signed risk receipt."""
+        from .trust_score import TrustScoreEngine
+        if evaluator_key_pair:
+            return TrustScoreEngine.issue_risk_receipt(credential, evaluator_key_pair, options)
+        return TrustScoreEngine.calculate_trust_score(credential, options)
+
+    def verify_trust_score_receipt(self, receipt: Dict[str, Any], evaluator_public_key: str) -> Dict[str, Any]:
+        """Cryptographically verifies a signed DocuTrustRiskReceipt2026."""
+        from .trust_score import TrustScoreEngine
+        return TrustScoreEngine.verify_risk_receipt(receipt, evaluator_public_key)
+
+    def execute_verifiable_compute(
+        self,
+        program: Dict[str, Any],
+        inputs: Dict[str, Any],
+        prover_key_pair: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Executes a deterministic AST program and generates execution trace & receipt."""
+        from .verifiable_compute import VerifiableComputeEngine
+        return VerifiableComputeEngine.execute_program(program, inputs, prover_key_pair)
+
+    def verify_compute_receipt(
+        self,
+        receipt: Dict[str, Any],
+        prover_public_key: str,
+        inputs: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Verifies an off-chain compute execution receipt."""
+        from .verifiable_compute import VerifiableComputeEngine
+        return VerifiableComputeEngine.verify_compute_receipt(receipt, prover_public_key, inputs)
+
+    def issue_vanish_token(
+        self,
+        claims: Dict[str, Any],
+        issuer_key_pair: Dict[str, Any],
+        subject_did: str,
+        options: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Issues an ephemeral forward-secret token with time-decay commitment."""
+        from .vanish_cred import VanishCredEngine
+        return VanishCredEngine.issue_token(claims, issuer_key_pair, subject_did, options)
+
+    def verify_vanish_token(
+        self,
+        token: Dict[str, Any],
+        ephemeral_key: str,
+        issuer_public_key: str,
+        current_epoch: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Verifies and decrypts an active ephemeral vanish token."""
+        from .vanish_cred import VanishCredEngine
+        return VanishCredEngine.verify_and_decrypt(token, ephemeral_key, issuer_public_key, current_epoch)
+
+    def generate_state_delta(
+        self,
+        base_state: Dict[str, Any],
+        target_state: Dict[str, Any],
+        relayer_key_pair: Dict[str, Any],
+        options: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Generates a compact O(Δ) cross-ledger delta proof between state replicas."""
+        from .state_sync import StateSyncEngine
+        return StateSyncEngine.generate_delta_proof(base_state, target_state, relayer_key_pair, options)
+
+    def verify_state_delta(
+        self,
+        base_state: Dict[str, Any],
+        delta_proof: Dict[str, Any],
+        relayer_public_key: str
+    ) -> Dict[str, Any]:
+        """Reconciles and verifies a cross-ledger delta proof against an initial base state."""
+        from .state_sync import StateSyncEngine
+        return StateSyncEngine.verify_and_reconcile(base_state, delta_proof, relayer_public_key)
+
+    def generate_universal_solidity_verifier(
+        self,
+        contract_name: str = "DocuTrustUniversalVerifier",
+        solidity_version: str = "^0.8.20"
+    ) -> str:
+        """Generates master Solidity contract verifying Merkle, SMT-256, Cross-Chain Bridge, and Groth16."""
+        from .solidity import SolidityEngine
+        return SolidityEngine.generate_universal_verifier_contract(contract_name, solidity_version)
+
+
 
 

@@ -93,7 +93,12 @@ const {
   CrossChainBridgeEngine,
   Groth16Engine,
   generateBridgeRelayerContract,
-  generateGroth16VerifierContract
+  generateGroth16VerifierContract,
+  TrustScoreEngine,
+  VerifiableComputeEngine,
+  VanishCredEngine,
+  StateSyncEngine,
+  generateUniversalVerifierContract
 } = require('@docutrust/core');
 
 const PORT = process.env.PORT || 4000;
@@ -190,10 +195,15 @@ const server = http.createServer(async (req, res) => {
       return jsonResponse(200, {
         status: 'healthy',
         service: 'DocuTrust Sovereign Verifiable Credentials Engine',
-        version: '11.0.0',
+        version: '12.0.0',
         features: [
           'W3C VC 2.0',
           'DID Key Ed25519',
+          'Quantitative Multi-Vector Trust & Risk Scoring Engine',
+          'Verifiable Off-Chain Compute VM & Execution Receipts',
+          'Ephemeral Forward-Secret Vanish Credentials',
+          'Compact O(Δ) Cross-Ledger State Synchronization',
+          'Master Universal EVM Verifier Smart Contract',
           'NIST FIPS 205 Stateless Hash-Based Signatures (SLH-DSA)',
           'WebAuthn / FIDO2 Passkey Hardware Attestation',
           'Multi-Chain Verifiable Attestation Bridge & Interoperability Relayer',
@@ -2455,6 +2465,148 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // ========================================================
+    // DocuTrust v12.0.0 Sovereign Trust Mesh Endpoints
+    // ========================================================
+
+    // 1. Trust Scoring & Risk Receipts
+    if (pathname === '/api/v1/trustscore/evaluate' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { credential, options, evaluatorKeyPair } = body;
+      if (!credential) return jsonResponse(400, { error: 'Missing credential object.' });
+
+      try {
+        const evalResult = TrustScoreEngine.evaluate(credential, options);
+        let receipt;
+        if (evaluatorKeyPair) {
+          receipt = TrustScoreEngine.issueRiskReceipt(credential, evalResult, evaluatorKeyPair);
+        }
+        return jsonResponse(200, { success: true, evalResult, receipt });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/trustscore/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { receipt, evaluatorPublicKey } = body;
+      if (!receipt || !evaluatorPublicKey) {
+        return jsonResponse(400, { error: 'Missing receipt or evaluatorPublicKey.' });
+      }
+
+      try {
+        const audit = TrustScoreEngine.verifyRiskReceipt(receipt, evaluatorPublicKey);
+        return jsonResponse(200, { success: true, ...audit });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // 2. Verifiable Compute Engine
+    if (pathname === '/api/v1/compute/execute' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { program, inputs, proverKeyPair } = body;
+      if (!program || !inputs) {
+        return jsonResponse(400, { error: 'Missing program or inputs object.' });
+      }
+
+      try {
+        const result = VerifiableComputeEngine.execute(program, inputs, proverKeyPair);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/compute/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { receipt, proverPublicKey, expectedInputs } = body;
+      if (!receipt || !proverPublicKey) {
+        return jsonResponse(400, { error: 'Missing receipt or proverPublicKey.' });
+      }
+
+      try {
+        const result = VerifiableComputeEngine.verifyReceipt(receipt, proverPublicKey, expectedInputs);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // 3. Ephemeral Forward-Secret Vanish Credentials
+    if (pathname === '/api/v1/vanish/issue' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { claims, issuerKeyPair, subjectDid, options } = body;
+      if (!claims || !issuerKeyPair || !subjectDid) {
+        return jsonResponse(400, { error: 'Missing claims, issuerKeyPair, or subjectDid.' });
+      }
+
+      try {
+        const result = VanishCredEngine.issueToken(claims, issuerKeyPair, subjectDid, options);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/vanish/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { token, ephemeralKey, issuerPublicKey, currentEpoch } = body;
+      if (!token || !ephemeralKey || !issuerPublicKey) {
+        return jsonResponse(400, { error: 'Missing token, ephemeralKey, or issuerPublicKey.' });
+      }
+
+      try {
+        const result = VanishCredEngine.verifyAndDecrypt(token, ephemeralKey, issuerPublicKey, currentEpoch);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // 4. Cross-Ledger Registry StateSync
+    if (pathname === '/api/v1/statesync/delta' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { baseState, targetState, relayerKeyPair, options } = body;
+      if (!baseState || !targetState || !relayerKeyPair) {
+        return jsonResponse(400, { error: 'Missing baseState, targetState, or relayerKeyPair.' });
+      }
+
+      try {
+        const deltaProof = StateSyncEngine.generateDeltaProof(baseState, targetState, relayerKeyPair, options);
+        return jsonResponse(200, { success: true, deltaProof });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/statesync/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { baseState, deltaProof, relayerPublicKey } = body;
+      if (!baseState || !deltaProof || !relayerPublicKey) {
+        return jsonResponse(400, { error: 'Missing baseState, deltaProof, or relayerPublicKey.' });
+      }
+
+      try {
+        const result = StateSyncEngine.applyAndVerifyDelta(baseState, deltaProof, relayerPublicKey);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // 5. Universal Solidity Master Verifier Export
+    if (pathname === '/api/v1/solidity/export-universal' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { contractName = 'DocuTrustUniversalVerifier', solidityVersion = '^0.8.20' } = body;
+      try {
+        const contractCode = generateUniversalVerifierContract({ contractName, solidityVersion });
+        return jsonResponse(200, { success: true, contractCode, contractName, solidityVersion });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
     // Default 404
     jsonResponse(404, { error: 'Route not found' });
   } catch (err) {
@@ -2464,7 +2616,7 @@ const server = http.createServer(async (req, res) => {
 
 if (require.main === module) {
   server.listen(PORT, () => {
-    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v11.0.0 running on http://localhost:${PORT}`);
+    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v12.0.0 running on http://localhost:${PORT}`);
   });
 }
 

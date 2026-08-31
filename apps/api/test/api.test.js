@@ -61,7 +61,7 @@ test('API Server Suite', async (t) => {
     const res = await makeRequest('GET', '/api/v1/health');
     assert.equal(res.status, 200);
     assert.equal(res.body.status, 'healthy');
-    assert.equal(res.body.version, '11.0.0');
+    assert.equal(res.body.version, '12.0.0');
     assert.ok(Array.isArray(res.body.features));
     assert.ok(res.body.systemDid.startsWith('did:key:z6M'));
   });
@@ -1640,6 +1640,137 @@ test('API Server Suite', async (t) => {
     assert.equal(grothRes.status, 200);
     assert.equal(grothRes.body.success, true);
     assert.ok(grothRes.body.contractCode.includes('contract DocuTrustEnterpriseGroth16'));
+  });
+
+  await t.test('52. POST /api/v1/trustscore/evaluate and verify', async () => {
+    const keyRes = await makeRequest('POST', '/api/v1/keys/generate');
+    const evaluatorKp = keyRes.body.keyPair;
+
+    const cred = {
+      id: 'urn:uuid:cred-api-test',
+      issuer: 'did:key:z6MkuIssuer',
+      validFrom: new Date().toISOString(),
+      proof: { type: 'Ed25519Signature2020', proofValue: 'sig' }
+    };
+
+    const evalRes = await makeRequest('POST', '/api/v1/trustscore/evaluate', {
+      credential: cred,
+      evaluatorKeyPair: evaluatorKp
+    });
+    assert.equal(evalRes.status, 200);
+    assert.equal(evalRes.body.success, true);
+    assert.ok(evalRes.body.evalResult.overallScore > 0);
+    assert.ok(evalRes.body.receipt);
+
+    const verifyRes = await makeRequest('POST', '/api/v1/trustscore/verify', {
+      receipt: evalRes.body.receipt,
+      evaluatorPublicKey: evaluatorKp.publicKeyHex
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.success, true);
+    assert.equal(verifyRes.body.valid, true);
+  });
+
+  await t.test('53. POST /api/v1/compute/execute and verify', async () => {
+    const keyRes = await makeRequest('POST', '/api/v1/keys/generate');
+    const proverKp = keyRes.body.keyPair;
+
+    const program = {
+      programId: 'APIComputeTest',
+      version: '1.0.0',
+      instructions: [
+        { op: 'MUL', args: ['$a', '$b'], outputVar: 'product' },
+        { op: 'THRESHOLD_CHECK', args: ['$product', 100], outputVar: 'isAbove100' }
+      ]
+    };
+    const inputs = { a: 12, b: 10 };
+
+    const execRes = await makeRequest('POST', '/api/v1/compute/execute', {
+      program,
+      inputs,
+      proverKeyPair: proverKp
+    });
+    assert.equal(execRes.status, 200);
+    assert.equal(execRes.body.success, true);
+    assert.equal(execRes.body.finalOutputs.product, 120);
+    assert.equal(execRes.body.finalOutputs.isAbove100, true);
+    assert.ok(execRes.body.receipt);
+
+    const verifyRes = await makeRequest('POST', '/api/v1/compute/verify', {
+      receipt: execRes.body.receipt,
+      proverPublicKey: proverKp.publicKeyHex,
+      expectedInputs: inputs
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.success, true);
+    assert.equal(verifyRes.body.valid, true);
+  });
+
+  await t.test('54. POST /api/v1/vanish/issue and verify', async () => {
+    const keyRes = await makeRequest('POST', '/api/v1/keys/generate');
+    const issuerKp = keyRes.body.keyPair;
+
+    const claims = { tempToken: 'TOKEN-9921' };
+    const issueRes = await makeRequest('POST', '/api/v1/vanish/issue', {
+      claims,
+      issuerKeyPair: issuerKp,
+      subjectDid: 'did:key:zSubject',
+      options: { ttlSeconds: 400 }
+    });
+    assert.equal(issueRes.status, 200);
+    assert.equal(issueRes.body.success, true);
+    assert.ok(issueRes.body.token);
+    assert.ok(issueRes.body.ephemeralKey);
+
+    const verifyRes = await makeRequest('POST', '/api/v1/vanish/verify', {
+      token: issueRes.body.token,
+      ephemeralKey: issueRes.body.ephemeralKey,
+      issuerPublicKey: issuerKp.publicKeyHex
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.success, true);
+    assert.equal(verifyRes.body.valid, true);
+    assert.deepEqual(verifyRes.body.claims, claims);
+  });
+
+  await t.test('55. POST /api/v1/statesync/delta and verify', async () => {
+    const keyRes = await makeRequest('POST', '/api/v1/keys/generate');
+    const relayerKp = keyRes.body.keyPair;
+
+    const baseState = { 'did:a': { entityDid: 'did:a', status: 'ACTIVE', accreditationLevel: 1, updatedEpoch: 100, metadataHash: '00' } };
+    const targetState = { ...baseState, 'did:b': { entityDid: 'did:b', status: 'ACTIVE', accreditationLevel: 2, updatedEpoch: 200, metadataHash: '11' } };
+
+    const deltaRes = await makeRequest('POST', '/api/v1/statesync/delta', {
+      baseState,
+      targetState,
+      relayerKeyPair: relayerKp
+    });
+    assert.equal(deltaRes.status, 200);
+    assert.equal(deltaRes.body.success, true);
+    assert.ok(deltaRes.body.deltaProof);
+
+    const verifyRes = await makeRequest('POST', '/api/v1/statesync/verify', {
+      baseState,
+      deltaProof: deltaRes.body.deltaProof,
+      relayerPublicKey: relayerKp.publicKeyHex
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.success, true);
+    assert.equal(verifyRes.body.valid, true);
+    assert.ok(verifyRes.body.newState['did:b']);
+  });
+
+  await t.test('56. POST /api/v1/solidity/export-universal', async () => {
+    const res = await makeRequest('POST', '/api/v1/solidity/export-universal', {
+      contractName: 'DocuTrustUniversalMaster'
+    });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
+    assert.ok(res.body.contractCode.includes('contract DocuTrustUniversalMaster'));
+    assert.ok(res.body.contractCode.includes('verifyMerkleProof'));
+    assert.ok(res.body.contractCode.includes('verifySMTProof'));
+    assert.ok(res.body.contractCode.includes('verifyBridgeAttestation'));
+    assert.ok(res.body.contractCode.includes('verifyGroth16Proof'));
   });
 });
 

@@ -1,6 +1,6 @@
 {
   "name": "@docutrust/sdk",
-  "version": "11.0.0",
+  "version": "12.0.0",
   "description": "Official TypeScript & JavaScript Client SDK for DocuTrust Sovereign Trust API",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -16,7 +16,7 @@
     "test": "npm run build && node --test test/sdk.test.js"
   },
   "dependencies": {
-    "@docutrust/core": "^11.0.0"
+    "@docutrust/core": "^12.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.14.9",

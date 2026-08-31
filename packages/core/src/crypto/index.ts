@@ -241,3 +241,51 @@ export function verifySignature(
     return false;
   }
 }
+
+/**
+ * Alias for signData to match W3C & EIP standard naming.
+ */
+export const signMessage = signData;
+
+/**
+ * Encrypts plaintext string using AES-256-GCM with a 32-byte key or passphrase.
+ * Returns formatted ciphertext string: ivHex:tagHex:ciphertextHex
+ */
+export function encryptWithPassword(plaintext: string, passwordOrKey: string): string {
+  const key = passwordOrKey.length === 64 && /^[0-9a-fA-F]{64}$/.test(passwordOrKey)
+    ? Buffer.from(passwordOrKey, 'hex')
+    : crypto.createHash('sha256').update(passwordOrKey).digest();
+
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const encrypted = Buffer.concat([cipher.update(Buffer.from(plaintext, 'utf-8')), cipher.final()]);
+  const tag = cipher.getAuthTag();
+
+  return `${iv.toString('hex')}:${tag.toString('hex')}:${encrypted.toString('hex')}`;
+}
+
+/**
+ * Decrypts AES-256-GCM formatted ciphertext string: ivHex:tagHex:ciphertextHex
+ */
+export function decryptWithPassword(encryptedString: string, passwordOrKey: string): string {
+  const parts = encryptedString.split(':');
+  if (parts.length !== 3) {
+    throw new Error('Invalid encrypted string format. Expected ivHex:tagHex:ciphertextHex');
+  }
+
+  const [ivHex, tagHex, cipherHex] = parts;
+  const key = passwordOrKey.length === 64 && /^[0-9a-fA-F]{64}$/.test(passwordOrKey)
+    ? Buffer.from(passwordOrKey, 'hex')
+    : crypto.createHash('sha256').update(passwordOrKey).digest();
+
+  const iv = Buffer.from(ivHex, 'hex');
+  const tag = Buffer.from(tagHex, 'hex');
+  const ciphertext = Buffer.from(cipherHex, 'hex');
+
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+  decipher.setAuthTag(tag);
+
+  const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+  return decrypted.toString('utf-8');
+}
+

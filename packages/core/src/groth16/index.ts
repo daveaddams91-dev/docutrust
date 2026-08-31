@@ -156,10 +156,13 @@ export class Groth16Engine {
     }
 
     // Verify point lengths
-    if (proof.a.x.length !== 66 || proof.a.y.length !== 66) {
+    if (!proof.a.x || !proof.a.y || proof.a.x.length !== 66 || proof.a.y.length !== 66) {
       errors.push('Proof point A is not a valid 32-byte field element.');
     }
-    if (proof.c.x.length !== 66 || proof.c.y.length !== 66) {
+    if (!proof.b.x || !proof.b.y || !Array.isArray(proof.b.x) || !Array.isArray(proof.b.y) || proof.b.x[0].length !== 66 || proof.b.y[0].length !== 66) {
+      errors.push('Proof point B is not a valid G2 field element pair.');
+    }
+    if (!proof.c.x || !proof.c.y || proof.c.x.length !== 66 || proof.c.y.length !== 66) {
       errors.push('Proof point C is not a valid 32-byte field element.');
     }
 

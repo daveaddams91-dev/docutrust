@@ -145,5 +145,22 @@ export * from './crosschain';
 // Export Zero-Knowledge Succinct Proofs (ZK-SNARK / Groth16) & Proof Aggregation (DocuTrust v11.0.0)
 export * from './groth16';
 
+// ========================================================
+// DocuTrust v12.0.0 Next-Gen Sovereign Trust Innovations
+// ========================================================
+
+// Export Quantitative Trust & Risk Scoring Engine (DocuTrust v12.0.0)
+export * from './trust-score';
+
+// Export Verifiable Off-Chain Computation & Execution Trace Engine (DocuTrust v12.0.0)
+export * from './verifiable-compute';
+
+// Export Ephemeral Forward-Secret Vanish Credential Engine (DocuTrust v12.0.0)
+export * from './vanish-cred';
+
+// Export Cross-Ledger Sovereign Registry StateSync & Delta Proof Engine (DocuTrust v12.0.0)
+export * from './state-sync';
+
+
 
 

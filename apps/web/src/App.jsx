@@ -33,6 +33,10 @@ import SLHDSAStudio from './components/SLHDSAStudio.jsx';
 import WebAuthnStudio from './components/WebAuthnStudio.jsx';
 import CrossChainBridgeStudio from './components/CrossChainBridgeStudio.jsx';
 import ZKSnarkStudio from './components/ZKSnarkStudio.jsx';
+import TrustScoreStudio from './components/TrustScoreStudio.jsx';
+import VerifiableComputeStudio from './components/VerifiableComputeStudio.jsx';
+import VanishCredStudio from './components/VanishCredStudio.jsx';
+import UniversalVerifierStudio from './components/UniversalVerifierStudio.jsx';
 import Footer from './components/Footer.jsx';
 
 export default function App() {
@@ -50,6 +54,10 @@ export default function App() {
 
       <main className="flex-1">
         {activeTab === 'hero' && <HeroSection setActiveTab={setActiveTab} />}
+        {activeTab === 'trustscore' && <TrustScoreStudio />}
+        {activeTab === 'compute' && <VerifiableComputeStudio />}
+        {activeTab === 'vanish' && <VanishCredStudio />}
+        {activeTab === 'universal' && <UniversalVerifierStudio />}
         {activeTab === 'slhdsa' && <SLHDSAStudio />}
         {activeTab === 'webauthn' && <WebAuthnStudio />}
         {activeTab === 'crosschain' && <CrossChainBridgeStudio />}

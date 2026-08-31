@@ -61,8 +61,12 @@ from .slhdsa import SLHDSAEngine
 from .webauthn import WebAuthnAttestationEngine
 from .crosschain import CrossChainBridgeEngine
 from .groth16 import Groth16Engine
+from .trust_score import TrustScoreEngine
+from .verifiable_compute import VerifiableComputeEngine
+from .vanish_cred import VanishCredEngine
+from .state_sync import StateSyncEngine
 
-__version__ = "11.0.0"
+__version__ = "12.0.0"
 __all__ = [
     "DocuTrustClient",
     "canonicalize_json",
@@ -138,6 +142,10 @@ __all__ = [
     "SLHDSAEngine",
     "WebAuthnAttestationEngine",
     "CrossChainBridgeEngine",
-    "Groth16Engine"
+    "Groth16Engine",
+    "TrustScoreEngine",
+    "VerifiableComputeEngine",
+    "VanishCredEngine",
+    "StateSyncEngine"
 ]
 

@@ -29,6 +29,10 @@ import {
 export default function Navbar({ activeTab, setActiveTab }) {
   const navItems = [
     { id: 'hero', label: 'Overview', icon: ShieldCheck },
+    { id: 'trustscore', label: 'Trust Scores', icon: Award },
+    { id: 'compute', label: 'Verifiable Compute', icon: Cpu },
+    { id: 'vanish', label: 'Vanish Creds', icon: Sparkles },
+    { id: 'universal', label: 'StateSync & Verifier', icon: Network },
     { id: 'slhdsa', label: 'SLH-DSA FIPS 205', icon: ShieldAlert },
     { id: 'webauthn', label: 'Passkeys', icon: Fingerprint },
     { id: 'crosschain', label: 'Cross-Chain Bridge', icon: ArrowRightLeft },
@@ -67,9 +71,9 @@ export default function Navbar({ activeTab, setActiveTab }) {
           <div>
             <div className="flex items-center gap-1.5">
               <span className="font-bold text-lg tracking-tight text-white font-sans">DocuTrust</span>
-              <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 font-mono font-semibold">v11.0.0</span>
+              <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 font-mono font-semibold">v12.0.0</span>
             </div>
-            <span className="text-[10px] text-gray-400 tracking-wide block font-mono">Quantum Sovereign Trust Mesh</span>
+            <span className="text-[10px] text-gray-400 tracking-wide block font-mono">Autonomous Sovereign Trust Mesh</span>
           </div>
         </div>
 

@@ -294,6 +294,34 @@ describe('DocuTrust TypeScript SDK (@docutrust/sdk)', () => {
     assert.strictEqual(mockCalls[65].url, 'https://test-api.docutrust.org/api/v1/solidity/export-bridge');
     await client.generateSolidityGroth16Verifier();
     assert.strictEqual(mockCalls[66].url, 'https://test-api.docutrust.org/api/v1/solidity/export-groth16');
+
+    // 53. v12.0.0 Trust Score
+    await client.evaluateTrustScore({}, {});
+    assert.strictEqual(mockCalls[67].url, 'https://test-api.docutrust.org/api/v1/trustscore/evaluate');
+    await client.verifyTrustScoreReceipt({}, '0x123');
+    assert.strictEqual(mockCalls[68].url, 'https://test-api.docutrust.org/api/v1/trustscore/verify');
+
+    // 54. v12.0.0 Verifiable Compute
+    await client.executeVerifiableCompute({}, {}, {});
+    assert.strictEqual(mockCalls[69].url, 'https://test-api.docutrust.org/api/v1/compute/execute');
+    await client.verifyComputeReceipt({}, '0x123');
+    assert.strictEqual(mockCalls[70].url, 'https://test-api.docutrust.org/api/v1/compute/verify');
+
+    // 55. v12.0.0 Vanish Ephemeral Credentials
+    await client.issueVanishToken({}, {}, 'did:key:z123');
+    assert.strictEqual(mockCalls[71].url, 'https://test-api.docutrust.org/api/v1/vanish/issue');
+    await client.verifyVanishToken({}, '0x123', '0x456');
+    assert.strictEqual(mockCalls[72].url, 'https://test-api.docutrust.org/api/v1/vanish/verify');
+
+    // 56. v12.0.0 StateSync Delta Proofs
+    await client.generateStateDelta({}, {}, {});
+    assert.strictEqual(mockCalls[73].url, 'https://test-api.docutrust.org/api/v1/statesync/delta');
+    await client.verifyStateDelta({}, {}, '0x123');
+    assert.strictEqual(mockCalls[74].url, 'https://test-api.docutrust.org/api/v1/statesync/verify');
+
+    // 57. v12.0.0 Universal Solidity Verifier
+    await client.generateUniversalSolidityVerifier();
+    assert.strictEqual(mockCalls[75].url, 'https://test-api.docutrust.org/api/v1/solidity/export-universal');
   });
 
   test('DocuTrustClient handles HTTP error responses gracefully', async () => {

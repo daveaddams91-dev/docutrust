@@ -213,7 +213,25 @@ const command = args[0];
 
 function printHelp() {
   console.log(`
-\x1b[1m\x1b[36m🛡️ DocuTrust CLI v11.0.0\x1b[0m — NIST SLH-DSA, WebAuthn Passkeys, Cross-Chain Bridge & Groth16 ZK-SNARKs
+\x1b[1m\x1b[36m🛡️ DocuTrust CLI v12.0.0\x1b[0m — Trust Scoring, Verifiable Compute, Ephemeral Vanish Creds & StateSync
+
+\x1b[1mSOVEREIGN TRUST SCORING & RISK RECEIPT ENGINE (v12.0.0):\x1b[0m
+  \x1b[32mtrustscore-eval\x1b[0m --credential <f> [--min-score <n>] [--key <k>] [--out <f>] Evaluate trust vector & issue signed risk receipt
+  \x1b[32mtrustscore-verify\x1b[0m --receipt <f> --evaluator-key <k|pub>           Verify unforgeable DocuTrustRiskReceipt2026
+
+\x1b[1mVERIFIABLE OFF-CHAIN COMPUTE & TRACE PROOFS (v12.0.0):\x1b[0m
+  \x1b[32mcompute-run\x1b[0m --program <f> --inputs <f> [--key <k>] [--out <f>]     Execute deterministic compute program & generate receipt
+  \x1b[32mcompute-verify\x1b[0m --receipt <f> --prover-key <k|pub> [--inputs <f>]  Verify verifiable compute execution trace receipt
+
+\x1b[1mEPHEMERAL FORWARD-SECRET VANISH CREDENTIALS (v12.0.0):\x1b[0m
+  \x1b[32mvanish-issue\x1b[0m --claims <f> --key <k> --subject <did> [--ttl <s>] [--out <f>] Issue self-expiring forward-secret vanish token
+  \x1b[32mvanish-verify\x1b[0m --token <f> --ephemeral-key <hex> --issuer-key <k|pub> Verify and decrypt vanish credential token
+
+\x1b[1mCROSS-LEDGER STATESYNC & UNIVERSAL SOLIDITY VERIFIER (v12.0.0):\x1b[0m
+  \x1b[32mstatesync-delta\x1b[0m --base <f> --target <f> --key <k> [--source <s>] [--dest <d>] [--out <f>] Generate O(Δ) state synchronization delta proof
+  \x1b[32mstatesync-verify\x1b[0m --base <f> --delta <f> --relayer-key <k|pub> [--out <f>] Apply and verify delta proof against base registry
+  \x1b[32msolidity-export-universal\x1b[0m [--name <str>] [--solc <ver>] [--out <f>] Generate DocuTrustUniversalVerifier.sol master smart contract
+
 
 \x1b[1mPOST-QUANTUM SLH-DSA & WEBAUTHN PASSKEYS (v11.0.0):\x1b[0m
   \x1b[32mslhdsa-keygen\x1b[0m [--out <file>]                         Generate NIST FIPS 205 SLH-DSA-SHA2-128s stateless PQC keypair
@@ -436,7 +454,7 @@ async function runDemoWizard() {
 
 async function main() {
   if (command === 'version' || command === '--version' || command === '-v') {
-    console.log('11.0.0');
+    console.log('12.0.0');
     return;
   }
 
@@ -3150,6 +3168,269 @@ async function main() {
     const code = core.generateGroth16VerifierContract({ contractName: name, solidityVersion: version });
     safeWriteFileSync(outFile, code);
     console.log(`\x1b[32m✔\x1b[0m Solidity Groth16 Verifier smart contract exported to \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  // ========================================================
+  // DocuTrust v12.0.0 Command Handlers
+  // ========================================================
+
+  // 1. Trust Score Engine
+  if (command === 'trustscore-eval') {
+    const credFile = getArgValue('--credential') || getArgValue('-c');
+    const minScore = Number(getArgValue('--min-score') || getArgValue('-m') || 650);
+    const keyFile = getArgValue('--key') || getArgValue('-k');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!credFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing required --credential <credential.json>');
+      process.exit(1);
+    }
+
+    const credential = JSON.parse(fs.readFileSync(credFile, 'utf-8'));
+    const evalResult = core.TrustScoreEngine.evaluate(credential, { minimumAcceptableScore: minScore });
+
+    console.log(`\x1b[32m✔\x1b[0m Trust & Risk Score Evaluation Completed:`);
+    console.log(`  Overall Score: \x1b[1m\x1b[36m${evalResult.overallScore} / 1000\x1b[0m`);
+    console.log(`  Risk Tier:     \x1b[1m${evalResult.riskTier}\x1b[0m`);
+    console.log(`  Acceptable:    ${evalResult.isAcceptable ? '\x1b[32mYES\x1b[0m' : '\x1b[31mNO\x1b[0m'}`);
+    console.log(`  Breakdown:     Crypto: ${evalResult.breakdown.cryptoSuiteScore}/250, Issuer: ${evalResult.breakdown.issuerAccreditationScore}/250, Revocation: ${evalResult.breakdown.revocationFreshnessScore}/200, Temporal: ${evalResult.breakdown.temporalValidityScore}/150, Schema: ${evalResult.breakdown.schemaComplianceScore}/150`);
+
+    if (keyFile) {
+      const keyData = JSON.parse(fs.readFileSync(keyFile, 'utf-8'));
+      const receipt = core.TrustScoreEngine.issueRiskReceipt(credential, evalResult, keyData);
+      const outReceiptFile = outFile || 'trust-risk-receipt.json';
+      safeWriteFileSync(outReceiptFile, JSON.stringify(receipt, null, 2));
+      console.log(`  Signed Risk Receipt saved to: \x1b[1m${outReceiptFile}\x1b[0m`);
+    }
+    return;
+  }
+
+  if (command === 'trustscore-verify') {
+    const receiptFile = getArgValue('--receipt') || getArgValue('-r');
+    const evalKeyArg = getArgValue('--evaluator-key') || getArgValue('-k');
+
+    if (!receiptFile || !evalKeyArg) {
+      console.error('\x1b[31mError:\x1b[0m Missing --receipt <receipt.json> or --evaluator-key <key.json|pubHex>');
+      process.exit(1);
+    }
+
+    const receipt = JSON.parse(fs.readFileSync(receiptFile, 'utf-8'));
+    let evaluatorKey = evalKeyArg;
+    if (fs.existsSync(evalKeyArg)) {
+      const kd = JSON.parse(fs.readFileSync(evalKeyArg, 'utf-8'));
+      evaluatorKey = kd.publicKeyHex || kd.publicKeyPem || kd;
+    }
+
+    const audit = core.TrustScoreEngine.verifyRiskReceipt(receipt, evaluatorKey);
+    if (audit.valid) {
+      console.log(`\x1b[32m✔\x1b[0m DocuTrust Risk Receipt is \x1b[1m\x1b[32mCRYPTOGRAPHICALLY VALID\x1b[0m`);
+      console.log(`  Credential ID: ${receipt.credentialId}`);
+      console.log(`  Overall Score: ${receipt.overallScore}/1000 (${receipt.riskTier})`);
+      console.log(`  Evaluator DID: ${receipt.evaluatorDid}`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m Risk receipt verification \x1b[1m\x1b[31mFAILED\x1b[0m:`, audit.errors.join(', '));
+      process.exit(1);
+    }
+    return;
+  }
+
+  // 2. Verifiable Compute Engine
+  if (command === 'compute-run') {
+    const progFile = getArgValue('--program') || getArgValue('-p');
+    const inputFile = getArgValue('--inputs') || getArgValue('-i');
+    const keyFile = getArgValue('--key') || getArgValue('-k');
+    const outFile = getArgValue('--out') || getArgValue('-o') || 'compute-receipt.json';
+
+    if (!progFile || !inputFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --program <program.json> or --inputs <inputs.json>');
+      process.exit(1);
+    }
+
+    const program = JSON.parse(fs.readFileSync(progFile, 'utf-8'));
+    const inputs = JSON.parse(fs.readFileSync(inputFile, 'utf-8'));
+    let proverKp;
+    if (keyFile) {
+      proverKp = JSON.parse(fs.readFileSync(keyFile, 'utf-8'));
+    }
+
+    const { finalOutputs, trace, receipt } = core.VerifiableComputeEngine.execute(program, inputs, proverKp);
+    console.log(`\x1b[32m✔\x1b[0m Verifiable Compute execution finished with ${trace.length} deterministic steps.`);
+    console.log(`  Outputs:`, JSON.stringify(finalOutputs, null, 2));
+
+    if (receipt) {
+      safeWriteFileSync(outFile, JSON.stringify(receipt, null, 2));
+      console.log(`  Signed Compute Receipt saved to: \x1b[1m${outFile}\x1b[0m`);
+    }
+    return;
+  }
+
+  if (command === 'compute-verify') {
+    const receiptFile = getArgValue('--receipt') || getArgValue('-r');
+    const proverKeyArg = getArgValue('--prover-key') || getArgValue('-k');
+    const inputFile = getArgValue('--inputs') || getArgValue('-i');
+
+    if (!receiptFile || !proverKeyArg) {
+      console.error('\x1b[31mError:\x1b[0m Missing --receipt <receipt.json> or --prover-key <key.json|pubHex>');
+      process.exit(1);
+    }
+
+    const receipt = JSON.parse(fs.readFileSync(receiptFile, 'utf-8'));
+    let proverKey = proverKeyArg;
+    if (fs.existsSync(proverKeyArg)) {
+      const kd = JSON.parse(fs.readFileSync(proverKeyArg, 'utf-8'));
+      proverKey = kd.publicKeyHex || kd.publicKeyPem || kd;
+    }
+    const expectedInputs = inputFile ? JSON.parse(fs.readFileSync(inputFile, 'utf-8')) : undefined;
+
+    const result = core.VerifiableComputeEngine.verifyReceipt(receipt, proverKey, expectedInputs);
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m Verifiable Compute Receipt is \x1b[1m\x1b[32mCRYPTOGRAPHICALLY VALID\x1b[0m`);
+      console.log(`  Program:      ${receipt.programId} v${receipt.programVersion}`);
+      console.log(`  Trace Root:   ${receipt.traceMerkleRoot}`);
+      console.log(`  Output Root:  ${receipt.outputStateHash}`);
+      console.log(`  Step Count:   ${receipt.executionStepCount}`);
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m Compute receipt verification \x1b[1m\x1b[31mFAILED\x1b[0m:`, result.errors.join(', '));
+      process.exit(1);
+    }
+    return;
+  }
+
+  // 3. Ephemeral Forward-Secret Vanish Credential Engine
+  if (command === 'vanish-issue') {
+    const claimsFile = getArgValue('--claims') || getArgValue('-c');
+    const keyFile = getArgValue('--key') || getArgValue('-k');
+    const subjectDid = getArgValue('--subject') || getArgValue('-s');
+    const ttl = Number(getArgValue('--ttl') || 300);
+    const outFile = getArgValue('--out') || getArgValue('-o') || 'vanish-token.json';
+
+    if (!claimsFile || !keyFile || !subjectDid) {
+      console.error('\x1b[31mError:\x1b[0m Missing required arguments: --claims <f>, --key <k>, --subject <did>');
+      process.exit(1);
+    }
+
+    const claims = JSON.parse(fs.readFileSync(claimsFile, 'utf-8'));
+    const issuerKp = JSON.parse(fs.readFileSync(keyFile, 'utf-8'));
+
+    const { token, ephemeralKey } = core.VanishCredEngine.issueToken(claims, issuerKp, subjectDid, { ttlSeconds: ttl });
+    const outputData = { token, ephemeralKey };
+    safeWriteFileSync(outFile, JSON.stringify(outputData, null, 2));
+
+    console.log(`\x1b[32m✔\x1b[0m Ephemeral Vanish Token issued successfully!`);
+    console.log(`  Token ID:       ${token.id}`);
+    console.log(`  TTL Seconds:    ${ttl}s`);
+    console.log(`  Epoch Expires:  ${token.epochExpires}`);
+    console.log(`  Ephemeral Key:  \x1b[33m${ephemeralKey}\x1b[0m`);
+    console.log(`  Saved to:       \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'vanish-verify') {
+    const tokenFile = getArgValue('--token') || getArgValue('-t');
+    const ephemeralKey = getArgValue('--ephemeral-key') || getArgValue('-e');
+    const issuerKeyArg = getArgValue('--issuer-key') || getArgValue('-k');
+
+    if (!tokenFile || !ephemeralKey || !issuerKeyArg) {
+      console.error('\x1b[31mError:\x1b[0m Missing --token <token.json>, --ephemeral-key <hex>, or --issuer-key <key.json|pubHex>');
+      process.exit(1);
+    }
+
+    const tokenObj = JSON.parse(fs.readFileSync(tokenFile, 'utf-8'));
+    const token = tokenObj.token || tokenObj;
+    let issuerKey = issuerKeyArg;
+    if (fs.existsSync(issuerKeyArg)) {
+      const kd = JSON.parse(fs.readFileSync(issuerKeyArg, 'utf-8'));
+      issuerKey = kd.publicKeyHex || kd.publicKeyPem || kd;
+    }
+
+    const result = core.VanishCredEngine.verifyAndDecrypt(token, ephemeralKey, issuerKey);
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m Vanish Credential Token is \x1b[1m\x1b[32mACTIVE & VALID\x1b[0m`);
+      console.log(`  Remaining Time: \x1b[32m${result.remainingSeconds}s\x1b[0m`);
+      console.log(`  Decrypted Claims:`, JSON.stringify(result.claims, null, 2));
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m Vanish token verification \x1b[1m\x1b[31mFAILED\x1b[0m (Expired: ${result.isExpired}):`, result.errors.join(', '));
+      process.exit(1);
+    }
+    return;
+  }
+
+  // 4. Cross-Ledger Sovereign Registry StateSync & Delta Proof Engine
+  if (command === 'statesync-delta') {
+    const baseFile = getArgValue('--base') || getArgValue('-b');
+    const targetFile = getArgValue('--target') || getArgValue('-t');
+    const keyFile = getArgValue('--key') || getArgValue('-k');
+    const sourceLedger = getArgValue('--source') || 'EVM:Mainnet';
+    const destLedger = getArgValue('--dest') || 'Mesh:Local';
+    const outFile = getArgValue('--out') || getArgValue('-o') || 'statesync-delta.json';
+
+    if (!baseFile || !targetFile || !keyFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --base <base.json>, --target <target.json>, or --key <key.json>');
+      process.exit(1);
+    }
+
+    const baseState = JSON.parse(fs.readFileSync(baseFile, 'utf-8'));
+    const targetState = JSON.parse(fs.readFileSync(targetFile, 'utf-8'));
+    const relayerKp = JSON.parse(fs.readFileSync(keyFile, 'utf-8'));
+
+    const deltaProof = core.StateSyncEngine.generateDeltaProof(baseState, targetState, relayerKp, {
+      source: sourceLedger,
+      destination: destLedger
+    });
+
+    safeWriteFileSync(outFile, JSON.stringify(deltaProof, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m StateSync Delta Proof generated successfully!`);
+    console.log(`  Source Root:     ${deltaProof.sourceStateRoot}`);
+    console.log(`  Target Root:     ${deltaProof.targetStateRoot}`);
+    console.log(`  Delta Elements:  ${deltaProof.deltaCount}`);
+    console.log(`  Saved to:        \x1b[1m${outFile}\x1b[0m`);
+    return;
+  }
+
+  if (command === 'statesync-verify') {
+    const baseFile = getArgValue('--base') || getArgValue('-b');
+    const deltaFile = getArgValue('--delta') || getArgValue('-d');
+    const relayerKeyArg = getArgValue('--relayer-key') || getArgValue('-k');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!baseFile || !deltaFile || !relayerKeyArg) {
+      console.error('\x1b[31mError:\x1b[0m Missing --base <base.json>, --delta <delta.json>, or --relayer-key <k|pubHex>');
+      process.exit(1);
+    }
+
+    const baseState = JSON.parse(fs.readFileSync(baseFile, 'utf-8'));
+    const deltaProof = JSON.parse(fs.readFileSync(deltaFile, 'utf-8'));
+    let relayerKey = relayerKeyArg;
+    if (fs.existsSync(relayerKeyArg)) {
+      const kd = JSON.parse(fs.readFileSync(relayerKeyArg, 'utf-8'));
+      relayerKey = kd.publicKeyHex || kd.publicKeyPem || kd;
+    }
+
+    const syncResult = core.StateSyncEngine.applyAndVerifyDelta(baseState, deltaProof, relayerKey);
+    if (syncResult.valid) {
+      console.log(`\x1b[32m✔\x1b[0m StateSync Delta Proof is \x1b[1m\x1b[32mAUTHENTICATED & RECONCILED\x1b[0m`);
+      console.log(`  Target Root:  ${syncResult.reconciledTargetRoot}`);
+      if (outFile) {
+        safeWriteFileSync(outFile, JSON.stringify(syncResult.newState, null, 2));
+        console.log(`  Updated state saved to: \x1b[1m${outFile}\x1b[0m`);
+      }
+    } else {
+      console.error(`\x1b[31m✖\x1b[0m StateSync verification \x1b[1m\x1b[31mFAILED\x1b[0m:`, syncResult.errors.join(', '));
+      process.exit(1);
+    }
+    return;
+  }
+
+  // 5. Universal Solidity Verifier Smart Contract Generator
+  if (command === 'solidity-export-universal') {
+    const name = getArgValue('--name') || getArgValue('-n') || 'DocuTrustUniversalVerifier';
+    const version = getArgValue('--solc') || '^0.8.20';
+    const outFile = getArgValue('--out') || getArgValue('-o') || `${name}.sol`;
+
+    const code = core.generateUniversalVerifierContract({ contractName: name, solidityVersion: version });
+    safeWriteFileSync(outFile, code);
+    console.log(`\x1b[32m✔\x1b[0m Master Universal EVM Solidity Smart Contract exported to \x1b[1m${outFile}\x1b[0m`);
     return;
   }
 

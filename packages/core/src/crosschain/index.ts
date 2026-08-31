@@ -133,13 +133,22 @@ export class CrossChainBridgeEngine {
   }
 
   /**
+   * Resets the processed nonces cache (useful for testing or cache rotation).
+   */
+  public static resetNonceCache(): void {
+    this.processedNonces.clear();
+  }
+
+  /**
    * Verifies a cross-chain attestation packet on destination chain or off-chain client.
    */
   public static verifyAttestation(
     attestation: CrossChainAttestation,
-    allowedRelayerPublicKeys?: string[]
+    allowedRelayerPublicKeys?: string[],
+    options?: { executeNonce?: boolean }
   ): { valid: boolean; validSignaturesCount: number; errors: string[] } {
     const errors: string[] = [];
+    const shouldExecute = options?.executeNonce !== false;
 
     if (!attestation || !attestation.message || !Array.isArray(attestation.signatures)) {
       return { valid: false, validSignaturesCount: 0, errors: ['Invalid attestation packet structure.'] };
@@ -190,7 +199,7 @@ export class CrossChainBridgeEngine {
     }
 
     const valid = errors.length === 0 && validCount >= attestation.quorumThreshold;
-    if (valid) {
+    if (valid && shouldExecute) {
       nonces.add(attestation.message.sequenceNonce);
     }
 

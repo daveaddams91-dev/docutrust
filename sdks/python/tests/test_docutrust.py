@@ -1449,7 +1449,110 @@ class TestDocuTrustPython(unittest.TestCase):
         self.assertIn("contract DocuTrustGroth16Verifier", groth16_code)
         self.assertIn("function verifyProof", groth16_code)
 
+    def test_trust_score_engine(self):
+        from docutrust.trust_score import TrustScoreEngine
+        from docutrust.crypto import generate_key_pair
+
+        evaluator_kp = generate_key_pair()
+        cred = {
+            "id": "urn:uuid:sample-cred-score",
+            "issuer": "did:key:zTrustedIssuer",
+            "proof": {"type": "ML-DSA-65-Ed25519-Hybrid", "proofValue": "0x123"},
+            "status": "ACTIVE",
+            "schemaValid": True
+        }
+
+        eval_res = TrustScoreEngine.calculate_trust_score(cred, {"minimumAcceptableScore": 600, "issuerAccreditationTiers": {"did:key:zTrustedIssuer": 3}})
+        self.assertGreaterEqual(eval_res["overallScore"], 800)
+        self.assertIn(eval_res["riskTier"], ["AAA", "AA"])
+        self.assertTrue(eval_res["isAcceptable"])
+
+        receipt = TrustScoreEngine.issue_risk_receipt(cred, evaluator_kp, {"minimumAcceptableScore": 600, "issuerAccreditationTiers": {"did:key:zTrustedIssuer": 3}})
+        self.assertEqual(receipt["type"], "DocuTrustRiskReceipt2026")
+        self.assertTrue(receipt["signatureHex"])
+
+        verify_res = TrustScoreEngine.verify_risk_receipt(receipt, evaluator_kp["publicKeyHex"])
+        self.assertTrue(verify_res["valid"])
+
+    def test_verifiable_compute_engine(self):
+        from docutrust.verifiable_compute import VerifiableComputeEngine
+        from docutrust.crypto import generate_key_pair
+
+        prover_kp = generate_key_pair()
+        program = {
+            "programId": "CreditScoringVM",
+            "version": "1.0.0",
+            "instructions": [
+                {"op": "WEIGHTED_SUM", "args": [["$income", "$history"], [0.7, 0.3]], "outputVar": "score"},
+                {"op": "THRESHOLD_CHECK", "args": ["$score", 50000], "outputVar": "approved"}
+            ]
+        }
+        inputs = {"income": 80000, "history": 10}
+
+        exec_res = VerifiableComputeEngine.execute_program(program, inputs, prover_kp)
+        self.assertTrue(exec_res["finalOutputs"]["approved"])
+        self.assertEqual(len(exec_res["trace"]), 2)
+        self.assertEqual(exec_res["receipt"]["type"], "DocuTrustComputeReceipt2026")
+
+        verify_res = VerifiableComputeEngine.verify_compute_receipt(exec_res["receipt"], prover_kp["publicKeyHex"], inputs)
+        self.assertTrue(verify_res["valid"])
+
+    def test_vanish_cred_engine(self):
+        from docutrust.vanish_cred import VanishCredEngine
+        from docutrust.crypto import generate_key_pair
+
+        issuer_kp = generate_key_pair()
+        claims = {"secretAuthCode": "AUTH-1234", "level": "SUPER_ADMIN"}
+
+        issue_res = VanishCredEngine.issue_token(claims, issuer_kp, "did:key:zSubject", {"ttlSeconds": 60})
+        self.assertEqual(issue_res["token"]["type"], "DocuTrustVanishToken2026")
+        self.assertTrue(issue_res["ephemeralKey"])
+
+        # Decrypt within valid epoch
+        verify_res = VanishCredEngine.verify_and_decrypt(issue_res["token"], issue_res["ephemeralKey"], issuer_kp["publicKeyHex"])
+        self.assertTrue(verify_res["valid"])
+        self.assertEqual(verify_res["claims"]["secretAuthCode"], "AUTH-1234")
+
+        # Test expired decay
+        expired_verify = VanishCredEngine.verify_and_decrypt(
+            issue_res["token"],
+            issue_res["ephemeralKey"],
+            issuer_kp["publicKeyHex"],
+            current_epoch=issue_res["expiresAtEpoch"] + 100
+        )
+        self.assertFalse(expired_verify["valid"])
+
+    def test_state_sync_engine(self):
+        from docutrust.state_sync import StateSyncEngine
+        from docutrust.crypto import generate_key_pair
+
+        relayer_kp = generate_key_pair()
+        base_state = {"did:key:z1": {"status": "ACTIVE", "tier": 1}}
+        target_state = {
+            "did:key:z1": {"status": "ACTIVE", "tier": 2},
+            "did:key:z2": {"status": "ACTIVE", "tier": 3}
+        }
+
+        delta_proof = StateSyncEngine.generate_delta_proof(base_state, target_state, relayer_kp)
+        self.assertEqual(delta_proof["type"], "DocuTrustStateDeltaProof2026")
+        self.assertEqual(delta_proof["deltaOperationsCount"], 2)
+
+        sync_res = StateSyncEngine.verify_and_reconcile(base_state, delta_proof, relayer_kp["publicKeyHex"])
+        self.assertTrue(sync_res["valid"])
+        self.assertEqual(sync_res["deltaAppliedCount"], 2)
+
+    def test_universal_solidity_verifier(self):
+        from docutrust.solidity import SolidityEngine
+
+        universal_code = SolidityEngine.generate_universal_verifier_contract()
+        self.assertIn("contract DocuTrustUniversalVerifier", universal_code)
+        self.assertIn("function verifyMerkleProof", universal_code)
+        self.assertIn("function verifySMTProof", universal_code)
+        self.assertIn("function verifyCrossChainQuorum", universal_code)
+        self.assertIn("function verifyGroth16SNARK", universal_code)
+
 if __name__ == '__main__':
     unittest.main()
+
 
 

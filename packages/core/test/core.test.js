@@ -153,7 +153,13 @@ const {
   CrossChainBridgeEngine,
   Groth16Engine,
   generateBridgeRelayerContract,
-  generateGroth16VerifierContract
+  generateGroth16VerifierContract,
+  // v12.0.0 Engines
+  TrustScoreEngine,
+  VerifiableComputeEngine,
+  VanishCredEngine,
+  StateSyncEngine,
+  generateUniversalVerifierContract
 } = require('../dist/index.js');
 
 // 1. Cryptography Tests
@@ -2851,6 +2857,193 @@ test('82. SolidityEngine: generateBridgeRelayerContract & generateGroth16Verifie
   assert.ok(groth16Sol.includes('verifyProof'));
   assert.ok(groth16Sol.includes('staticcall(sub(gas(), 2000), 8'));
 });
+
+// 83. Verifiable Credential Quantitative Trust & Risk Scoring Engine
+test('83. TrustScoreEngine: evaluate trust vector, issueRiskReceipt, and verifyRiskReceipt', () => {
+  const evaluatorKp = generateKeyPair();
+
+  const credential = {
+    id: 'urn:uuid:cred-eval-001',
+    issuer: 'did:web:accredited.university.edu',
+    validFrom: new Date(Date.now() - 3600000).toISOString(),
+    validUntil: new Date(Date.now() + 31536000000).toISOString(),
+    credentialStatus: {
+      type: 'BitstringStatusList2024',
+      statusListIndex: '42'
+    },
+    proof: {
+      type: 'DocuTrustSLHDSASignature2026',
+      signatureValue: 'slh1_random_commitment_path'
+    }
+  };
+
+  const evalResult = TrustScoreEngine.evaluate(credential, {
+    minimumAcceptableScore: 700,
+    registryAccreditationMap: {
+      'did:web:accredited.university.edu': 240
+    }
+  });
+
+  assert.ok(evalResult.overallScore >= 800);
+  assert.equal(evalResult.isAcceptable, true);
+  assert.equal(evalResult.riskTier, 'TRUSTED_GRADE_AAA');
+  assert.equal(evalResult.breakdown.cryptoSuiteScore, 250);
+  assert.equal(evalResult.breakdown.revocationFreshnessScore, 200);
+
+  // Issue risk receipt
+  const receipt = TrustScoreEngine.issueRiskReceipt(credential, evalResult, evaluatorKp);
+  assert.equal(receipt.type, 'DocuTrustRiskReceipt2026');
+  assert.equal(receipt.overallScore, evalResult.overallScore);
+
+  // Verify receipt
+  const verifyAudit = TrustScoreEngine.verifyRiskReceipt(receipt, evaluatorKp.publicKeyHex);
+  assert.equal(verifyAudit.valid, true);
+  assert.equal(verifyAudit.errors.length, 0);
+
+  // Tampered receipt check
+  const tamperedReceipt = { ...receipt, overallScore: 999 };
+  const tamperedAudit = TrustScoreEngine.verifyRiskReceipt(tamperedReceipt, evaluatorKp.publicKeyHex);
+  assert.equal(tamperedAudit.valid, false);
+});
+
+// 84. Verifiable Off-Chain Computation & Execution Trace Engine
+test('84. VerifiableComputeEngine: execute deterministic program, emit trace, and verifyReceipt', () => {
+  const proverKp = generateKeyPair();
+
+  const program = {
+    programId: 'CreditRiskScoreEvaluationPipeline',
+    version: '1.0.0',
+    instructions: [
+      { op: 'WEIGHTED_SUM', args: [['$income', '$creditHistoryYears', '$collateralValue'], [0.4, 0.3, 0.3]], outputVar: 'baseWeightedScore' },
+      { op: 'THRESHOLD_CHECK', args: ['$baseWeightedScore', 50000], outputVar: 'isApproved' },
+      { op: 'RANGE_CHECK', args: ['$debtToIncomeRatio', 0, 0.45], outputVar: 'isDTICompliant' }
+    ]
+  };
+
+  const inputs = {
+    income: 85000,
+    creditHistoryYears: 10,
+    collateralValue: 120000,
+    debtToIncomeRatio: 0.28
+  };
+
+  const { finalOutputs, trace, receipt } = VerifiableComputeEngine.execute(program, inputs, proverKp);
+  assert.equal(finalOutputs.isApproved, true);
+  assert.equal(finalOutputs.isDTICompliant, true);
+  assert.equal(trace.length, 3);
+  assert.ok(receipt);
+
+  // Verify compute receipt
+  const verifyResult = VerifiableComputeEngine.verifyReceipt(receipt, proverKp.publicKeyHex, inputs);
+  assert.equal(verifyResult.valid, true);
+  assert.equal(verifyResult.errors.length, 0);
+
+  // Input mismatch check
+  const badInputs = { ...inputs, income: 10000 };
+  const badVerify = VerifiableComputeEngine.verifyReceipt(receipt, proverKp.publicKeyHex, badInputs);
+  assert.equal(badVerify.valid, false);
+});
+
+// 85. Ephemeral Forward-Secret Vanish Credential Engine
+test('85. VanishCredEngine: issueToken, verifyAndDecrypt, and epoch expiration check', () => {
+  const issuerKp = generateKeyPair();
+  const subjectDid = 'did:key:z6MkuSubjectEphemeral';
+
+  const claims = {
+    oneTimePasscode: 'OTP-883921',
+    accessPrivilege: 'TEMPORARY_DATA_ROOM_ACCESS'
+  };
+
+  // Issue 5-minute ephemeral vanish token
+  const { token, ephemeralKey } = VanishCredEngine.issueToken(claims, issuerKp, subjectDid, { ttlSeconds: 300 });
+  assert.equal(token.type, 'DocuTrustVanishToken2026');
+  assert.ok(token.timeLockCommitment);
+
+  // Decrypt while active
+  const activeResult = VanishCredEngine.verifyAndDecrypt(token, ephemeralKey, issuerKp.publicKeyHex);
+  assert.equal(activeResult.valid, true);
+  assert.equal(activeResult.isExpired, false);
+  assert.deepEqual(activeResult.claims, claims);
+  assert.ok(activeResult.remainingSeconds > 0);
+
+  // Expired epoch check
+  const futureEpoch = token.epochExpires + 100;
+  const expiredResult = VanishCredEngine.verifyAndDecrypt(token, ephemeralKey, issuerKp.publicKeyHex, futureEpoch);
+  assert.equal(expiredResult.valid, false);
+  assert.equal(expiredResult.isExpired, true);
+  assert.equal(expiredResult.remainingSeconds, 0);
+});
+
+// 86. Cross-Ledger Sovereign Registry StateSync & Delta Proof Engine
+test('86. StateSyncEngine: computeStateRoot, generateDeltaProof, and applyAndVerifyDelta', () => {
+  const relayerKp = generateKeyPair();
+
+  const baseState = {
+    'did:key:z6MkuIssuer1': {
+      entityDid: 'did:key:z6MkuIssuer1',
+      status: 'ACTIVE',
+      accreditationLevel: 2,
+      updatedEpoch: 1700000000,
+      metadataHash: sha256Hex('Issuer 1 Metadata')
+    },
+    'did:key:z6MkuIssuer2': {
+      entityDid: 'did:key:z6MkuIssuer2',
+      status: 'ACTIVE',
+      accreditationLevel: 1,
+      updatedEpoch: 1700000000,
+      metadataHash: sha256Hex('Issuer 2 Metadata')
+    }
+  };
+
+  const targetState = {
+    ...baseState,
+    'did:key:z6MkuIssuer2': {
+      entityDid: 'did:key:z6MkuIssuer2',
+      status: 'REVOKED',
+      accreditationLevel: 0,
+      updatedEpoch: 1700005000,
+      metadataHash: sha256Hex('Issuer 2 Revoked')
+    },
+    'did:key:z6MkuIssuer3': {
+      entityDid: 'did:key:z6MkuIssuer3',
+      status: 'ACTIVE',
+      accreditationLevel: 3,
+      updatedEpoch: 1700005000,
+      metadataHash: sha256Hex('Issuer 3 Sovereign Root')
+    }
+  };
+
+  const deltaProof = StateSyncEngine.generateDeltaProof(baseState, targetState, relayerKp, {
+    source: 'EVM:Mainnet:0xRegistry',
+    destination: 'Mesh:PeerNode:Alpha'
+  });
+
+  assert.equal(deltaProof.type, 'DocuTrustDeltaProof2026');
+  assert.equal(deltaProof.deltaCount, 2);
+
+  // Apply and verify delta proof against local base state
+  const syncResult = StateSyncEngine.applyAndVerifyDelta(baseState, deltaProof, relayerKp.publicKeyHex);
+  assert.equal(syncResult.valid, true);
+  assert.equal(syncResult.errors.length, 0);
+  assert.equal(syncResult.newState['did:key:z6MkuIssuer2'].status, 'REVOKED');
+  assert.equal(syncResult.newState['did:key:z6MkuIssuer3'].accreditationLevel, 3);
+});
+
+// 87. Master Universal EVM Solidity Smart Contract Verifier
+test('87. SolidityEngine: generateUniversalVerifierContract output verification', () => {
+  const universalSol = generateUniversalVerifierContract({
+    contractName: 'DocuTrustProductionUniversalVerifier',
+    solidityVersion: '^0.8.20'
+  });
+
+  assert.ok(universalSol.includes('contract DocuTrustProductionUniversalVerifier'));
+  assert.ok(universalSol.includes('verifyMerkleProof'));
+  assert.ok(universalSol.includes('verifySMTProof'));
+  assert.ok(universalSol.includes('verifyBridgeAttestation'));
+  assert.ok(universalSol.includes('verifyGroth16Proof'));
+  assert.ok(universalSol.includes('checkBitstringStatus'));
+});
+
 
 
 

@@ -1627,7 +1627,111 @@ export class DocuTrustClient {
   public async generateSolidityGroth16Verifier(options?: { contractName?: string; solidityVersion?: string }): Promise<{ success: boolean; contractCode: string }> {
     return this.request('/solidity/export-groth16', 'POST', options || {});
   }
+
+  // ========================================================
+  // v12.0.0 Autonomous Sovereign Trust Mesh & Verifiable Compute Client Methods
+  // ========================================================
+
+  /**
+   * Quantitatively evaluates credential trust score (0-1000) and optionally signs a tamper-proof Risk Receipt.
+   */
+  public async evaluateTrustScore(
+    credential: Record<string, any>,
+    evaluatorKeyPair?: any,
+    options?: { minimumAcceptableScore?: number; issuerAccreditationTiers?: Record<string, number> }
+  ): Promise<{ success: boolean; evaluation: any; receipt?: any }> {
+    return this.request('/trustscore/evaluate', 'POST', { credential, evaluatorKeyPair, options });
+  }
+
+  /**
+   * Cryptographically verifies a signed DocuTrustRiskReceipt2026.
+   */
+  public async verifyTrustScoreReceipt(
+    receipt: any,
+    evaluatorPublicKey: string
+  ): Promise<{ success: boolean; valid: boolean; overallScore: number; riskTier: string; isAcceptable: boolean; errors: string[] }> {
+    return this.request('/trustscore/verify', 'POST', { receipt, evaluatorPublicKey });
+  }
+
+  /**
+   * Executes a deterministic credential compute program and generates a verifiable execution trace and receipt.
+   */
+  public async executeVerifiableCompute(
+    program: any,
+    inputs: Record<string, any>,
+    proverKeyPair: any
+  ): Promise<{ success: boolean; finalOutputs: Record<string, any>; trace: any[]; receipt: any }> {
+    return this.request('/compute/execute', 'POST', { program, inputs, proverKeyPair });
+  }
+
+  /**
+   * Verifies an off-chain compute execution receipt and cryptographic state trace root.
+   */
+  public async verifyComputeReceipt(
+    receipt: any,
+    proverPublicKey: string,
+    inputs?: Record<string, any>
+  ): Promise<{ success: boolean; valid: boolean; errors: string[] }> {
+    return this.request('/compute/verify', 'POST', { receipt, proverPublicKey, inputs });
+  }
+
+  /**
+   * Issues an ephemeral forward-secret token that self-expires and decays past its TTL window.
+   */
+  public async issueVanishToken(
+    claims: Record<string, any>,
+    issuerKeyPair: any,
+    subjectDid: string,
+    options?: { ttlSeconds?: number; epochWindowSeconds?: number }
+  ): Promise<{ success: boolean; token: any; ephemeralKey: string; expiresAtEpoch: number }> {
+    return this.request('/vanish/issue', 'POST', { claims, issuerKeyPair, subjectDid, options });
+  }
+
+  /**
+   * Verifies and decrypts an active ephemeral vanish token.
+   */
+  public async verifyVanishToken(
+    token: any,
+    ephemeralKey: string,
+    issuerPublicKey: string,
+    currentEpoch?: number
+  ): Promise<{ success: boolean; valid: boolean; claims?: Record<string, any>; errors?: string[]; error?: string }> {
+    return this.request('/vanish/verify', 'POST', { token, ephemeralKey, issuerPublicKey, currentEpoch });
+  }
+
+  /**
+   * Computes a compact O(Δ) cryptographic delta proof between registry state replicas.
+   */
+  public async generateStateDelta(
+    baseState: Record<string, any>,
+    targetState: Record<string, any>,
+    relayerKeyPair: any,
+    options?: { source?: string; destination?: string }
+  ): Promise<{ success: boolean; deltaProof: any }> {
+    return this.request('/statesync/delta', 'POST', { baseState, targetState, relayerKeyPair, options });
+  }
+
+  /**
+   * Reconciles and verifies a cross-ledger delta proof against an initial base state.
+   */
+  public async verifyStateDelta(
+    baseState: Record<string, any>,
+    deltaProof: any,
+    relayerPublicKey: string
+  ): Promise<{ success: boolean; valid: boolean; reconciledTargetRoot?: string; deltaAppliedCount?: number; errors: string[] }> {
+    return this.request('/statesync/verify', 'POST', { baseState, deltaProof, relayerPublicKey });
+  }
+
+  /**
+   * Generates production-ready DocuTrustUniversalVerifier.sol EVM smart contract.
+   */
+  public async generateUniversalSolidityVerifier(
+    options?: { contractName?: string; solidityVersion?: string }
+  ): Promise<{ success: boolean; soliditySource: string }> {
+    return this.request('/solidity/export-universal', 'POST', options || {});
+  }
 }
+
 
 
 
