@@ -128,7 +128,12 @@ const {
   ProactiveSecretSharingEngine,
   VectorCommitmentEngine,
   PQBlindSignatureEngine,
-  AgentContractEngine
+  AgentContractEngine,
+  // v20.0.0 Engines
+  ZKRollupEngine,
+  MemoryQuarantineEngine,
+  PQAbeEngine,
+  AgentAuctionEngine
 } = require('@docutrust/core');
 
 const PORT = process.env.PORT || 4000;
@@ -4484,6 +4489,234 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // ========================================================
+    // 78. ZK-Rollup & Batch State Compression Endpoints (v20.0.0)
+    // ========================================================
+    if (pathname === '/api/v1/rollup/batch' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { initialAccounts, transactions, blockNumber } = body;
+      if (!transactions || !Array.isArray(transactions)) {
+        return jsonResponse(400, { error: 'Missing transactions array.' });
+      }
+      try {
+        const batch = ZKRollupEngine.createRollupBatch(initialAccounts || [], transactions, blockNumber || 1);
+        return jsonResponse(200, { success: true, batch });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/rollup/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { batch } = body;
+      if (!batch) {
+        return jsonResponse(400, { error: 'Missing rollup batch.' });
+      }
+      try {
+        const result = ZKRollupEngine.verifyRollupBatch(batch);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ========================================================
+    // 79. Verifiable Memory Quarantine Endpoints (v20.0.0)
+    // ========================================================
+    if (pathname === '/api/v1/quarantine/detect' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { nodes, groundTruthBaselines, threshold } = body;
+      if (!nodes || !Array.isArray(nodes)) {
+        return jsonResponse(400, { error: 'Missing nodes array.' });
+      }
+      try {
+        const analysis = MemoryQuarantineEngine.detectPoisoning(nodes, groundTruthBaselines || [], threshold || 0.65);
+        return jsonResponse(200, { success: true, analysis });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/quarantine/certificate' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { agentDid, quarantinedNodes, boundaryNodeIds, issuerSecretKeyHex } = body;
+      if (!agentDid || !quarantinedNodes || !issuerSecretKeyHex) {
+        return jsonResponse(400, { error: 'Missing agentDid, quarantinedNodes, or issuerSecretKeyHex.' });
+      }
+      try {
+        const certificate = MemoryQuarantineEngine.issueQuarantineCertificate(
+          agentDid,
+          quarantinedNodes,
+          boundaryNodeIds || [],
+          issuerSecretKeyHex
+        );
+        return jsonResponse(200, { success: true, certificate });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/quarantine/rollback' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { fullGraph, quarantineCert, cleanNodes } = body;
+      if (!fullGraph || !quarantineCert || !cleanNodes) {
+        return jsonResponse(400, { error: 'Missing fullGraph, quarantineCert, or cleanNodes.' });
+      }
+      try {
+        const proof = MemoryQuarantineEngine.generateRollbackProof(fullGraph, quarantineCert, cleanNodes);
+        const verification = MemoryQuarantineEngine.verifyRollbackProof(proof, quarantineCert, cleanNodes);
+        return jsonResponse(200, { success: true, proof, verification });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ========================================================
+    // 80. Multi-Authority Post-Quantum ABE Endpoints (v20.0.0)
+    // ========================================================
+    if (pathname === '/api/v1/pqabe/setup' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { authorityId, authorityName } = body;
+      if (!authorityId || !authorityName) {
+        return jsonResponse(400, { error: 'Missing authorityId or authorityName.' });
+      }
+      try {
+        const authority = PQAbeEngine.setupAuthority(authorityId, authorityName);
+        return jsonResponse(200, { success: true, authority });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/pqabe/issue' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { authority, userDid, attribute, expirationEpoch } = body;
+      if (!authority || !userDid || !attribute) {
+        return jsonResponse(400, { error: 'Missing authority, userDid, or attribute.' });
+      }
+      try {
+        const token = PQAbeEngine.issueAttributeToken(authority, userDid, attribute, expirationEpoch);
+        return jsonResponse(200, { success: true, token });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/pqabe/encrypt' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { payload, policyExpression, authorities } = body;
+      if (!payload || !policyExpression || !authorities) {
+        return jsonResponse(400, { error: 'Missing payload, policyExpression, or authorities.' });
+      }
+      try {
+        const ciphertext = PQAbeEngine.encrypt(payload, policyExpression, authorities);
+        return jsonResponse(200, { success: true, ciphertext });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/pqabe/decrypt' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { ciphertext, userTokens, userDid } = body;
+      if (!ciphertext || !userTokens || !userDid) {
+        return jsonResponse(400, { error: 'Missing ciphertext, userTokens, or userDid.' });
+      }
+      try {
+        const result = PQAbeEngine.decrypt(ciphertext, userTokens, userDid);
+        return jsonResponse(200, { success: result.success, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ========================================================
+    // 81. Decentralized Agent Capability Auction Endpoints (v20.0.0)
+    // ========================================================
+    if (pathname === '/api/v1/agent-auction/create' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { auctioneerDid, taskSpec } = body;
+      if (!auctioneerDid || !taskSpec) {
+        return jsonResponse(400, { error: 'Missing auctioneerDid or taskSpec.' });
+      }
+      try {
+        const auction = AgentAuctionEngine.createAuction(auctioneerDid, taskSpec);
+        return jsonResponse(200, { success: true, auction });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/agent-auction/commit' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { auction, agentDid, bidAmount, stakeAmount, salt } = body;
+      if (!auction || !agentDid || bidAmount === undefined || stakeAmount === undefined || !salt) {
+        return jsonResponse(400, { error: 'Missing auction, agentDid, bidAmount, stakeAmount, or salt.' });
+      }
+      try {
+        const result = AgentAuctionEngine.commitBid(auction, agentDid, bidAmount, stakeAmount, salt);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/agent-auction/reveal' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { auction, commitmentId, agentDid, bidAmount, stakeAmount, salt, qualityMetric } = body;
+      if (!auction || !commitmentId || !agentDid || bidAmount === undefined || stakeAmount === undefined || !salt) {
+        return jsonResponse(400, { error: 'Missing auction, commitmentId, agentDid, bidAmount, stakeAmount, or salt.' });
+      }
+      try {
+        const result = AgentAuctionEngine.revealBid(auction, commitmentId, agentDid, bidAmount, stakeAmount, salt, qualityMetric);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/agent-auction/clear' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { auction } = body;
+      if (!auction) {
+        return jsonResponse(400, { error: 'Missing auction payload.' });
+      }
+      try {
+        const result = AgentAuctionEngine.clearAuction(auction);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/agent-auction/settle' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { auction, clearingResult, executionReceiptId } = body;
+      if (!auction || !clearingResult || !executionReceiptId) {
+        return jsonResponse(400, { error: 'Missing auction, clearingResult, or executionReceiptId.' });
+      }
+      try {
+        const result = AgentAuctionEngine.settleAuction(auction, clearingResult, executionReceiptId);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/agent-auction/slash' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { auction, disputeProof } = body;
+      if (!auction || !disputeProof) {
+        return jsonResponse(400, { error: 'Missing auction or disputeProof.' });
+      }
+      try {
+        const result = AgentAuctionEngine.slashAuction(auction, disputeProof);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
     // Default 404
     jsonResponse(404, { error: 'Route not found' });
   } catch (err) {
@@ -4493,7 +4726,7 @@ const server = http.createServer(async (req, res) => {
 
 if (require.main === module) {
   server.listen(PORT, () => {
-    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v19.0.0 running on http://localhost:${PORT}`);
+    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v20.0.0 running on http://localhost:${PORT}`);
   });
 }
 

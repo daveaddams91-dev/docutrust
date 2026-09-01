@@ -63,6 +63,10 @@ import PSSStudio from './components/PSSStudio.jsx';
 import VectorCommitmentStudio from './components/VectorCommitmentStudio.jsx';
 import PQBlindStudio from './components/PQBlindStudio.jsx';
 import AgentContractStudio from './components/AgentContractStudio.jsx';
+import ZKRollupStudio from './components/ZKRollupStudio.jsx';
+import MemoryQuarantineStudio from './components/MemoryQuarantineStudio.jsx';
+import PQAbeStudio from './components/PQAbeStudio.jsx';
+import AgentAuctionStudio from './components/AgentAuctionStudio.jsx';
 import Footer from './components/Footer.jsx';
 
 export default function App() {
@@ -80,6 +84,10 @@ export default function App() {
 
       <main className="flex-1">
         {activeTab === 'hero' && <HeroSection setActiveTab={setActiveTab} />}
+        {activeTab === 'zk-rollup-studio' && <ZKRollupStudio />}
+        {activeTab === 'quarantine-studio' && <MemoryQuarantineStudio />}
+        {activeTab === 'pqabe-studio' && <PQAbeStudio />}
+        {activeTab === 'agent-auction-studio' && <AgentAuctionStudio />}
         {activeTab === 'pss-studio' && <PSSStudio />}
         {activeTab === 'vector-studio' && <VectorCommitmentStudio />}
         {activeTab === 'pqblind-studio' && <PQBlindStudio />}

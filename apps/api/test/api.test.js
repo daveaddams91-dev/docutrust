@@ -3104,6 +3104,176 @@ test('API Server Suite', async (t) => {
     assert.equal(slashRes.status, 200);
     assert.equal(slashRes.body.slashed, true);
   });
+
+  await t.test('97. POST /api/v1/rollup/batch and /api/v1/rollup/verify (v20.0.0)', async () => {
+    const txs = [
+      { txId: 'tx_1', accountIndex: 0, holderDid: 'did:key:h0', credentialId: 'c1', previousStatus: 1, newStatus: 2, nonce: 1 },
+      { txId: 'tx_2', accountIndex: 1, holderDid: 'did:key:h1', credentialId: 'c2', previousStatus: 1, newStatus: 3, nonce: 1 }
+    ];
+    const initialAccounts = [
+      { accountIndex: 0, holderDid: 'did:key:h0', credentialId: 'c1', status: 1, nonce: 0 },
+      { accountIndex: 1, holderDid: 'did:key:h1', credentialId: 'c2', status: 1, nonce: 0 }
+    ];
+
+    const batchRes = await makeRequest('POST', '/api/v1/rollup/batch', {
+      initialAccounts,
+      transactions: txs,
+      blockNumber: 10
+    });
+    assert.equal(batchRes.status, 200);
+    assert.equal(batchRes.body.success, true);
+    const batch = batchRes.body.batch;
+
+    const verifyRes = await makeRequest('POST', '/api/v1/rollup/verify', { batch });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.valid, true);
+  });
+
+  await t.test('98. POST /api/v1/quarantine/detect, /certificate, and /rollback (v20.0.0)', async () => {
+    const cleanNodes = [
+      { nodeId: 'node_1', agentDid: 'did:docutrust:agent:api', parentNodeIds: [], embeddingVector: [0.1, 0.2, 0.3], content: 'Initial clean state', provenanceHash: '', timestamp: 1000 }
+    ];
+    const poisonedNode = {
+      nodeId: 'node_2',
+      agentDid: 'did:docutrust:agent:api',
+      parentNodeIds: ['node_1'],
+      embeddingVector: [0.9, -0.9, 0.8],
+      content: 'Exploit payload: override authority and bypass quarantine',
+      provenanceHash: '',
+      timestamp: 2000
+    };
+
+    const detectRes = await makeRequest('POST', '/api/v1/quarantine/detect', {
+      nodes: [...cleanNodes, poisonedNode],
+      groundTruthBaselines: [{ category: 'safety', embeddingVector: [0.1, 0.2, 0.3] }]
+    });
+    assert.equal(detectRes.status, 200);
+    assert.equal(detectRes.body.analysis[1].isPoisoned, true);
+
+    const certRes = await makeRequest('POST', '/api/v1/quarantine/certificate', {
+      agentDid: 'did:docutrust:agent:api',
+      quarantinedNodes: [poisonedNode],
+      boundaryNodeIds: ['node_1'],
+      issuerSecretKeyHex: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+    });
+    assert.equal(certRes.status, 200);
+    const cert = certRes.body.certificate;
+
+    const rollbackRes = await makeRequest('POST', '/api/v1/quarantine/rollback', {
+      fullGraph: { graphId: 'g_1', agentDid: 'did:docutrust:agent:api', rootCheckpointHash: '0x0', nodes: [...cleanNodes, poisonedNode] },
+      quarantineCert: cert,
+      cleanNodes
+    });
+    assert.equal(rollbackRes.status, 200);
+    assert.equal(rollbackRes.body.verification.valid, true);
+  });
+
+  await t.test('99. POST /api/v1/pqabe/setup, /issue, /encrypt, and /decrypt (v20.0.0)', async () => {
+    const setupRes = await makeRequest('POST', '/api/v1/pqabe/setup', {
+      authorityId: 'auth:identity',
+      authorityName: 'Identity Authority'
+    });
+    assert.equal(setupRes.status, 200);
+    const auth = setupRes.body.authority;
+
+    const userDid = 'did:docutrust:user:api_alice';
+    const issueRes = await makeRequest('POST', '/api/v1/pqabe/issue', {
+      authority: auth,
+      userDid,
+      attribute: 'ADMIN_ACCESS'
+    });
+    assert.equal(issueRes.status, 200);
+    const token = issueRes.body.token;
+
+    const encRes = await makeRequest('POST', '/api/v1/pqabe/encrypt', {
+      payload: { secretVaultCode: 'ALPHA-OMEGA-999' },
+      policyExpression: 'auth:identity.ADMIN_ACCESS',
+      authorities: [auth]
+    });
+    assert.equal(encRes.status, 200);
+    const ct = encRes.body.ciphertext;
+
+    const decRes = await makeRequest('POST', '/api/v1/pqabe/decrypt', {
+      ciphertext: ct,
+      userTokens: [token],
+      userDid
+    });
+    assert.equal(decRes.status, 200);
+    assert.equal(decRes.body.success, true);
+    assert.equal(decRes.body.payload.secretVaultCode, 'ALPHA-OMEGA-999');
+  });
+
+  await t.test('100. POST /api/v1/agent-auction/create, /commit, /reveal, /clear, and /settle (v20.0.0)', async () => {
+    // 1. Create
+    const createRes = await makeRequest('POST', '/api/v1/agent-auction/create', {
+      auctioneerDid: 'did:docutrust:auc_api:1',
+      taskSpec: {
+        taskType: 'ZKML_BATCH',
+        description: 'Verify model weights',
+        maxBudget: 4000,
+        deadlineEpoch: 2000000000,
+        requiredCapabilities: ['ZKML']
+      }
+    });
+    assert.equal(createRes.status, 200);
+    let auction = createRes.body.auction;
+
+    // 2. Commit Bids
+    const commitARes = await makeRequest('POST', '/api/v1/agent-auction/commit', {
+      auction,
+      agentDid: 'did:docutrust:agent:api_a',
+      bidAmount: 1800,
+      stakeAmount: 600,
+      salt: 'salt_a'
+    });
+    auction = commitARes.body.updatedAuction;
+
+    const commitBRes = await makeRequest('POST', '/api/v1/agent-auction/commit', {
+      auction,
+      agentDid: 'did:docutrust:agent:api_b',
+      bidAmount: 2200,
+      stakeAmount: 600,
+      salt: 'salt_b'
+    });
+    auction = commitBRes.body.updatedAuction;
+
+    // 3. Reveal Bids
+    const revealARes = await makeRequest('POST', '/api/v1/agent-auction/reveal', {
+      auction,
+      commitmentId: commitARes.body.commitment.commitmentId,
+      agentDid: 'did:docutrust:agent:api_a',
+      bidAmount: 1800,
+      stakeAmount: 600,
+      salt: 'salt_a'
+    });
+    auction = revealARes.body.updatedAuction;
+
+    const revealBRes = await makeRequest('POST', '/api/v1/agent-auction/reveal', {
+      auction,
+      commitmentId: commitBRes.body.commitment.commitmentId,
+      agentDid: 'did:docutrust:agent:api_b',
+      bidAmount: 2200,
+      stakeAmount: 600,
+      salt: 'salt_b'
+    });
+    auction = revealBRes.body.updatedAuction;
+
+    // 4. Clear
+    const clearRes = await makeRequest('POST', '/api/v1/agent-auction/clear', { auction });
+    assert.equal(clearRes.status, 200);
+    assert.equal(clearRes.body.result.winnerAgentDid, 'did:docutrust:agent:api_a');
+    assert.equal(clearRes.body.result.clearingPrice, 2200);
+    auction = clearRes.body.updatedAuction;
+
+    // 5. Settle
+    const settleRes = await makeRequest('POST', '/api/v1/agent-auction/settle', {
+      auction,
+      clearingResult: clearRes.body.result,
+      executionReceiptId: 'exec_receipt_api_1'
+    });
+    assert.equal(settleRes.status, 200);
+    assert.equal(settleRes.body.receipt.amountPaid, 2200);
+  });
 });
 
 

@@ -193,7 +193,12 @@ const {
   ProactiveSecretSharingEngine,
   VectorCommitmentEngine,
   PQBlindSignatureEngine,
-  AgentContractEngine
+  AgentContractEngine,
+  // v20.0.0 Engines
+  ZKRollupEngine,
+  MemoryQuarantineEngine,
+  PQAbeEngine,
+  AgentAuctionEngine
 } = require('../dist/index.js');
 
 // 1. Cryptography Tests
@@ -4525,6 +4530,210 @@ test('119. AgentContractEngine: task escrow contracts, trace commitments, fraud-
   const slashRes = AgentContractEngine.verifyAndSlash(updatedContract, receipt, dispute);
   assert.equal(slashRes.slashed, true);
   assert.equal(slashRes.updatedContract.status, 'SLASHED');
+});
+
+// 120. ZK-Rollup & Batch State Compression Engine (v20.0.0)
+test('120. ZKRollupEngine: state transitions, binary DA compression, validium STARK proofs, and EVM calldata generation', () => {
+  const initialAccounts = [
+    { accountIndex: 0, holderDid: 'did:docutrust:holder0', credentialId: 'cred_001', status: 1, nonce: 0 },
+    { accountIndex: 1, holderDid: 'did:docutrust:holder1', credentialId: 'cred_002', status: 1, nonce: 0 },
+    { accountIndex: 2, holderDid: 'did:docutrust:holder2', credentialId: 'cred_003', status: 2, nonce: 0 }
+  ];
+
+  const transactions = [
+    { txId: 'tx_01', accountIndex: 0, holderDid: 'did:docutrust:holder0', credentialId: 'cred_001', previousStatus: 1, newStatus: 3, nonce: 1 },
+    { txId: 'tx_02', accountIndex: 1, holderDid: 'did:docutrust:holder1', credentialId: 'cred_002', previousStatus: 1, newStatus: 2, nonce: 1 },
+    { txId: 'tx_03', accountIndex: 2, holderDid: 'did:docutrust:holder2', credentialId: 'cred_003', previousStatus: 2, newStatus: 1, nonce: 1 }
+  ];
+
+  const batch = ZKRollupEngine.createRollupBatch(initialAccounts, transactions, 1);
+  assert.equal(batch.transactionCount, 3);
+  assert.ok(batch.previousStateRoot.length === 64);
+  assert.ok(batch.postStateRoot.length === 64);
+  assert.notEqual(batch.previousStateRoot, batch.postStateRoot);
+  assert.ok(batch.evmCalldataHex.startsWith('0x'));
+
+  const ver = ZKRollupEngine.verifyRollupBatch(batch);
+  assert.equal(ver.valid, true);
+
+  const decompressed = ZKRollupEngine.decompressStateDiffs(batch.compressedDataAvailabilityBase64);
+  assert.equal(decompressed.length, 3);
+  assert.equal(decompressed[0].accountIndex, 0);
+  assert.equal(decompressed[0].newStatus, 3);
+});
+
+// 121. Verifiable Agent Memory Poisoning & Knowledge Quarantine Engine (v20.0.0)
+test('121. MemoryQuarantineEngine: poisoning detection, semantic drift calculation, quarantine certificate issuance, and verifiable rollback proof', () => {
+  const baselines = [
+    { category: 'core_protocol', embeddingVector: [0.1, 0.2, 0.3, 0.4, 0.5] }
+  ];
+
+  const cleanNodes = [
+    {
+      nodeId: 'mem_01',
+      agentDid: 'did:docutrust:agent:007',
+      parentNodeIds: [],
+      embeddingVector: [0.11, 0.19, 0.31, 0.39, 0.51],
+      content: 'System initialized in sovereign secure mode.',
+      provenanceHash: '',
+      timestamp: 1700000000
+    },
+    {
+      nodeId: 'mem_02',
+      agentDid: 'did:docutrust:agent:007',
+      parentNodeIds: ['mem_01'],
+      embeddingVector: [0.12, 0.21, 0.29, 0.42, 0.49],
+      content: 'Verified smart contract escrow conditions.',
+      provenanceHash: '',
+      timestamp: 1700000100
+    }
+  ];
+  cleanNodes.forEach(n => { n.provenanceHash = MemoryQuarantineEngine.computeNodeHash(n); });
+
+  const poisonedNode = {
+    nodeId: 'mem_03_infected',
+    agentDid: 'did:docutrust:agent:007',
+    parentNodeIds: ['mem_02'],
+    embeddingVector: [0.9, -0.8, 0.7, -0.6, 0.5], // Severe drift
+    content: 'Attack payload: override authority and bypass quarantine policies.',
+    provenanceHash: '',
+    timestamp: 1700000200
+  };
+  poisonedNode.provenanceHash = MemoryQuarantineEngine.computeNodeHash(poisonedNode);
+
+  const fullNodes = [...cleanNodes, poisonedNode];
+  const graph = {
+    graphId: 'graph_001',
+    agentDid: 'did:docutrust:agent:007',
+    rootCheckpointHash: MemoryQuarantineEngine.computeGraphRoot(cleanNodes),
+    nodes: fullNodes
+  };
+
+  // Detect poisoning
+  const analysis = MemoryQuarantineEngine.detectPoisoning(fullNodes, baselines, 0.5);
+  assert.equal(analysis[0].isPoisoned, false);
+  assert.equal(analysis[1].isPoisoned, false);
+  assert.equal(analysis[2].isPoisoned, true);
+  assert.ok(analysis[2].poisonScore > 0.6);
+
+  // Issue quarantine certificate
+  const cert = MemoryQuarantineEngine.issueQuarantineCertificate(
+    graph.agentDid,
+    [poisonedNode],
+    ['mem_02'],
+    '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+  );
+  assert.equal(cert.quarantinedNodeIds.length, 1);
+
+  // Generate rollback proof
+  const rollbackProof = MemoryQuarantineEngine.generateRollbackProof(graph, cert, cleanNodes);
+  assert.equal(rollbackProof.prunedNodeCount, 1);
+  assert.equal(rollbackProof.preservedNodeCount, 2);
+
+  const ver = MemoryQuarantineEngine.verifyRollbackProof(rollbackProof, cert, cleanNodes);
+  assert.equal(ver.valid, true);
+});
+
+// 122. Multi-Authority Post-Quantum Attribute-Based Encryption (MA-PQ-ABE) (v20.0.0)
+test('122. PQAbeEngine: decentralized authority setup, token issuance, multi-authority boolean policy parsing, encryption, and decryption', () => {
+  const authId = PQAbeEngine.setupAuthority('auth:identity', 'Identity Authority');
+  const authSec = PQAbeEngine.setupAuthority('auth:sec', 'Security Clearance Authority');
+  const authRoot = PQAbeEngine.setupAuthority('auth:root', 'Root Administration Authority');
+
+  const userDid = 'did:docutrust:user:alice';
+
+  // Issue tokens
+  const token1 = PQAbeEngine.issueAttributeToken(authId, userDid, 'VERIFIED_EMPLOYEE');
+  const token2 = PQAbeEngine.issueAttributeToken(authSec, userDid, 'CLEARANCE_L5');
+  const userTokens = [token1, token2];
+
+  const confidentialPayload = {
+    project: 'Project Quantum Fortress',
+    budgetUsd: 15000000,
+    coordinates: '37.7749,-122.4194'
+  };
+
+  const policy = '(auth:identity.VERIFIED_EMPLOYEE AND auth:sec.CLEARANCE_L5) OR auth:root.SYS_ADMIN';
+
+  // Encrypt
+  const ciphertext = PQAbeEngine.encrypt(confidentialPayload, policy, [authId, authSec, authRoot]);
+  assert.ok(ciphertext.ciphertextId.startsWith('pq_abe_ct_'));
+  assert.equal(ciphertext.authoritiesUsed.length, 3);
+
+  // Decrypt with valid satisfying tokens
+  const decSuccess = PQAbeEngine.decrypt(ciphertext, userTokens, userDid);
+  assert.equal(decSuccess.success, true);
+  assert.deepEqual(decSuccess.payload, confidentialPayload);
+
+  // Decrypt with insufficient tokens fails gracefully
+  const decFail = PQAbeEngine.decrypt(ciphertext, [token1], userDid);
+  assert.equal(decFail.success, false);
+});
+
+// 123. Decentralized AI Agent Capability Auction & Settlement Protocol (v20.0.0)
+test('123. AgentAuctionEngine: sealed-bid commit-reveal, second-price Vickrey procurement clearing, escrow settlement, and dispute slashing', () => {
+  const taskSpec = {
+    taskType: 'ZK_SNARK_PROVER_BATCH',
+    description: 'Generate Groth16 recursive proof for 1000 transactions',
+    maxBudget: 2500,
+    deadlineEpoch: Math.floor(Date.now() / 1000) + 7200,
+    requiredCapabilities: ['GROTH16', 'BN254', 'GPU_ACCELERATED']
+  };
+
+  let auction = AgentAuctionEngine.createAuction('did:docutrust:auctioneer:01', taskSpec);
+  assert.equal(auction.status, 'OPEN');
+
+  // Three agents submit sealed commitments
+  const saltA = 'salt_alpha_99';
+  const saltB = 'salt_beta_88';
+  const saltC = 'salt_gamma_77';
+
+  const resA = AgentAuctionEngine.commitBid(auction, 'did:docutrust:agent:alpha', 1200, 500, saltA);
+  auction = resA.updatedAuction;
+
+  const resB = AgentAuctionEngine.commitBid(auction, 'did:docutrust:agent:beta', 1500, 500, saltB);
+  auction = resB.updatedAuction;
+
+  const resC = AgentAuctionEngine.commitBid(auction, 'did:docutrust:agent:gamma', 1800, 500, saltC);
+  auction = resC.updatedAuction;
+
+  assert.equal(auction.commitments.length, 3);
+
+  // Reveal bids
+  auction = AgentAuctionEngine.revealBid(auction, resA.commitment.commitmentId, 'did:docutrust:agent:alpha', 1200, 500, saltA).updatedAuction;
+  auction = AgentAuctionEngine.revealBid(auction, resB.commitment.commitmentId, 'did:docutrust:agent:beta', 1500, 500, saltB).updatedAuction;
+  auction = AgentAuctionEngine.revealBid(auction, resC.commitment.commitmentId, 'did:docutrust:agent:gamma', 1800, 500, saltC).updatedAuction;
+
+  assert.equal(auction.revealedBids.length, 3);
+
+  // Clear auction (Vickrey: lowest bidder wins at 2nd lowest price: Alpha wins at 1500)
+  const { updatedAuction: clearedAuction, result: clearingResult } = AgentAuctionEngine.clearAuction(auction);
+  assert.equal(clearingResult.winnerAgentDid, 'did:docutrust:agent:alpha');
+  assert.equal(clearingResult.winningBid, 1200);
+  assert.equal(clearingResult.clearingPrice, 1500); // 2nd price
+  assert.equal(clearedAuction.status, 'CLEARED');
+
+  // Settle auction
+  const { updatedAuction: settledAuction, receipt } = AgentAuctionEngine.settleAuction(clearedAuction, clearingResult, 'receipt_exec_001');
+  assert.equal(settledAuction.status, 'SETTLED');
+  assert.equal(receipt.amountPaid, 1500);
+  assert.equal(receipt.stakeReturned, 500);
+});
+
+// 124. Universal Verifier Contract (v20.0.0 Verifiers)
+test('124. SolidityEngine: verify Universal Verifier contract contains all v19.0.0 and v20.0.0 on-chain verification functions', () => {
+  const contractSrc = SolidityEngine.generateUniversalVerifierContract();
+  // v19 verifiers
+  assert.ok(contractSrc.includes('function verifyProactiveShareRenewal'));
+  assert.ok(contractSrc.includes('function verifyVectorCommitmentPosition'));
+  assert.ok(contractSrc.includes('function verifySubvectorOpening'));
+  assert.ok(contractSrc.includes('function verifyPQBlindSignature'));
+  assert.ok(contractSrc.includes('function verifyAgentContractSettlement'));
+  // v20 verifiers
+  assert.ok(contractSrc.includes('function verifyRollupBlock'));
+  assert.ok(contractSrc.includes('function verifyMemoryRollbackProof'));
+  assert.ok(contractSrc.includes('function verifyPQAbePolicyReceipt'));
+  assert.ok(contractSrc.includes('function verifyAgentAuctionClearing'));
 });
 
 

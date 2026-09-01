@@ -554,6 +554,44 @@ describe('DocuTrust TypeScript SDK (@docutrust/sdk)', () => {
     assert.strictEqual(mockCalls[170].url, 'https://test-api.docutrust.org/api/v1/agent-contract/slash');
     await client.agentContractSettle({}, {});
     assert.strictEqual(mockCalls[171].url, 'https://test-api.docutrust.org/api/v1/agent-contract/settle');
+
+    // 78. v20.0.0 ZK-Rollup & Batch State Compression
+    await client.zkRollupCreateBatch([], [], 1);
+    assert.strictEqual(mockCalls[172].url, 'https://test-api.docutrust.org/api/v1/rollup/batch');
+    await client.zkRollupVerifyBatch({});
+    assert.strictEqual(mockCalls[173].url, 'https://test-api.docutrust.org/api/v1/rollup/verify');
+
+    // 79. v20.0.0 Verifiable Memory Quarantine
+    await client.memoryQuarantineDetect([]);
+    assert.strictEqual(mockCalls[174].url, 'https://test-api.docutrust.org/api/v1/quarantine/detect');
+    await client.memoryQuarantineIssueCertificate('did:agent', []);
+    assert.strictEqual(mockCalls[175].url, 'https://test-api.docutrust.org/api/v1/quarantine/certificate');
+    await client.memoryQuarantineRollback({}, {}, []);
+    assert.strictEqual(mockCalls[176].url, 'https://test-api.docutrust.org/api/v1/quarantine/rollback');
+
+    // 80. v20.0.0 Multi-Authority Post-Quantum ABE
+    await client.pqAbeSetup('auth:1', 'Name');
+    assert.strictEqual(mockCalls[177].url, 'https://test-api.docutrust.org/api/v1/pqabe/setup');
+    await client.pqAbeIssueToken({}, 'did:u', 'ATTR');
+    assert.strictEqual(mockCalls[178].url, 'https://test-api.docutrust.org/api/v1/pqabe/issue');
+    await client.pqAbeEncrypt({}, 'policy', []);
+    assert.strictEqual(mockCalls[179].url, 'https://test-api.docutrust.org/api/v1/pqabe/encrypt');
+    await client.pqAbeDecrypt({}, [], 'did:u');
+    assert.strictEqual(mockCalls[180].url, 'https://test-api.docutrust.org/api/v1/pqabe/decrypt');
+
+    // 81. v20.0.0 Decentralized Agent Capability Auction
+    await client.agentAuctionCreate('did:auc', {});
+    assert.strictEqual(mockCalls[181].url, 'https://test-api.docutrust.org/api/v1/agent-auction/create');
+    await client.agentAuctionCommitBid({}, 'did:a', 100, 50, 's');
+    assert.strictEqual(mockCalls[182].url, 'https://test-api.docutrust.org/api/v1/agent-auction/commit');
+    await client.agentAuctionRevealBid({}, 'comm_1', 'did:a', 100, 50, 's');
+    assert.strictEqual(mockCalls[183].url, 'https://test-api.docutrust.org/api/v1/agent-auction/reveal');
+    await client.agentAuctionClear({});
+    assert.strictEqual(mockCalls[184].url, 'https://test-api.docutrust.org/api/v1/agent-auction/clear');
+    await client.agentAuctionSettle({}, {}, 'rcpt_1');
+    assert.strictEqual(mockCalls[185].url, 'https://test-api.docutrust.org/api/v1/agent-auction/settle');
+    await client.agentAuctionSlash({}, {});
+    assert.strictEqual(mockCalls[186].url, 'https://test-api.docutrust.org/api/v1/agent-auction/slash');
   });
 
   test('DocuTrustClient handles HTTP error responses gracefully', async () => {

@@ -270,3 +270,19 @@ export * from './pq-blind';
 // Export Verifiable Autonomous Agent Smart Contracts & Slashing Engine (DocuTrust v19.0.0)
 export * from './agent-contract';
 
+// ========================================================
+// DocuTrust v20.0.0 Sovereign Trust & Sovereign Cryptographic Core
+// ========================================================
+
+// Export ZK-Rollup & Batch State Compression Engine (DocuTrust v20.0.0)
+export * from './zk-rollup';
+
+// Export Verifiable Agent Memory Poisoning & Knowledge Quarantine Engine (DocuTrust v20.0.0)
+export * from './memory-quarantine';
+
+// Export Multi-Authority Post-Quantum Attribute-Based Encryption (MA-PQ-ABE) (DocuTrust v20.0.0)
+export * from './pq-abe';
+
+// Export Decentralized AI Agent Capability Auction & Settlement Protocol (DocuTrust v20.0.0)
+export * from './agent-auction';
+

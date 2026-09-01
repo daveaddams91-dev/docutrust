@@ -2810,6 +2810,175 @@ class DocuTrustClient:
         from .agent_contract import AgentContractEngine
         return AgentContractEngine.settle_contract(contract, receipt)
 
+    # ========================================================
+    # v20.0.0 ZK-Rollup & Batch State Compression Methods
+    # ========================================================
+
+    def zk_rollup_create_batch(
+        self,
+        initial_accounts: List[Dict[str, Any]],
+        transactions: List[Dict[str, Any]],
+        block_number: int = 1
+    ) -> Dict[str, Any]:
+        """Creates a compressed state diff rollup batch with a STARK validium proof."""
+        from .zk_rollup import ZKRollupEngine
+        return ZKRollupEngine.create_batch(initial_accounts, transactions, block_number)
+
+    def zk_rollup_verify_batch(
+        self,
+        batch: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Verifies the Validium ZK-Rollup batch state transition and STARK proof."""
+        from .zk_rollup import ZKRollupEngine
+        return ZKRollupEngine.verify_batch(batch)
+
+    # ========================================================
+    # v20.0.0 Verifiable Memory Quarantine Methods
+    # ========================================================
+
+    def memory_quarantine_detect(
+        self,
+        nodes: List[Dict[str, Any]],
+        ground_truth_baselines: Optional[List[Dict[str, Any]]] = None,
+        threshold: float = 0.65
+    ) -> List[Dict[str, Any]]:
+        """Scans memory nodes against baseline embeddings to detect semantic drift."""
+        from .memory_quarantine import MemoryQuarantineEngine
+        return MemoryQuarantineEngine.detect_anomalies(nodes, ground_truth_baselines, threshold)
+
+    def memory_quarantine_issue_certificate(
+        self,
+        agent_did: str,
+        quarantined_nodes: List[Dict[str, Any]],
+        boundary_node_ids: Optional[List[str]] = None,
+        issuer_secret_key_hex: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Issues a cryptographic quarantine certificate isolating compromised memory nodes."""
+        from .memory_quarantine import MemoryQuarantineEngine
+        return MemoryQuarantineEngine.issue_quarantine_certificate(
+            agent_did, quarantined_nodes, boundary_node_ids, issuer_secret_key_hex
+        )
+
+    def memory_quarantine_rollback(
+        self,
+        full_graph: Dict[str, Any],
+        quarantine_cert: Dict[str, Any],
+        clean_nodes: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Generates a zero-knowledge verifiable rollback proof demonstrating state recovery."""
+        from .memory_quarantine import MemoryQuarantineEngine
+        return MemoryQuarantineEngine.generate_rollback_proof(full_graph, quarantine_cert, clean_nodes)
+
+    # ========================================================
+    # v20.0.0 Multi-Authority Post-Quantum ABE Methods
+    # ========================================================
+
+    def pq_abe_setup(
+        self,
+        authority_id: str,
+        authority_name: str
+    ) -> Dict[str, Any]:
+        """Initializes a decentralized attribute authority with post-quantum lattice master keys."""
+        from .pq_abe import PQAbeEngine
+        return PQAbeEngine.setup_authority(authority_id, authority_name)
+
+    def pq_abe_issue_token(
+        self,
+        authority: Dict[str, Any],
+        user_did: str,
+        attribute: str,
+        expiration_epoch: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Issues a post-quantum lattice attribute secret token to a specific user DID."""
+        from .pq_abe import PQAbeEngine
+        return PQAbeEngine.issue_attribute_token(authority, user_did, attribute, expiration_epoch)
+
+    def pq_abe_encrypt(
+        self,
+        payload: Any,
+        policy_expression: str,
+        authorities: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Encrypts data under a multi-authority monotone Boolean access policy."""
+        from .pq_abe import PQAbeEngine
+        return PQAbeEngine.encrypt(payload, policy_expression, authorities)
+
+    def pq_abe_decrypt(
+        self,
+        ciphertext: Dict[str, Any],
+        user_tokens: List[Dict[str, Any]],
+        user_did: str
+    ) -> Dict[str, Any]:
+        """Decrypts a post-quantum lattice ciphertext using user attribute tokens."""
+        from .pq_abe import PQAbeEngine
+        return PQAbeEngine.decrypt(ciphertext, user_tokens, user_did)
+
+    # ========================================================
+    # v20.0.0 Decentralized Agent Capability Auction Methods
+    # ========================================================
+
+    def agent_auction_create(
+        self,
+        auctioneer_did: str,
+        task_spec: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Initializes a new sealed-bid capability auction."""
+        from .agent_auction import AgentAuctionEngine
+        return AgentAuctionEngine.create_auction(auctioneer_did, task_spec)
+
+    def agent_auction_commit_bid(
+        self,
+        auction: Dict[str, Any],
+        agent_did: str,
+        bid_amount: int,
+        stake_amount: int,
+        salt: str
+    ) -> Dict[str, Any]:
+        """Submits a cryptographic commitment hiding the bid amount and stake."""
+        from .agent_auction import AgentAuctionEngine
+        return AgentAuctionEngine.commit_bid(auction, agent_did, bid_amount, stake_amount, salt)
+
+    def agent_auction_reveal_bid(
+        self,
+        auction: Dict[str, Any],
+        commitment_id: str,
+        agent_did: str,
+        bid_amount: int,
+        stake_amount: int,
+        salt: str,
+        quality_metric: Optional[float] = 1.0
+    ) -> Dict[str, Any]:
+        """Reveals the sealed bid values and verifies against the commitment hash."""
+        from .agent_auction import AgentAuctionEngine
+        return AgentAuctionEngine.reveal_bid(auction, commitment_id, agent_did, bid_amount, stake_amount, salt, quality_metric)
+
+    def agent_auction_clear(
+        self,
+        auction: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Clears the auction using Vickrey second-price procurement logic."""
+        from .agent_auction import AgentAuctionEngine
+        return AgentAuctionEngine.clear_auction(auction)
+
+    def agent_auction_settle(
+        self,
+        auction: Dict[str, Any],
+        clearing_result: Dict[str, Any],
+        execution_receipt_id: str
+    ) -> Dict[str, Any]:
+        """Settles escrow payout upon verified task execution."""
+        from .agent_auction import AgentAuctionEngine
+        return AgentAuctionEngine.settle_auction(auction, clearing_result, execution_receipt_id)
+
+    def agent_auction_slash(
+        self,
+        auction: Dict[str, Any],
+        dispute_proof: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Slashes malicious or defaulted winning agent stake upon fraud proof."""
+        from .agent_auction import AgentAuctionEngine
+        return AgentAuctionEngine.slash_agent(auction, dispute_proof)
+
 
 
 

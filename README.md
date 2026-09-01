@@ -2,20 +2,20 @@
 
 # 🛡️ DocuTrust
 
-### The Open-Source Sovereign Trust Fabric for Verifiable Credentials, Proactive Secret Sharing, Vector Commitments, Post-Quantum Blind Signatures & Autonomous AI Agent Smart Contracts
+### The Open-Source Sovereign Trust Fabric for Verifiable Credentials, Validium ZK-Rollups, Memory Quarantine, MA-PQ-ABE & AI Agent Capability Auctions
 
-[![Version](https://img.shields.io/badge/Version-v19.0.0-cyan.svg)]()
+[![Version](https://img.shields.io/badge/Version-v20.0.0-cyan.svg)]()
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CI Status](https://img.shields.io/badge/CI-100%25%20Passing-brightgreen.svg)]()
-[![Proactive Secret Sharing](https://img.shields.io/badge/PSS-Feldman%20VSS%20Epoch%20Resharing-teal.svg)]()
-[![Vector Commitments](https://img.shields.io/badge/Vector%20Commitments-O(1)%20Constant--Size%20Proofs-indigo.svg)]()
-[![PQ Blind Signatures](https://img.shields.io/badge/PQ%20Blind-ML--DSA%20Lattice%20Signatures-amber.svg)]()
-[![Agent Smart Contracts](https://img.shields.io/badge/Agent%20Contracts-Escrow%20%2B%20Fraud%20Slashing-cyan.svg)]()
+[![ZK-Rollups](https://img.shields.io/badge/ZK--Rollup-Validium%20STARK%20Compression-teal.svg)]()
+[![Memory Quarantine](https://img.shields.io/badge/Memory%20Quarantine-Verifiable%20ZK--Rollback-indigo.svg)]()
+[![MA-PQ-ABE](https://img.shields.io/badge/MA--PQ--ABE-Lattice%20Attribute%20Encryption-amber.svg)]()
+[![Agent Auctions](https://img.shields.io/badge/Agent%20Auctions-Vickrey%20Commit--Reveal-cyan.svg)]()
 [![Python SDK](https://img.shields.io/badge/Python-3.8+-3776AB?logo=python&logoColor=white)]()
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)]()
 
 <p align="center">
-  <b>DocuTrust</b> enables universities, enterprises, AI agent swarms, and decentralized networks to issue tamper-proof academic degrees, credentials, and autonomous agent attestations with <b>Proactive Secret Sharing (PSS) epoch resharing</b>, <b>constant-size Vector Commitments (VC)</b>, <b>Post-Quantum Lattice Blind Signatures (ML-DSA)</b>, <b>Autonomous AI Agent Escrow Smart Contracts & Fraud Slashing</b>, <b>Zero-Knowledge Machine Learning (zkML)</b>, <b>Yao's Garbled Circuits MPC</b>, and <b>Threshold Timelock Encryption</b>.
+  <b>DocuTrust</b> enables universities, enterprises, AI agent swarms, and decentralized networks to issue tamper-proof academic degrees, credentials, and autonomous agent attestations with <b>Validium ZK-Rollup batch state compression</b>, <b>Verifiable Agent Memory Poisoning Quarantine & ZK-Rollback</b>, <b>Multi-Authority Post-Quantum Attribute-Based Encryption (MA-PQ-ABE)</b>, <b>Decentralized Agent Capability Auctions (Vickrey)</b>, <b>Proactive Secret Sharing (PSS)</b>, and <b>Post-Quantum Lattice Signatures (ML-DSA)</b>.
 </p>
 
 [Quickstart Demo](#-10-second-quickstart-demo) • [Architecture](#-system-architecture--workflow) • [Security Hardening](#-defense-in-depth-security-hardening-uncrackable-guarantee) • [CLI Toolkit](#-cli-toolkit) • [Python SDK](#-python-sdk-docutrust) • [REST API](#-rest-api-endpoints)

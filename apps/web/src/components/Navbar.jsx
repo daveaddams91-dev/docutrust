@@ -40,6 +40,10 @@ export default function Navbar({ activeTab, setActiveTab }) {
 
   const navItems = [
     { id: 'hero', label: 'Overview', icon: ShieldCheck, cat: 'Core' },
+    { id: 'zk-rollup-studio', label: 'ZK-Rollup', icon: Layers, cat: 'v20' },
+    { id: 'quarantine-studio', label: 'Memory Quarantine', icon: ShieldAlert, cat: 'v20' },
+    { id: 'pqabe-studio', label: 'MA-PQ-ABE', icon: Key, cat: 'v20' },
+    { id: 'agent-auction-studio', label: 'Capability Auction', icon: Award, cat: 'v20' },
     { id: 'pss-studio', label: 'Proactive Sharing', icon: RefreshCw, cat: 'v19' },
     { id: 'vector-studio', label: 'Vector Commitments', icon: Layers, cat: 'v19' },
     { id: 'pqblind-studio', label: 'PQ Blind Signatures', icon: EyeOff, cat: 'v19' },
@@ -108,7 +112,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
           <div>
             <div className="flex items-center gap-2">
               <span className="font-bold text-base bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-100 to-gray-400 tracking-tight">DocuTrust</span>
-              <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono font-semibold">v18.0.0</span>
+              <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono font-semibold">v20.0.0</span>
             </div>
             <span className="text-[10px] text-gray-400 tracking-wide block font-mono">Autonomous Sovereign Trust Mesh</span>
           </div>

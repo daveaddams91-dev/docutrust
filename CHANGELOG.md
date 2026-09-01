@@ -1,5 +1,53 @@
 # 📝 DocuTrust Changelog & Release Notes
 
+## [v20.0.0] - ZK-Rollup & Validium State Compression, Verifiable Memory Quarantine, Multi-Authority PQ-ABE & Decentralized Agent Capability Auctions - 2026-09-01
+
+### 🌟 Release Overview (v20.0.0 - Major Milestone Release)
+DocuTrust 20.0.0 is a milestone architectural release introducing Validium ZK-Rollup batch state compression with FRI STARK proofs, Verifiable Agent Memory Poisoning & Knowledge Quarantine with zero-knowledge rollback proofs, Multi-Authority Post-Quantum Attribute-Based Encryption (MA-PQ-ABE) over lattice rings ($q = 8380417$), and Decentralized AI Agent Capability Auctions with commit-reveal Vickrey second-price procurement and automated slashing:
+
+1. **ZK-Rollup & Batch State Compression Engine (`@docutrust/core/zk-rollup`, `docutrust.zk_rollup`)**:
+   - Implemented `ZKRollupEngine` enabling population-scale state transition compression for credential lifecycle events (revocations, suspensions, status updates, batch anchors).
+   - Bit-packed compressed state diffs minimizing on-chain data footprint down to 10 bytes per transaction.
+   - Succinct Validium STARK-style polynomial commitment evaluations and FRI boundary check proofs.
+   - Synthesized EVM calldata and standalone on-chain Solidity verifier contract (`DocuTrustZKRollupVerifier.sol`).
+
+2. **Verifiable Agent Memory Poisoning & Knowledge Quarantine Engine (`@docutrust/core/memory-quarantine`, `docutrust.memory_quarantine`)**:
+   - Implemented `MemoryQuarantineEngine` for scanning dynamic autonomous agent knowledge graphs and vector memory stores.
+   - Multi-modal drift detection using cosine distance against ground-truth baseline embeddings and heuristic prompt injection phrase scanners.
+   - Cryptographic Quarantine Certificates (`DocuTrustMemoryQuarantineCertificate2026`) isolating poisoned nodes and subtrees with boundary markers.
+   - Zero-Knowledge Verifiable Rollback Proofs (`DocuTrustVerifiableRollbackProof2026`) mathematically demonstrating that pruned state matches prior verified Merkle roots.
+
+3. **Multi-Authority Post-Quantum Attribute-Based Encryption (MA-PQ-ABE) (`@docutrust/core/pq-abe`, `docutrust.pq_abe`)**:
+   - Implemented `PQAbeEngine` delivering decentralized post-quantum attribute-based encryption without a single central authority.
+   - Lattice ring evaluation over prime modulus $q = 8380417$.
+   - Decentralized attribute token generation bound to user DIDs with secret key components.
+   - Monotone Boolean policy tree compiler evaluating multi-authority AND/OR expressions.
+   - Hybrid encryption combining lattice encapsulation with authenticated AES-256-GCM symmetric payload encryption.
+
+4. **Decentralized AI Agent Capability Auction Protocol (`@docutrust/core/agent-auction`, `docutrust.agent_auction`)**:
+   - Implemented `AgentAuctionEngine` providing sealed-bid commit-reveal Vickrey second-price procurement auctions for autonomous agent capability sourcing.
+   - Cryptographic bid and stake commitments hiding valuations until the reveal phase.
+   - Automated Vickrey second-price clearing algorithm determining optimal agent assignment.
+   - Full lifecycle settlement: escrow lockup, verified execution payout, and fraud dispute collateral slashing.
+
+5. **Solidity On-Chain Verifier Contracts**:
+   - Created `DocuTrustZKRollupVerifier.sol` for verifying Validium state transitions on-chain.
+   - Created `DocuTrustAgentEscrowVerifier.sol` for managing on-chain agent capability escrows and dispute slashing.
+
+6. **Interactive Web Studios (`ZKRollupStudio.jsx`, `MemoryQuarantineStudio.jsx`, `PQAbeStudio.jsx`, `AgentAuctionStudio.jsx`)**:
+   - `ZKRollupStudio.jsx`: Visual batch state transition compressor, Merkle root diff analyzer, STARK proof inspector, and EVM calldata generator.
+   - `MemoryQuarantineStudio.jsx`: Knowledge graph node scanner, embedding drift analyzer, quarantine certificate issuer, and ZK-rollback animator.
+   - `PQAbeStudio.jsx`: Decentralized attribute authority creator, user token keyring manager, monotone access policy builder, and lattice decryptor.
+   - `AgentAuctionStudio.jsx`: Reverse capability auction manager, commit-reveal bid submitter, Vickrey clearing calculator, and dispute slashing console.
+
+7. **Full-Stack CLI, REST API & Python/TypeScript SDK Parity**:
+   - CLI: Added 13 new commands across `zk-rollup-*`, `memory-quarantine-*`, `pq-abe-*`, `agent-auction-*`.
+   - REST API: Added 15 new REST endpoints across `/api/v1/zk-rollup/*`, `/api/v1/memory-quarantine/*`, `/api/v1/pq-abe/*`, `/api/v1/agent-auction/*`.
+   - TypeScript SDK (`@docutrust/sdk`): Re-exported v20 engines, added typed client methods, and 100% test coverage.
+   - Python SDK (`docutrust`): Added 4 new engine modules, dual naming conventions, client wrapper methods, and 110/110 passing unit tests.
+
+---
+
 ## [v19.0.0] - Proactive Secret Sharing (PSS), Constant-Size Vector Commitments, Post-Quantum Lattice Blind Signatures & Autonomous AI Agent Smart Contracts - 2026-09-01
 
 ### 🌟 Release Overview (v19.0.0 - Major Milestone Release)

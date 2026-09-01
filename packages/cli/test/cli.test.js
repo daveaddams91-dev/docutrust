@@ -1748,6 +1748,64 @@ test('CLI Suite', async (t) => {
     assert.ok(createOut.includes('Agent Escrow Contract created'));
     assert.ok(fs.existsSync(contractFile));
   });
+
+  await t.test('70. docutrust rollup-batch and rollup-verify (v20.0.0)', () => {
+    const batchFile = path.join(tempDir, 'rollup-batch.json');
+    const createOut = execSync(`node "${cliPath}" rollup-batch --block 1 --out "${batchFile}"`).toString();
+    assert.ok(createOut.includes('ZK-Rollup Batch Block created'));
+    assert.ok(fs.existsSync(batchFile));
+
+    const verifyOut = execSync(`node "${cliPath}" rollup-verify --batch "${batchFile}"`).toString();
+    assert.ok(verifyOut.includes('AUTHENTIC'));
+  });
+
+  await t.test('71. docutrust quarantine-detect, quarantine-cert, and quarantine-rollback (v20.0.0)', () => {
+    const analysisFile = path.join(tempDir, 'quarantine-analysis.json');
+    const certFile = path.join(tempDir, 'quarantine-cert.json');
+    const proofFile = path.join(tempDir, 'quarantine-rollback.json');
+
+    const detectOut = execSync(`node "${cliPath}" quarantine-detect --out "${analysisFile}"`).toString();
+    assert.ok(detectOut.includes('Memory Poisoning Analysis saved'));
+
+    const certOut = execSync(`node "${cliPath}" quarantine-cert --agent "did:docutrust:agent:test" --out "${certFile}"`).toString();
+    assert.ok(certOut.includes('Quarantine Certificate saved'));
+
+    const rollbackOut = execSync(`node "${cliPath}" quarantine-rollback --cert "${certFile}" --out "${proofFile}"`).toString();
+    assert.ok(rollbackOut.includes('Memory Rollback Proof saved'));
+  });
+
+  await t.test('72. docutrust pqabe-setup, pqabe-issue, pqabe-encrypt, and pqabe-decrypt (v20.0.0)', () => {
+    const authFile = path.join(tempDir, 'pqabe-auth.json');
+    const tokenFile = path.join(tempDir, 'pqabe-token.json');
+    const ctFile = path.join(tempDir, 'pqabe-ct.json');
+
+    const setupOut = execSync(`node "${cliPath}" pqabe-setup --authority "auth:identity" --name "Identity Auth" --out "${authFile}"`).toString();
+    assert.ok(setupOut.includes('PQ-ABE Authority setup completed'));
+
+    const issueOut = execSync(`node "${cliPath}" pqabe-issue --authority "${authFile}" --user "did:docutrust:user:alice" --attribute "VERIFIED_DEVELOPER" --out "${tokenFile}"`).toString();
+    assert.ok(issueOut.includes('Attribute Token issued and saved'));
+
+    const encOut = execSync(`node "${cliPath}" pqabe-encrypt --data "Secret Key Material" --policy "auth:identity.VERIFIED_DEVELOPER" --out "${ctFile}"`).toString();
+    assert.ok(encOut.includes('PQ-ABE Ciphertext saved'));
+
+    const decOut = execSync(`node "${cliPath}" pqabe-decrypt --ct "${ctFile}" --tokens "${tokenFile}" --user "did:docutrust:user:alice"`).toString();
+    assert.ok(decOut.includes('Decryption Succeeded!'));
+  });
+
+  await t.test('73. docutrust agent-auction-create, agent-auction-commit, and agent-auction-clear (v20.0.0)', () => {
+    const auctionFile = path.join(tempDir, 'agent-auction.json');
+    const commitFile = path.join(tempDir, 'agent-auction-commit.json');
+    const clearFile = path.join(tempDir, 'agent-auction-clear.json');
+
+    const createOut = execSync(`node "${cliPath}" agent-auction-create --auctioneer "did:docutrust:auc:1" --task-type "PROVER" --max-budget 3000 --out "${auctionFile}"`).toString();
+    assert.ok(createOut.includes('Agent Auction created and saved'));
+
+    const commitOut = execSync(`node "${cliPath}" agent-auction-commit --auction "${auctionFile}" --agent "did:docutrust:agent:alpha" --bid 1500 --stake 600 --salt "saltA" --out "${commitFile}"`).toString();
+    assert.ok(commitOut.includes('Bid Commitment generated'));
+
+    const clearOut = execSync(`node "${cliPath}" agent-auction-clear --out "${clearFile}"`).toString();
+    assert.ok(clearOut.includes('Auction cleared'));
+  });
 });
 
 

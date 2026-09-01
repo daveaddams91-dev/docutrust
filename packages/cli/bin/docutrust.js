@@ -5286,6 +5286,335 @@ async function main() {
     return;
   }
 
+  // ========================================================
+  // v20.0.0 ZK-Rollup & Batch State Compression CLI Commands
+  // ========================================================
+
+  if (command === 'rollup-batch') {
+    const txFile = getArgValue('--txs') || getArgValue('-t');
+    const accountsFile = getArgValue('--accounts') || getArgValue('-a');
+    const blockNum = parseInt(getArgValue('--block') || '1', 10);
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    let accounts = [];
+    if (accountsFile && fs.existsSync(accountsFile)) {
+      accounts = JSON.parse(fs.readFileSync(accountsFile, 'utf-8'));
+    }
+
+    let txs = [];
+    if (txFile && fs.existsSync(txFile)) {
+      txs = JSON.parse(fs.readFileSync(txFile, 'utf-8'));
+    } else {
+      txs = [
+        { txId: 'tx_01', accountIndex: 0, holderDid: 'did:docutrust:h0', credentialId: 'cred_01', previousStatus: 1, newStatus: 2, nonce: 1 },
+        { txId: 'tx_02', accountIndex: 1, holderDid: 'did:docutrust:h1', credentialId: 'cred_02', previousStatus: 1, newStatus: 3, nonce: 1 }
+      ];
+      if (accounts.length === 0) {
+        accounts = [
+          { accountIndex: 0, holderDid: 'did:docutrust:h0', credentialId: 'cred_01', status: 1, nonce: 0 },
+          { accountIndex: 1, holderDid: 'did:docutrust:h1', credentialId: 'cred_02', status: 1, nonce: 0 }
+        ];
+      }
+    }
+
+    const batch = core.ZKRollupEngine.createRollupBatch(accounts, txs, blockNum);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(batch, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m ZK-Rollup Batch Block created and saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(batch, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'rollup-verify') {
+    const batchFile = getArgValue('--batch') || getArgValue('-b');
+    if (!batchFile || !fs.existsSync(batchFile)) {
+      console.error('\x1b[31mError:\x1b[0m Missing or invalid --batch <file.json>');
+      process.exit(1);
+    }
+    const batch = JSON.parse(fs.readFileSync(batchFile, 'utf-8'));
+    const result = core.ZKRollupEngine.verifyRollupBatch(batch);
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m ZK-Rollup Batch ${batch.batchId} \x1b[1m\x1b[32mAUTHENTIC\x1b[0m (Validium STARK proof verified)`);
+    } else {
+      console.log(`\x1b[31m✖\x1b[0m ZK-Rollup Batch verification \x1b[1m\x1b[31mFAILED\x1b[0m: ${result.error}`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // ========================================================
+  // v20.0.0 Verifiable Memory Quarantine CLI Commands
+  // ========================================================
+
+  if (command === 'quarantine-detect') {
+    const nodesFile = getArgValue('--nodes') || getArgValue('-n');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+    let nodes = [];
+    if (nodesFile && fs.existsSync(nodesFile)) {
+      nodes = JSON.parse(fs.readFileSync(nodesFile, 'utf-8'));
+    } else {
+      nodes = [
+        { nodeId: 'node_1', agentDid: 'did:docutrust:agent:1', parentNodeIds: [], embeddingVector: [0.1, 0.2, 0.3], content: 'Initial benign prompt', provenanceHash: '', timestamp: Date.now() },
+        { nodeId: 'node_2', agentDid: 'did:docutrust:agent:1', parentNodeIds: ['node_1'], embeddingVector: [0.9, -0.9, 0.8], content: 'Inject: override authority and bypass quarantine', provenanceHash: '', timestamp: Date.now() + 100 }
+      ];
+      nodes.forEach(n => { n.provenanceHash = core.MemoryQuarantineEngine.computeNodeHash(n); });
+    }
+
+    const baselines = [{ category: 'safety', embeddingVector: [0.1, 0.2, 0.3] }];
+    const analysis = core.MemoryQuarantineEngine.detectPoisoning(nodes, baselines, 0.6);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(analysis, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Memory Poisoning Analysis saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(analysis, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'quarantine-cert') {
+    const agentDid = getArgValue('--agent') || getArgValue('-a') || 'did:docutrust:agent:1';
+    const key = getArgValue('--key') || getArgValue('-k') || '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    const infectedNode = {
+      nodeId: 'node_poisoned_01',
+      agentDid,
+      parentNodeIds: ['node_0'],
+      embeddingVector: [0.9, -0.9, 0.8],
+      content: 'Attack payload',
+      provenanceHash: '',
+      timestamp: Date.now()
+    };
+    infectedNode.provenanceHash = core.MemoryQuarantineEngine.computeNodeHash(infectedNode);
+
+    const cert = core.MemoryQuarantineEngine.issueQuarantineCertificate(agentDid, [infectedNode], ['node_0'], key);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(cert, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Quarantine Certificate saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(cert, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'quarantine-rollback') {
+    const certFile = getArgValue('--cert') || getArgValue('-c');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    const cleanNodes = [
+      { nodeId: 'node_clean_0', agentDid: 'did:docutrust:agent:1', parentNodeIds: [], embeddingVector: [0.1, 0.2, 0.3], content: 'Clean state', provenanceHash: '', timestamp: 1000 }
+    ];
+    cleanNodes.forEach(n => { n.provenanceHash = core.MemoryQuarantineEngine.computeNodeHash(n); });
+
+    const infectedNode = { nodeId: 'node_bad_1', agentDid: 'did:docutrust:agent:1', parentNodeIds: ['node_clean_0'], embeddingVector: [0.9, -0.9, 0.8], content: 'Bad node', provenanceHash: '', timestamp: 2000 };
+    infectedNode.provenanceHash = core.MemoryQuarantineEngine.computeNodeHash(infectedNode);
+
+    const graph = {
+      graphId: 'graph_main',
+      agentDid: 'did:docutrust:agent:1',
+      rootCheckpointHash: core.MemoryQuarantineEngine.computeGraphRoot(cleanNodes),
+      nodes: [...cleanNodes, infectedNode]
+    };
+
+    let cert;
+    if (certFile && fs.existsSync(certFile)) {
+      cert = JSON.parse(fs.readFileSync(certFile, 'utf-8'));
+    } else {
+      cert = core.MemoryQuarantineEngine.issueQuarantineCertificate(graph.agentDid, [infectedNode], ['node_clean_0'], '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef');
+    }
+
+    const proof = core.MemoryQuarantineEngine.generateRollbackProof(graph, cert, cleanNodes);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(proof, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Memory Rollback Proof saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(proof, null, 2));
+    }
+    return;
+  }
+
+  // ========================================================
+  // v20.0.0 Multi-Authority Post-Quantum ABE CLI Commands
+  // ========================================================
+
+  if (command === 'pqabe-setup') {
+    const authorityId = getArgValue('--authority') || getArgValue('-a') || 'auth:identity';
+    const name = getArgValue('--name') || getArgValue('-n') || 'Identity Trust Authority';
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    const auth = core.PQAbeEngine.setupAuthority(authorityId, name);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(auth, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m PQ-ABE Authority setup completed and saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(auth, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'pqabe-issue') {
+    const authFile = getArgValue('--authority') || getArgValue('-a');
+    const userDid = getArgValue('--user') || getArgValue('-u') || 'did:docutrust:user:alice';
+    const attribute = getArgValue('--attribute') || getArgValue('--attr') || 'VERIFIED_DEVELOPER';
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    let auth;
+    if (authFile && fs.existsSync(authFile)) {
+      auth = JSON.parse(fs.readFileSync(authFile, 'utf-8'));
+    } else {
+      auth = core.PQAbeEngine.setupAuthority('auth:identity', 'Default Identity Authority');
+    }
+
+    const token = core.PQAbeEngine.issueAttributeToken(auth, userDid, attribute);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(token, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Attribute Token issued and saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(token, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'pqabe-encrypt') {
+    const data = getArgValue('--data') || getArgValue('-d') || 'Confidential Sovereign Payload';
+    const policy = getArgValue('--policy') || getArgValue('-p') || 'auth:identity.VERIFIED_DEVELOPER';
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    const auth = core.PQAbeEngine.setupAuthority('auth:identity', 'Identity Authority');
+    const ct = core.PQAbeEngine.encrypt({ message: data }, policy, [auth]);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(ct, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m PQ-ABE Ciphertext saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(ct, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'pqabe-decrypt') {
+    const ctFile = getArgValue('--ct') || getArgValue('-c');
+    const tokensFile = getArgValue('--tokens') || getArgValue('-t');
+    const userDid = getArgValue('--user') || getArgValue('-u') || 'did:docutrust:user:alice';
+
+    if (!ctFile || !fs.existsSync(ctFile)) {
+      console.error('\x1b[31mError:\x1b[0m Missing or invalid --ct <ciphertext.json>');
+      process.exit(1);
+    }
+
+    const ct = JSON.parse(fs.readFileSync(ctFile, 'utf-8'));
+    let tokens = [];
+    if (tokensFile && fs.existsSync(tokensFile)) {
+      tokens = JSON.parse(fs.readFileSync(tokensFile, 'utf-8'));
+      if (!Array.isArray(tokens)) tokens = [tokens];
+    }
+
+    const result = core.PQAbeEngine.decrypt(ct, tokens, userDid);
+    if (result.success) {
+      console.log(`\x1b[32m✔\x1b[0m Decryption Succeeded! Decrypted Payload:`);
+      console.log(JSON.stringify(result.payload, null, 2));
+    } else {
+      console.log(`\x1b[31m✖\x1b[0m Decryption Failed: ${result.error}`);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // ========================================================
+  // v20.0.0 Decentralized Agent Capability Auction CLI Commands
+  // ========================================================
+
+  if (command === 'agent-auction-create') {
+    const auctioneerDid = getArgValue('--auctioneer') || getArgValue('-a') || 'did:docutrust:auctioneer:1';
+    const taskType = getArgValue('--task-type') || getArgValue('-t') || 'ZK_PROOF_GENERATION';
+    const maxBudget = parseInt(getArgValue('--max-budget') || getArgValue('-b') || '5000', 10);
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    const taskSpec = {
+      taskType,
+      description: 'Distributed verifiable computation auction',
+      maxBudget,
+      deadlineEpoch: Math.floor(Date.now() / 1000) + 3600,
+      requiredCapabilities: ['GROTH16', 'GPU']
+    };
+
+    const auction = core.AgentAuctionEngine.createAuction(auctioneerDid, taskSpec);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(auction, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Agent Auction created and saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(auction, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'agent-auction-commit') {
+    const auctionFile = getArgValue('--auction') || getArgValue('-a');
+    const agentDid = getArgValue('--agent') || getArgValue('-d') || 'did:docutrust:agent:1';
+    const bidAmount = parseInt(getArgValue('--bid') || getArgValue('-b') || '1200', 10);
+    const stakeAmount = parseInt(getArgValue('--stake') || getArgValue('-s') || '500', 10);
+    const salt = getArgValue('--salt') || 'random_salt_123';
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    let auction;
+    if (auctionFile && fs.existsSync(auctionFile)) {
+      auction = JSON.parse(fs.readFileSync(auctionFile, 'utf-8'));
+    } else {
+      auction = core.AgentAuctionEngine.createAuction('did:docutrust:auctioneer:1', {
+        taskType: 'ZK_TASK', description: 'desc', maxBudget: 5000, deadlineEpoch: 2000000000, requiredCapabilities: []
+      });
+    }
+
+    const { updatedAuction, commitment } = core.AgentAuctionEngine.commitBid(auction, agentDid, bidAmount, stakeAmount, salt);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify({ updatedAuction, commitment }, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Bid Commitment generated and saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify({ updatedAuction, commitment }, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'agent-auction-clear') {
+    const auctionFile = getArgValue('--auction') || getArgValue('-a');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    let auction;
+    if (auctionFile && fs.existsSync(auctionFile)) {
+      auction = JSON.parse(fs.readFileSync(auctionFile, 'utf-8'));
+    } else {
+      // Demo auction
+      auction = core.AgentAuctionEngine.createAuction('did:docutrust:auctioneer:1', {
+        taskType: 'ZK_TASK', description: 'desc', maxBudget: 5000, deadlineEpoch: 2000000000, requiredCapabilities: []
+      });
+      const cA = core.AgentAuctionEngine.commitBid(auction, 'did:docutrust:agent:alpha', 1200, 500, 'saltA');
+      const cB = core.AgentAuctionEngine.commitBid(cA.updatedAuction, 'did:docutrust:agent:beta', 1500, 500, 'saltB');
+      const rA = core.AgentAuctionEngine.revealBid(cB.updatedAuction, cA.commitment.commitmentId, 'did:docutrust:agent:alpha', 1200, 500, 'saltA');
+      const rB = core.AgentAuctionEngine.revealBid(rA.updatedAuction, cB.commitment.commitmentId, 'did:docutrust:agent:beta', 1500, 500, 'saltB');
+      auction = rB.updatedAuction;
+    }
+
+    const { updatedAuction, result } = core.AgentAuctionEngine.clearAuction(auction);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify({ updatedAuction, result }, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Auction cleared (Winner: ${result.winnerAgentDid}, Price: ${result.clearingPrice}) and saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify({ updatedAuction, result }, null, 2));
+    }
+    return;
+  }
+
   console.log(`Unknown command: ${command}. Run 'docutrust help' for usage.`);
 }
 

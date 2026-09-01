@@ -292,6 +292,34 @@ $$\text{TraceRoot} = \text{MerkleTree}(\{H(\text{step}_0), \dots, H(\text{step}_
 3. Optimistic fraud dispute verification: Watchdog challengers submit dispute proof containing invalid step index and expected state hash.
 4. Automatic state transition: on verified fraud, agent collateral is slashed, bounty is paid to challenger, and principal funds are refunded.
 
+### 2.41 ZK-Rollup & Batch State Compression Engine (Validium STARK)
+1. High-throughput state transition compression: aggregates 1,000+ status updates and credential issuances into a single $O(1)$ batch root transition:
+$$\text{StateRoot}_{t+1} = \text{ApplyBatch}(\text{StateRoot}_t, \Delta_{\text{batch}})$$
+2. Bit-packed byte-level state diff compression generating minimal L1 EVM calldata.
+3. FRI-based STARK validium proof synthesis verifying polynomial execution traces without off-chain data availability bottlenecks.
+4. Synthesized Solidity verifier `DocuTrustZKRollupVerifier.sol`.
+
+### 2.42 Verifiable Agent Memory Poisoning & Knowledge Quarantine Engine
+1. Multi-modal embedding drift detector scanning dynamic agent knowledge graphs against trusted ground-truth baselines:
+$$\text{DriftScore} = 1.0 - \max(0.0, \cos(\vec{e}_{\text{node}}, \vec{e}_{\text{baseline}}))$$
+2. Heuristic prompt injection & contradiction scanner computing composite threat scores.
+3. Cryptographic Quarantine Certificates (`DocuTrustMemoryQuarantineCertificate2026`) isolating subtrees with cryptographic boundary markers.
+4. Zero-knowledge verifiable rollback proofs verifying that pruned graphs restore exact prior uncompromised Merkle state roots.
+
+### 2.43 Multi-Authority Post-Quantum Attribute-Based Encryption (MA-PQ-ABE)
+1. Post-Quantum Lattice ABE operating over modular ring $\mathbb{Z}_q$ with prime modulus $q = 8380417$.
+2. Decentralized attribute authorities issue user-bound attribute secret tokens:
+$$\vec{t}_{u, \text{attr}} = (\text{MSK}_{\text{auth}} \cdot H(\text{attr}) + H(u) + 3) \pmod q$$
+3. Monotone Boolean policy tree compiler evaluating AND/OR access trees over multi-authority attribute sets.
+4. Lattice ciphertext encapsulation combined with symmetric AES-256-GCM data payload encryption.
+
+### 2.44 Decentralized AI Agent Capability Auction Protocol
+1. Sealed-bid Vickrey Second-Price Procurement Auction protocol for agent capability tasks.
+2. Cryptographic commit-reveal scheme hiding bids and collateral stakes:
+$$C_{\text{bid}} = \text{SHA-256}(\text{"bid:"} \parallel \text{AuctionId} \parallel \text{AgentDID} \parallel \text{Bid} \parallel \text{Stake} \parallel \text{Salt})$$
+3. Automated second-price clearing algorithm determining lowest bidder as task executor while paying the second-lowest bid price.
+4. Built-in escrow lockup, verified execution settlement, and fraud dispute slashing.
+
 ---
 
 ## 3. Directory Layout

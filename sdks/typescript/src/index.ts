@@ -2854,6 +2854,143 @@ export class DocuTrustClient {
   ): Promise<{ success: boolean; settled: boolean; updatedContract: any; error?: string }> {
     return this.request('/agent-contract/settle', 'POST', { contract, receipt });
   }
+
+  // ========================================================
+  // v20.0.0 ZK-Rollup & Batch State Compression Client Methods
+  // ========================================================
+
+  public async zkRollupCreateBatch(
+    initialAccounts: any[],
+    transactions: any[],
+    blockNumber?: number
+  ): Promise<{ success: boolean; batch: any }> {
+    return this.request('/rollup/batch', 'POST', { initialAccounts, transactions, blockNumber });
+  }
+
+  public async zkRollupVerifyBatch(
+    batch: any
+  ): Promise<{ success: boolean; valid: boolean; error?: string }> {
+    return this.request('/rollup/verify', 'POST', { batch });
+  }
+
+  // ========================================================
+  // v20.0.0 Verifiable Memory Quarantine Client Methods
+  // ========================================================
+
+  public async memoryQuarantineDetect(
+    nodes: any[],
+    groundTruthBaselines?: any[],
+    threshold?: number
+  ): Promise<{ success: boolean; analysis: any[] }> {
+    return this.request('/quarantine/detect', 'POST', { nodes, groundTruthBaselines, threshold });
+  }
+
+  public async memoryQuarantineIssueCertificate(
+    agentDid: string,
+    quarantinedNodes: any[],
+    boundaryNodeIds?: string[],
+    issuerSecretKeyHex?: string
+  ): Promise<{ success: boolean; certificate: any }> {
+    return this.request('/quarantine/certificate', 'POST', { agentDid, quarantinedNodes, boundaryNodeIds, issuerSecretKeyHex });
+  }
+
+  public async memoryQuarantineRollback(
+    fullGraph: any,
+    quarantineCert: any,
+    cleanNodes: any[]
+  ): Promise<{ success: boolean; proof: any; verification: any }> {
+    return this.request('/quarantine/rollback', 'POST', { fullGraph, quarantineCert, cleanNodes });
+  }
+
+  // ========================================================
+  // v20.0.0 Multi-Authority Post-Quantum ABE Client Methods
+  // ========================================================
+
+  public async pqAbeSetup(
+    authorityId: string,
+    authorityName: string
+  ): Promise<{ success: boolean; authority: any }> {
+    return this.request('/pqabe/setup', 'POST', { authorityId, authorityName });
+  }
+
+  public async pqAbeIssueToken(
+    authority: any,
+    userDid: string,
+    attribute: string,
+    expirationEpoch?: number
+  ): Promise<{ success: boolean; token: any }> {
+    return this.request('/pqabe/issue', 'POST', { authority, userDid, attribute, expirationEpoch });
+  }
+
+  public async pqAbeEncrypt(
+    payload: any,
+    policyExpression: string,
+    authorities: any[]
+  ): Promise<{ success: boolean; ciphertext: any }> {
+    return this.request('/pqabe/encrypt', 'POST', { payload, policyExpression, authorities });
+  }
+
+  public async pqAbeDecrypt(
+    ciphertext: any,
+    userTokens: any[],
+    userDid: string
+  ): Promise<{ success: boolean; payload?: any; error?: string }> {
+    return this.request('/pqabe/decrypt', 'POST', { ciphertext, userTokens, userDid });
+  }
+
+  // ========================================================
+  // v20.0.0 Decentralized Agent Capability Auction Client Methods
+  // ========================================================
+
+  public async agentAuctionCreate(
+    auctioneerDid: string,
+    taskSpec: any
+  ): Promise<{ success: boolean; auction: any }> {
+    return this.request('/agent-auction/create', 'POST', { auctioneerDid, taskSpec });
+  }
+
+  public async agentAuctionCommitBid(
+    auction: any,
+    agentDid: string,
+    bidAmount: number,
+    stakeAmount: number,
+    salt: string
+  ): Promise<{ success: boolean; updatedAuction: any; commitment: any }> {
+    return this.request('/agent-auction/commit', 'POST', { auction, agentDid, bidAmount, stakeAmount, salt });
+  }
+
+  public async agentAuctionRevealBid(
+    auction: any,
+    commitmentId: string,
+    agentDid: string,
+    bidAmount: number,
+    stakeAmount: number,
+    salt: string,
+    qualityMetric?: number
+  ): Promise<{ success: boolean; updatedAuction: any; bid: any }> {
+    return this.request('/agent-auction/reveal', 'POST', { auction, commitmentId, agentDid, bidAmount, stakeAmount, salt, qualityMetric });
+  }
+
+  public async agentAuctionClear(
+    auction: any
+  ): Promise<{ success: boolean; updatedAuction: any; result: any }> {
+    return this.request('/agent-auction/clear', 'POST', { auction });
+  }
+
+  public async agentAuctionSettle(
+    auction: any,
+    clearingResult: any,
+    executionReceiptId: string
+  ): Promise<{ success: boolean; updatedAuction: any; receipt: any }> {
+    return this.request('/agent-auction/settle', 'POST', { auction, clearingResult, executionReceiptId });
+  }
+
+  public async agentAuctionSlash(
+    auction: any,
+    disputeProof: any
+  ): Promise<{ success: boolean; updatedAuction: any; slashingReceipt: any }> {
+    return this.request('/agent-auction/slash', 'POST', { auction, disputeProof });
+  }
 }
 
 

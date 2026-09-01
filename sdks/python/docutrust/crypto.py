@@ -191,3 +191,29 @@ def decrypt_with_password(ciphertext_json: str, password_hex: str) -> str:
     from .encryption import decrypt_aes_gcm
     payload = json.loads(ciphertext_json)
     return decrypt_aes_gcm(payload, password_hex).decode('utf-8')
+
+def aes_gcm_encrypt(plaintext: str, key_hex: str) -> Dict[str, str]:
+    import base64
+    from .encryption import encrypt_aes_gcm
+    res = encrypt_aes_gcm(plaintext, key_hex)
+    raw_ct = base64.b64decode(res["ciphertext"])
+    return {
+        "ciphertextHex": raw_ct.hex(),
+        "ivHex": res["iv"],
+        "tagHex": res["authTag"],
+        "saltHex": res["salt"]
+    }
+
+def aes_gcm_decrypt(ciphertext_hex: str, key_hex: str, iv_hex: str, tag_hex: str, salt_hex: Optional[str] = None) -> str:
+    import base64
+    from .encryption import decrypt_aes_gcm
+    b64_ct = base64.b64encode(bytes.fromhex(ciphertext_hex)).decode('utf-8')
+    payload = {
+        "algorithm": "AES-256-GCM",
+        "ciphertext": b64_ct,
+        "iv": iv_hex,
+        "authTag": tag_hex,
+        "salt": salt_hex or (bytes(32).hex())
+    }
+    dec_bytes = decrypt_aes_gcm(payload, key_hex)
+    return dec_bytes.decode('utf-8')

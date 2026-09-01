@@ -92,8 +92,12 @@ from .proactive_sharing import ProactiveSecretSharingEngine, PSS_PRIME
 from .vector_commitments import VectorCommitmentEngine, VC_PRIME
 from .pq_blind import PQBlindSignatureEngine, PQ_LATTICE_Q
 from .agent_contract import AgentContractEngine
+from .zk_rollup import ZKRollupEngine
+from .memory_quarantine import MemoryQuarantineEngine
+from .pq_abe import PQAbeEngine
+from .agent_auction import AgentAuctionEngine
 
-__version__ = "19.0.0"
+__version__ = "20.0.0"
 __all__ = [
     "DocuTrustClient",
     "canonicalize_json",
@@ -204,5 +208,9 @@ __all__ = [
     "VC_PRIME",
     "PQBlindSignatureEngine",
     "PQ_LATTICE_Q",
-    "AgentContractEngine"
+    "AgentContractEngine",
+    "ZKRollupEngine",
+    "MemoryQuarantineEngine",
+    "PQAbeEngine",
+    "AgentAuctionEngine"
 ]
