@@ -2690,6 +2690,170 @@ export class DocuTrustClient {
   ): Promise<{ success: boolean; payload?: any; error?: string }> {
     return this.request('/timelock/unseal', 'POST', { envelope, vdfProof });
   }
+
+  // ========================================================
+  // v19.0.0 Proactive Secret Sharing (PSS) Client Methods
+  // ========================================================
+
+  public async pssSetupCommittee(
+    secretHex: string,
+    threshold: number,
+    totalParticipants: number,
+    participantDids?: string[]
+  ): Promise<{ success: boolean; committee: any; shares: any[]; secretCoefficients: string[] }> {
+    return this.request('/pss/setup', 'POST', { secretHex, threshold, totalParticipants, participantDids });
+  }
+
+  public async pssGenerateRenewalSubShares(
+    participantId: number,
+    threshold: number,
+    totalParticipants: number,
+    currentEpoch: number
+  ): Promise<{ success: boolean; subSharePackets: any[]; zeroCoefficients: string[] }> {
+    return this.request('/pss/renew/generate', 'POST', { participantId, threshold, totalParticipants, currentEpoch });
+  }
+
+  public async pssApplyRenewal(
+    currentShare: any,
+    receivedPackets: any[],
+    committee: any
+  ): Promise<{ success: boolean; updatedShare: any }> {
+    return this.request('/pss/renew/apply', 'POST', { currentShare, receivedPackets, committee });
+  }
+
+  public async pssReconstructSecret(
+    shares: any[],
+    threshold: number
+  ): Promise<{ success: boolean; secretHex: string; valid: boolean }> {
+    return this.request('/pss/reconstruct', 'POST', { shares, threshold });
+  }
+
+  // ========================================================
+  // v19.0.0 Succinct Vector Commitment Client Methods
+  // ========================================================
+
+  public async vectorCommit(
+    vector: any[],
+    crs?: any
+  ): Promise<{ success: boolean; commitment: any }> {
+    return this.request('/vector/commit', 'POST', { vector, crs });
+  }
+
+  public async vectorProvePosition(
+    vector: any[],
+    index: number,
+    crs?: any
+  ): Promise<{ success: boolean; proof: any }> {
+    return this.request('/vector/prove-position', 'POST', { vector, index, crs });
+  }
+
+  public async vectorVerifyPosition(
+    commitmentHex: string,
+    proof: any,
+    crs?: any
+  ): Promise<{ success: boolean; valid: boolean; error?: string }> {
+    return this.request('/vector/verify-position', 'POST', { commitmentHex, proof, crs });
+  }
+
+  public async vectorProveSubvector(
+    vector: any[],
+    indices: number[],
+    crs?: any
+  ): Promise<{ success: boolean; proof: any }> {
+    return this.request('/vector/prove-subvector', 'POST', { vector, indices, crs });
+  }
+
+  public async vectorVerifySubvector(
+    commitmentHex: string,
+    proof: any,
+    crs?: any
+  ): Promise<{ success: boolean; valid: boolean; error?: string }> {
+    return this.request('/vector/verify-subvector', 'POST', { commitmentHex, proof, crs });
+  }
+
+  // ========================================================
+  // v19.0.0 Post-Quantum Blind Signature Client Methods
+  // ========================================================
+
+  public async pqBlindGenerateKeyPair(): Promise<{ success: boolean; keyPair: any }> {
+    return this.request('/pqblind/keygen', 'POST', {});
+  }
+
+  public async pqBlindMessage(
+    message: any,
+    signerKey: any
+  ): Promise<{ success: boolean; request: any; blindingSecretHex: string; messageHash: string }> {
+    return this.request('/pqblind/blind', 'POST', { message, signerKey });
+  }
+
+  public async pqBlindSign(
+    request: any,
+    signerKey: any
+  ): Promise<{ success: boolean; blindResponse: any }> {
+    return this.request('/pqblind/sign', 'POST', { request, signerKey });
+  }
+
+  public async pqBlindUnblind(
+    messageHash: string,
+    blindResponse: any,
+    blindingSecretHex: string,
+    signerKey: any
+  ): Promise<{ success: boolean; unblindedReceipt: any }> {
+    return this.request('/pqblind/unblind', 'POST', { messageHash, blindResponse, blindingSecretHex, signerKey });
+  }
+
+  public async pqBlindVerify(
+    message: any,
+    receipt: any,
+    publicKeyHex: string
+  ): Promise<{ success: boolean; valid: boolean; error?: string }> {
+    return this.request('/pqblind/verify', 'POST', { message, receipt, publicKeyHex });
+  }
+
+  // ========================================================
+  // v19.0.0 Autonomous Agent Smart Contract Client Methods
+  // ========================================================
+
+  public async agentContractCreate(
+    principalDid: string,
+    agentDid: string,
+    taskSpec: any,
+    bountyAmount?: number,
+    agentStakeAmount?: number,
+    challengeWindowSeconds?: number
+  ): Promise<{ success: boolean; contract: any }> {
+    return this.request('/agent-contract/create', 'POST', {
+      principalDid,
+      agentDid,
+      taskSpec,
+      bountyAmount,
+      agentStakeAmount,
+      challengeWindowSeconds
+    });
+  }
+
+  public async agentContractSubmitExecution(
+    contract: any,
+    outputPayload: any,
+    executionSteps?: any[]
+  ): Promise<{ success: boolean; updatedContract: any; receipt: any }> {
+    return this.request('/agent-contract/submit', 'POST', { contract, outputPayload, executionSteps });
+  }
+
+  public async agentContractVerifyAndSlash(
+    contract: any,
+    receipt: any,
+    dispute: any
+  ): Promise<{ success: boolean; slashed: boolean; updatedContract: any; slashingReceipt?: any; error?: string }> {
+    return this.request('/agent-contract/slash', 'POST', { contract, receipt, dispute });
+  }
+
+  public async agentContractSettle(
+    contract: any,
+    receipt: any
+  ): Promise<{ success: boolean; settled: boolean; updatedContract: any; error?: string }> {
+    return this.request('/agent-contract/settle', 'POST', { contract, receipt });
+  }
 }
 
 

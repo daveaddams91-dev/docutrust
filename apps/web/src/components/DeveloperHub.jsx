@@ -175,41 +175,39 @@ $ docutrust agent-verify --attestation attestation.json`
             REST API v1 Endpoints
           </h3>
 
-          <div className="space-y-2.5">
             <div className="p-2.5 rounded-lg bg-gray-950 border border-gray-800 space-y-1">
               <div className="flex items-center gap-2">
                 <span className="px-1.5 py-0.5 rounded text-[10px] bg-indigo-500/10 text-indigo-400 font-bold">POST</span>
-                <span className="text-white text-[11px]">/api/v1/anoncreds/blind-issue</span>
+                <span className="text-white text-[11px]">/api/v1/pss/setup</span>
               </div>
-              <p className="text-[10px] text-gray-400 font-sans">AnonCreds 2.0 blind BBS+ credential issuance</p>
+              <p className="text-[10px] text-gray-400 font-sans">Initialize Proactive Secret Sharing committee</p>
             </div>
 
             <div className="p-2.5 rounded-lg bg-gray-950 border border-gray-800 space-y-1">
               <div className="flex items-center gap-2">
                 <span className="px-1.5 py-0.5 rounded text-[10px] bg-cyan-500/10 text-cyan-400 font-bold">POST</span>
-                <span className="text-white text-[11px]">/api/v1/dkg/ceremony</span>
+                <span className="text-white text-[11px]">/api/v1/vector/commit</span>
               </div>
-              <p className="text-[10px] text-gray-400 font-sans">Initialize FROST K-of-N threshold ceremony</p>
+              <p className="text-[10px] text-gray-400 font-sans">Generate O(1) constant-size vector commitment</p>
             </div>
 
             <div className="p-2.5 rounded-lg bg-gray-950 border border-gray-800 space-y-1">
               <div className="flex items-center gap-2">
-                <span className="px-1.5 py-0.5 rounded text-[10px] bg-blue-500/10 text-blue-400 font-bold">POST</span>
-                <span className="text-white text-[11px]">/api/v1/solidity/export-verifier</span>
+                <span className="px-1.5 py-0.5 rounded text-[10px] bg-purple-500/10 text-purple-400 font-bold">POST</span>
+                <span className="text-white text-[11px]">/api/v1/pqblind/blind</span>
               </div>
-              <p className="text-[10px] text-gray-400 font-sans">Generate on-chain Solidity verifier contract</p>
+              <p className="text-[10px] text-gray-400 font-sans">ML-DSA lattice post-quantum message blinding</p>
             </div>
 
             <div className="p-2.5 rounded-lg bg-gray-950 border border-gray-800 space-y-1">
               <div className="flex items-center gap-2">
-                <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400 font-bold">POST</span>
-                <span className="text-white text-[11px]">/api/v1/audit/bundle/create</span>
+                <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-400 font-bold">POST</span>
+                <span className="text-white text-[11px]">/api/v1/agent-contract/create</span>
               </div>
-              <p className="text-[10px] text-gray-400 font-sans">Package .dtbundle with SOC2 compliance</p>
+              <p className="text-[10px] text-gray-400 font-sans">Create autonomous agent task escrow & stake contract</p>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  }

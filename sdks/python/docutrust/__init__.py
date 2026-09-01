@@ -1,5 +1,4 @@
 from __future__ import annotations
-__version__ = "17.0.0"
 from .client import DocuTrustClient
 from .crypto import canonicalize_json, sha256_hex, MerkleTree, encode_base58, decode_base58
 from .pqc import generate_pqc_hybrid_keys
@@ -89,8 +88,12 @@ from .zkml_inference import ZKMLEngine
 from .mpc_garbled_circuits import MPCGarbledCircuitEngine
 from .swarm_consensus import SwarmConsensusEngine
 from .timelock_encryption import TimelockEncryptionEngine
+from .proactive_sharing import ProactiveSecretSharingEngine, PSS_PRIME
+from .vector_commitments import VectorCommitmentEngine, VC_PRIME
+from .pq_blind import PQBlindSignatureEngine, PQ_LATTICE_Q
+from .agent_contract import AgentContractEngine
 
-__version__ = "18.0.0"
+__version__ = "19.0.0"
 __all__ = [
     "DocuTrustClient",
     "canonicalize_json",
@@ -144,11 +147,6 @@ __all__ = [
     "PresentationExchangeEngine",
     "MultiSigEngine",
     "DIDResolver",
-    "create_did_peer_0",
-    "create_did_peer_2",
-    "create_did_jwk",
-    "encode_did_jwk",
-    "decode_did_jwk",
     "AnonCredsEngine",
     "DKGEngine",
     "SolidityEngine",
@@ -161,6 +159,11 @@ __all__ = [
     "DualHybridKEMEngine",
     "BadgeEngine",
     "PolicyEngine",
+    "create_did_peer_0",
+    "create_did_peer_2",
+    "create_did_jwk",
+    "encode_did_jwk",
+    "decode_did_jwk",
     "RingSignatureEngine",
     "SparseMerkleTree",
     "SLHDSAEngine",
@@ -194,5 +197,12 @@ __all__ = [
     "ZKMLEngine",
     "MPCGarbledCircuitEngine",
     "SwarmConsensusEngine",
-    "TimelockEncryptionEngine"
+    "TimelockEncryptionEngine",
+    "ProactiveSecretSharingEngine",
+    "PSS_PRIME",
+    "VectorCommitmentEngine",
+    "VC_PRIME",
+    "PQBlindSignatureEngine",
+    "PQ_LATTICE_Q",
+    "AgentContractEngine"
 ]

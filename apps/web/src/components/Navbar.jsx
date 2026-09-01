@@ -31,7 +31,8 @@ import {
   Hourglass,
   Menu,
   X,
-  Compass
+  Compass,
+  RefreshCw
 } from 'lucide-react';
 
 export default function Navbar({ activeTab, setActiveTab }) {
@@ -39,6 +40,10 @@ export default function Navbar({ activeTab, setActiveTab }) {
 
   const navItems = [
     { id: 'hero', label: 'Overview', icon: ShieldCheck, cat: 'Core' },
+    { id: 'pss-studio', label: 'Proactive Sharing', icon: RefreshCw, cat: 'v19' },
+    { id: 'vector-studio', label: 'Vector Commitments', icon: Layers, cat: 'v19' },
+    { id: 'pqblind-studio', label: 'PQ Blind Signatures', icon: EyeOff, cat: 'v19' },
+    { id: 'agent-contract-studio', label: 'Agent Smart Contracts', icon: Cpu, cat: 'v19' },
     { id: 'zkml-studio', label: 'zkML Inference', icon: Brain, cat: 'v18' },
     { id: 'mpc-studio', label: 'Garbled Circuits', icon: Lock, cat: 'v18' },
     { id: 'swarm-studio', label: 'Swarm Consensus', icon: Users, cat: 'v18' },

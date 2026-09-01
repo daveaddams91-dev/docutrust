@@ -6,7 +6,7 @@ from typing import Dict, Any, List, Optional, Union
 from .crypto import canonicalize_json, sha256_hex, MerkleTree
 
 class DocuTrustClient:
-    """Client for DocuTrust Sovereign Trust API v8.0.0."""
+    """Client for DocuTrust Sovereign Trust API v19.0.0."""
     def __init__(self, api_url: str = "https://api.docutrust.org/api/v1", api_key: Optional[str] = None):
         self.api_url = api_url.rstrip("/")
         self.api_key = api_key
@@ -2615,6 +2615,201 @@ class DocuTrustClient:
         """Unlocks and decrypts a timelocked credential using a valid VDF proof."""
         from .timelock_encryption import TimelockEncryptionEngine
         return TimelockEncryptionEngine.unseal_timelock_credential(envelope, vdf_proof)
+
+    # ========================================================
+    # v19.0.0 Proactive Secret Sharing (PSS) Methods
+    # ========================================================
+
+    def pss_setup_committee(
+        self,
+        secret_hex: str,
+        threshold: int,
+        total_participants: int,
+        participant_dids: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """Initializes a new PSS validator committee with Feldman VSS."""
+        from .proactive_sharing import ProactiveSecretSharingEngine
+        return ProactiveSecretSharingEngine.setup_committee(secret_hex, threshold, total_participants, participant_dids)
+
+    def pss_generate_renewal_subshares(
+        self,
+        participant_id: int,
+        threshold: int,
+        total_participants: int,
+        current_epoch: int
+    ) -> Dict[str, Any]:
+        """Generates zero-constant renewal sub-shares for proactive share rotation."""
+        from .proactive_sharing import ProactiveSecretSharingEngine
+        return ProactiveSecretSharingEngine.generate_renewal_subshares(participant_id, threshold, total_participants, current_epoch)
+
+    def pss_apply_renewal(
+        self,
+        current_share: Dict[str, Any],
+        received_packets: List[Dict[str, Any]],
+        committee: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Applies received renewal packets to rotate a share for the next epoch."""
+        from .proactive_sharing import ProactiveSecretSharingEngine
+        return ProactiveSecretSharingEngine.apply_renewal(current_share, received_packets, committee)
+
+    def pss_reconstruct_secret(
+        self,
+        shares: List[Dict[str, Any]],
+        threshold: int
+    ) -> Dict[str, Any]:
+        """Reconstructs the master secret from any threshold subset of shares."""
+        from .proactive_sharing import ProactiveSecretSharingEngine
+        return ProactiveSecretSharingEngine.reconstruct_secret(shares, threshold)
+
+    # ========================================================
+    # v19.0.0 Succinct Vector Commitment Methods
+    # ========================================================
+
+    def vector_commit(
+        self,
+        vector: List[Any],
+        crs: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Computes an O(1) succinct vector commitment over an attribute list."""
+        from .vector_commitments import VectorCommitmentEngine
+        return VectorCommitmentEngine.commit(vector, crs)
+
+    def vector_prove_position(
+        self,
+        vector: List[Any],
+        index: int,
+        crs: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Generates a single-position opening proof."""
+        from .vector_commitments import VectorCommitmentEngine
+        return VectorCommitmentEngine.prove_position(vector, index, crs)
+
+    def vector_verify_position(
+        self,
+        commitment_hex: str,
+        proof: Dict[str, Any],
+        crs: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Verifies a single-position opening proof."""
+        from .vector_commitments import VectorCommitmentEngine
+        return VectorCommitmentEngine.verify_position(commitment_hex, proof, crs)
+
+    def vector_prove_subvector(
+        self,
+        vector: List[Any],
+        indices: List[int],
+        crs: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Generates an aggregated subvector opening proof for an index subset."""
+        from .vector_commitments import VectorCommitmentEngine
+        return VectorCommitmentEngine.prove_subvector(vector, indices, crs)
+
+    def vector_verify_subvector(
+        self,
+        commitment_hex: str,
+        proof: Dict[str, Any],
+        crs: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Verifies an aggregated subvector opening proof in O(|I|) time."""
+        from .vector_commitments import VectorCommitmentEngine
+        return VectorCommitmentEngine.verify_subvector(commitment_hex, proof, crs)
+
+    # ========================================================
+    # v19.0.0 Post-Quantum Blind Signature Methods
+    # ========================================================
+
+    def pq_blind_generate_keypair(self) -> Dict[str, Any]:
+        """Generates a Post-Quantum Blind Signer keypair."""
+        from .pq_blind import PQBlindSignatureEngine
+        return PQBlindSignatureEngine.generate_keypair()
+
+    def pq_blind_message(
+        self,
+        message: Any,
+        signer_key: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Blinds a message using secret scalar beta before sending to signer."""
+        from .pq_blind import PQBlindSignatureEngine
+        return PQBlindSignatureEngine.blind_message(message, signer_key)
+
+    def pq_blind_sign(
+        self,
+        request: Dict[str, Any],
+        signer_key: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Signer blind-signs the blinded commitment without knowing message contents."""
+        from .pq_blind import PQBlindSignatureEngine
+        return PQBlindSignatureEngine.sign_blinded_message(request, signer_key)
+
+    def pq_blind_unblind(
+        self,
+        message_hash: str,
+        blind_response: Dict[str, Any],
+        blinding_secret_hex: str,
+        signer_key: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """User unblinds the blind signature to obtain a valid public signature."""
+        from .pq_blind import PQBlindSignatureEngine
+        return PQBlindSignatureEngine.unblind_signature(message_hash, blind_response, blinding_secret_hex, signer_key)
+
+    def pq_blind_verify(
+        self,
+        message: Any,
+        receipt: Dict[str, Any],
+        public_key_hex: str
+    ) -> Dict[str, Any]:
+        """Verifies an unblinded Post-Quantum signature."""
+        from .pq_blind import PQBlindSignatureEngine
+        return PQBlindSignatureEngine.verify_signature(message, receipt, public_key_hex)
+
+    # ========================================================
+    # v19.0.0 Autonomous Agent Smart Contract Methods
+    # ========================================================
+
+    def agent_contract_create(
+        self,
+        principal_did: str,
+        agent_did: str,
+        task_spec: Dict[str, Any],
+        bounty_amount: int = 1000,
+        agent_stake_amount: int = 500,
+        challenge_window_seconds: int = 3600
+    ) -> Dict[str, Any]:
+        """Creates an escrow smart contract for an autonomous AI agent."""
+        from .agent_contract import AgentContractEngine
+        return AgentContractEngine.create_contract(
+            principal_did, agent_did, task_spec, bounty_amount, agent_stake_amount, challenge_window_seconds
+        )
+
+    def agent_contract_submit_execution(
+        self,
+        contract: Dict[str, Any],
+        output_payload: Dict[str, Any],
+        execution_steps: Optional[List[Any]] = None
+    ) -> Dict[str, Any]:
+        """Submits agent execution traces and output to the contract."""
+        from .agent_contract import AgentContractEngine
+        return AgentContractEngine.submit_execution(contract, output_payload, execution_steps)
+
+    def agent_contract_verify_and_slash(
+        self,
+        contract: Dict[str, Any],
+        receipt: Dict[str, Any],
+        dispute: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Evaluates a fraud proof and slashes agent collateral if invalid execution is proven."""
+        from .agent_contract import AgentContractEngine
+        return AgentContractEngine.verify_and_slash(contract, receipt, dispute)
+
+    def agent_contract_settle(
+        self,
+        contract: Dict[str, Any],
+        receipt: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Settles contract and releases bounty upon challenge window expiration."""
+        from .agent_contract import AgentContractEngine
+        return AgentContractEngine.settle_contract(contract, receipt)
+
 
 
 

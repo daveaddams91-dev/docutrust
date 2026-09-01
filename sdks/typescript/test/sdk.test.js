@@ -510,6 +510,50 @@ describe('DocuTrust TypeScript SDK (@docutrust/sdk)', () => {
     assert.strictEqual(mockCalls[152].url, 'https://test-api.docutrust.org/api/v1/timelock/seal');
     await client.unsealTimelockCredential({}, {});
     assert.strictEqual(mockCalls[153].url, 'https://test-api.docutrust.org/api/v1/timelock/unseal');
+
+    // 74. v19.0.0 Proactive Secret Sharing (PSS)
+    await client.pssSetupCommittee('0x123', 2, 3);
+    assert.strictEqual(mockCalls[154].url, 'https://test-api.docutrust.org/api/v1/pss/setup');
+    await client.pssGenerateRenewalSubShares(1, 2, 3, 0);
+    assert.strictEqual(mockCalls[155].url, 'https://test-api.docutrust.org/api/v1/pss/renew/generate');
+    await client.pssApplyRenewal({}, [], {});
+    assert.strictEqual(mockCalls[156].url, 'https://test-api.docutrust.org/api/v1/pss/renew/apply');
+    await client.pssReconstructSecret([], 2);
+    assert.strictEqual(mockCalls[157].url, 'https://test-api.docutrust.org/api/v1/pss/reconstruct');
+
+    // 75. v19.0.0 Succinct Vector Commitments
+    await client.vectorCommit([]);
+    assert.strictEqual(mockCalls[158].url, 'https://test-api.docutrust.org/api/v1/vector/commit');
+    await client.vectorProvePosition([], 0);
+    assert.strictEqual(mockCalls[159].url, 'https://test-api.docutrust.org/api/v1/vector/prove-position');
+    await client.vectorVerifyPosition('0x', {});
+    assert.strictEqual(mockCalls[160].url, 'https://test-api.docutrust.org/api/v1/vector/verify-position');
+    await client.vectorProveSubvector([], []);
+    assert.strictEqual(mockCalls[161].url, 'https://test-api.docutrust.org/api/v1/vector/prove-subvector');
+    await client.vectorVerifySubvector('0x', {});
+    assert.strictEqual(mockCalls[162].url, 'https://test-api.docutrust.org/api/v1/vector/verify-subvector');
+
+    // 76. v19.0.0 Post-Quantum Blind Signatures
+    await client.pqBlindGenerateKeyPair();
+    assert.strictEqual(mockCalls[163].url, 'https://test-api.docutrust.org/api/v1/pqblind/keygen');
+    await client.pqBlindMessage({}, {});
+    assert.strictEqual(mockCalls[164].url, 'https://test-api.docutrust.org/api/v1/pqblind/blind');
+    await client.pqBlindSign({}, {});
+    assert.strictEqual(mockCalls[165].url, 'https://test-api.docutrust.org/api/v1/pqblind/sign');
+    await client.pqBlindUnblind('0x', {}, '0x', {});
+    assert.strictEqual(mockCalls[166].url, 'https://test-api.docutrust.org/api/v1/pqblind/unblind');
+    await client.pqBlindVerify({}, {}, '0x');
+    assert.strictEqual(mockCalls[167].url, 'https://test-api.docutrust.org/api/v1/pqblind/verify');
+
+    // 77. v19.0.0 Autonomous Agent Smart Contracts
+    await client.agentContractCreate('did:p', 'did:a', {}, 100, 50, 60);
+    assert.strictEqual(mockCalls[168].url, 'https://test-api.docutrust.org/api/v1/agent-contract/create');
+    await client.agentContractSubmitExecution({}, {}, []);
+    assert.strictEqual(mockCalls[169].url, 'https://test-api.docutrust.org/api/v1/agent-contract/submit');
+    await client.agentContractVerifyAndSlash({}, {}, {});
+    assert.strictEqual(mockCalls[170].url, 'https://test-api.docutrust.org/api/v1/agent-contract/slash');
+    await client.agentContractSettle({}, {});
+    assert.strictEqual(mockCalls[171].url, 'https://test-api.docutrust.org/api/v1/agent-contract/settle');
   });
 
   test('DocuTrustClient handles HTTP error responses gracefully', async () => {
@@ -529,3 +573,4 @@ describe('DocuTrust TypeScript SDK (@docutrust/sdk)', () => {
     );
   });
 });
+

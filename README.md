@@ -2,20 +2,20 @@
 
 # 🛡️ DocuTrust
 
-### The Open-Source Sovereign Trust Fabric for Verifiable Credentials, zkML Neural Inference, MPC Garbled Circuits, Autonomous Swarm Consensus & Threshold Timelock Encryption
+### The Open-Source Sovereign Trust Fabric for Verifiable Credentials, Proactive Secret Sharing, Vector Commitments, Post-Quantum Blind Signatures & Autonomous AI Agent Smart Contracts
 
-[![Version](https://img.shields.io/badge/Version-v18.0.0-cyan.svg)]()
+[![Version](https://img.shields.io/badge/Version-v19.0.0-cyan.svg)]()
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CI Status](https://img.shields.io/badge/CI-100%25%20Passing-brightgreen.svg)]()
-[![Zero-Knowledge ML](https://img.shields.io/badge/zkML-Quantized%20Inference%20%2B%20EVM%20Calldata-teal.svg)]()
-[![MPC Garbled Circuits](https://img.shields.io/badge/MPC-Free--XOR%20Yao%20%2B%20OT-indigo.svg)]()
-[![Swarm Consensus](https://img.shields.io/badge/Swarm%20Consensus-Weighted%20Reputation%20Threshold-amber.svg)]()
-[![Timelock Encryption](https://img.shields.io/badge/Timelock-Wesolowski%20VDF%20%2B%20O(1)%20Proof-cyan.svg)]()
+[![Proactive Secret Sharing](https://img.shields.io/badge/PSS-Feldman%20VSS%20Epoch%20Resharing-teal.svg)]()
+[![Vector Commitments](https://img.shields.io/badge/Vector%20Commitments-O(1)%20Constant--Size%20Proofs-indigo.svg)]()
+[![PQ Blind Signatures](https://img.shields.io/badge/PQ%20Blind-ML--DSA%20Lattice%20Signatures-amber.svg)]()
+[![Agent Smart Contracts](https://img.shields.io/badge/Agent%20Contracts-Escrow%20%2B%20Fraud%20Slashing-cyan.svg)]()
 [![Python SDK](https://img.shields.io/badge/Python-3.8+-3776AB?logo=python&logoColor=white)]()
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)]()
 
 <p align="center">
-  <b>DocuTrust</b> enables universities, enterprises, AI agent swarms, and decentralized networks to issue tamper-proof academic degrees, credentials, and autonomous agent attestations with <b>Zero-Knowledge Machine Learning (zkML) inference proofs</b>, <b>Free-XOR optimized Yao's Garbled Circuits MPC</b>, <b>Autonomous AI Agent Swarm Consensus & Intent Voting</b>, <b>Multi-Party Threshold Timelock Encryption with Wesolowski VDF</b>, <b>Transparent STARKs & FRI low-degree polynomial proximity testing</b>, <b>aBFT FROST Consensus</b>, and <b>Private Set Intersection (PSI)</b>.
+  <b>DocuTrust</b> enables universities, enterprises, AI agent swarms, and decentralized networks to issue tamper-proof academic degrees, credentials, and autonomous agent attestations with <b>Proactive Secret Sharing (PSS) epoch resharing</b>, <b>constant-size Vector Commitments (VC)</b>, <b>Post-Quantum Lattice Blind Signatures (ML-DSA)</b>, <b>Autonomous AI Agent Escrow Smart Contracts & Fraud Slashing</b>, <b>Zero-Knowledge Machine Learning (zkML)</b>, <b>Yao's Garbled Circuits MPC</b>, and <b>Threshold Timelock Encryption</b>.
 </p>
 
 [Quickstart Demo](#-10-second-quickstart-demo) • [Architecture](#-system-architecture--workflow) • [Security Hardening](#-defense-in-depth-security-hardening-uncrackable-guarantee) • [CLI Toolkit](#-cli-toolkit) • [Python SDK](#-python-sdk-docutrust) • [REST API](#-rest-api-endpoints)

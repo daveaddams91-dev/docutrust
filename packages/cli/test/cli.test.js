@@ -800,15 +800,15 @@ test('CLI Suite', async (t) => {
     assert.ok(aggOut.includes('Status List Multi-Partition Root matches'));
   });
 
-  await t.test('29. docutrust version displays v17.0.0', () => {
+  await t.test('29. docutrust version displays v19.0.0', () => {
     const out1 = execSync(`node "${cliPath}" version`).toString().trim();
-    assert.equal(out1, '17.0.0');
+    assert.equal(out1, '19.0.0');
 
     const out2 = execSync(`node "${cliPath}" --version`).toString().trim();
-    assert.equal(out2, '17.0.0');
+    assert.equal(out2, '19.0.0');
 
     const out3 = execSync(`node "${cliPath}" -v`).toString().trim();
-    assert.equal(out3, '17.0.0');
+    assert.equal(out3, '19.0.0');
   });
 
   await t.test('30. docutrust ringsig-sign and ringsig-verify (Linkable Ring Signatures)', () => {
@@ -1675,7 +1675,81 @@ test('CLI Suite', async (t) => {
     const decrypted = JSON.parse(fs.readFileSync(decryptedFile, 'utf-8'));
     assert.deepEqual(decrypted, secretData);
   });
+
+  await t.test('66. docutrust pss-init, pss-reshare, pss-reconstruct', () => {
+    const pssSetupFile = path.join(tempDir, 'pss-setup.json');
+    const pssRenewalFile = path.join(tempDir, 'pss-renewal.json');
+    const pssReconFile = path.join(tempDir, 'pss-recon.json');
+
+    // 1. Init
+    const initOut = execSync(`node "${cliPath}" pss-init --secret "0x1234567890abcdef" --threshold 2 --total 3 --out "${pssSetupFile}"`).toString();
+    assert.ok(initOut.includes('PSS Committee setup saved'));
+    assert.ok(fs.existsSync(pssSetupFile));
+
+    // 2. Reshare
+    const reshareOut = execSync(`node "${cliPath}" pss-reshare --participant 1 --threshold 2 --total 3 --epoch 0 --out "${pssRenewalFile}"`).toString();
+    assert.ok(reshareOut.includes('PSS Renewal Sub-shares saved'));
+
+    // 3. Reconstruct
+    const setupData = JSON.parse(fs.readFileSync(pssSetupFile, 'utf-8'));
+    const sharesFile = path.join(tempDir, 'pss-shares.json');
+    fs.writeFileSync(sharesFile, JSON.stringify(setupData.shares.slice(0, 2), null, 2), 'utf-8');
+
+    const reconOut = execSync(`node "${cliPath}" pss-reconstruct --shares "${sharesFile}" --threshold 2 --out "${pssReconFile}"`).toString();
+    assert.ok(reconOut.includes('PSS Reconstructed Secret saved'));
+  });
+
+  await t.test('67. docutrust vector-commit, vector-prove, vector-verify', () => {
+    const vecFile = path.join(tempDir, 'vec-data.json');
+    const commFile = path.join(tempDir, 'vec-comm.json');
+    const proofFile = path.join(tempDir, 'vec-proof.json');
+
+    const vectorData = [{ role: 'ADMIN' }, { clearance: 'HIGH' }];
+    fs.writeFileSync(vecFile, JSON.stringify(vectorData, null, 2), 'utf-8');
+
+    // 1. Commit
+    const commOut = execSync(`node "${cliPath}" vector-commit --vector "${vecFile}" --out "${commFile}"`).toString();
+    assert.ok(commOut.includes('Vector Commitment saved'));
+
+    // 2. Prove subvector
+    const proveOut = execSync(`node "${cliPath}" vector-prove --vector "${vecFile}" --indices "0,1" --out "${proofFile}"`).toString();
+    assert.ok(proveOut.includes('Subvector Proof saved'));
+
+    // 3. Verify
+    const commitData = JSON.parse(fs.readFileSync(commFile, 'utf-8'));
+    const verifyOut = execSync(`node "${cliPath}" vector-verify --commitment "${commitData.commitmentHex}" --proof "${proofFile}"`).toString();
+    assert.ok(verifyOut.includes('VALID'));
+  });
+
+  await t.test('68. docutrust pq-blind-keygen, pq-blind-request, pq-blind-sign', () => {
+    const kpFile = path.join(tempDir, 'pqblind-kp.json');
+    const msgFile = path.join(tempDir, 'pqblind-msg.json');
+    const reqFile = path.join(tempDir, 'pqblind-req.json');
+    const sigFile = path.join(tempDir, 'pqblind-sig.json');
+
+    // 1. Keygen
+    const kpOut = execSync(`node "${cliPath}" pq-blind-keygen --out "${kpFile}"`).toString();
+    assert.ok(kpOut.includes('PQ Blind KeyPair generated and saved'));
+
+    // 2. Request / Blind
+    fs.writeFileSync(msgFile, JSON.stringify({ vote: 'YES' }), 'utf-8');
+    const reqOut = execSync(`node "${cliPath}" pq-blind-request --msg "${msgFile}" --signer-key "${kpFile}" --out "${reqFile}"`).toString();
+    assert.ok(reqOut.includes('Blinded Message Request saved'));
+
+    // 3. Sign
+    const signOut = execSync(`node "${cliPath}" pq-blind-sign --request "${reqFile}" --signer-key "${kpFile}" --out "${sigFile}"`).toString();
+    assert.ok(signOut.includes('Blind Signature saved'));
+  });
+
+  await t.test('69. docutrust agent-contract-create', () => {
+    const contractFile = path.join(tempDir, 'agent-contract.json');
+
+    const createOut = execSync(`node "${cliPath}" agent-contract-create --principal "did:key:p" --agent "did:key:a" --bounty 500 --stake 250 --out "${contractFile}"`).toString();
+    assert.ok(createOut.includes('Agent Escrow Contract created'));
+    assert.ok(fs.existsSync(contractFile));
+  });
 });
+
 
 
 

@@ -123,7 +123,12 @@ const {
   ZKMLEngine,
   MPCGarbledCircuitEngine,
   SwarmConsensusEngine,
-  TimelockEncryptionEngine
+  TimelockEncryptionEngine,
+  // v19.0.0 Engines
+  ProactiveSecretSharingEngine,
+  VectorCommitmentEngine,
+  PQBlindSignatureEngine,
+  AgentContractEngine
 } = require('@docutrust/core');
 
 const PORT = process.env.PORT || 4000;
@@ -4204,6 +4209,281 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // ========================================================
+    // v19.0.0 Proactive Secret Sharing (PSS) Endpoints
+    // ========================================================
+
+    if (pathname === '/api/v1/pss/setup' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { secretHex, threshold, totalParticipants, participantDids } = body;
+      if (!secretHex || !threshold || !totalParticipants) {
+        return jsonResponse(400, { error: 'Missing secretHex, threshold, or totalParticipants.' });
+      }
+      try {
+        const result = ProactiveSecretSharingEngine.setupCommittee(secretHex, threshold, totalParticipants, participantDids);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/pss/renew/generate' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { participantId, threshold, totalParticipants, currentEpoch } = body;
+      if (participantId === undefined || !threshold || !totalParticipants) {
+        return jsonResponse(400, { error: 'Missing participantId, threshold, or totalParticipants.' });
+      }
+      try {
+        const result = ProactiveSecretSharingEngine.generateRenewalSubShares(
+          participantId,
+          threshold,
+          totalParticipants,
+          currentEpoch || 0
+        );
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/pss/renew/apply' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { currentShare, receivedPackets, committee } = body;
+      if (!currentShare || !receivedPackets || !committee) {
+        return jsonResponse(400, { error: 'Missing currentShare, receivedPackets, or committee.' });
+      }
+      try {
+        const updatedShare = ProactiveSecretSharingEngine.applyRenewal(currentShare, receivedPackets, committee);
+        return jsonResponse(200, { success: true, updatedShare });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/pss/reconstruct' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { shares, threshold } = body;
+      if (!shares || !threshold) {
+        return jsonResponse(400, { error: 'Missing shares or threshold.' });
+      }
+      try {
+        const result = ProactiveSecretSharingEngine.reconstructSecret(shares, threshold);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ========================================================
+    // v19.0.0 Succinct Vector Commitment Endpoints
+    // ========================================================
+
+    if (pathname === '/api/v1/vector/commit' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { vector, crs } = body;
+      if (!vector || !Array.isArray(vector)) {
+        return jsonResponse(400, { error: 'Missing or invalid vector array.' });
+      }
+      try {
+        const commitment = VectorCommitmentEngine.commit(vector, crs);
+        return jsonResponse(200, { success: true, commitment });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/vector/prove-position' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { vector, index, crs } = body;
+      if (!vector || index === undefined) {
+        return jsonResponse(400, { error: 'Missing vector or index.' });
+      }
+      try {
+        const proof = VectorCommitmentEngine.provePosition(vector, index, crs);
+        return jsonResponse(200, { success: true, proof });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/vector/verify-position' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { commitmentHex, proof, crs } = body;
+      if (!commitmentHex || !proof) {
+        return jsonResponse(400, { error: 'Missing commitmentHex or proof.' });
+      }
+      try {
+        const result = VectorCommitmentEngine.verifyPosition(commitmentHex, proof, crs);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/vector/prove-subvector' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { vector, indices, crs } = body;
+      if (!vector || !indices || !Array.isArray(indices)) {
+        return jsonResponse(400, { error: 'Missing vector or indices array.' });
+      }
+      try {
+        const proof = VectorCommitmentEngine.proveSubvector(vector, indices, crs);
+        return jsonResponse(200, { success: true, proof });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/vector/verify-subvector' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { commitmentHex, proof, crs } = body;
+      if (!commitmentHex || !proof) {
+        return jsonResponse(400, { error: 'Missing commitmentHex or proof.' });
+      }
+      try {
+        const result = VectorCommitmentEngine.verifySubvector(commitmentHex, proof, crs);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ========================================================
+    // v19.0.0 Post-Quantum Blind Signature Endpoints
+    // ========================================================
+
+    if (pathname === '/api/v1/pqblind/keygen' && req.method === 'POST') {
+      try {
+        const keyPair = PQBlindSignatureEngine.generateKeyPair();
+        return jsonResponse(200, { success: true, keyPair });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/pqblind/blind' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { message, signerKey } = body;
+      if (!message || !signerKey) {
+        return jsonResponse(400, { error: 'Missing message or signerKey.' });
+      }
+      try {
+        const result = PQBlindSignatureEngine.blindMessage(message, signerKey);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/pqblind/sign' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { request, signerKey } = body;
+      if (!request || !signerKey) {
+        return jsonResponse(400, { error: 'Missing request or signerKey.' });
+      }
+      try {
+        const blindResponse = PQBlindSignatureEngine.signBlindedMessage(request, signerKey);
+        return jsonResponse(200, { success: true, blindResponse });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/pqblind/unblind' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { messageHash, blindResponse, blindingSecretHex, signerKey } = body;
+      if (!messageHash || !blindResponse || !blindingSecretHex || !signerKey) {
+        return jsonResponse(400, { error: 'Missing parameters for unblinding.' });
+      }
+      try {
+        const unblindedReceipt = PQBlindSignatureEngine.unblindSignature(messageHash, blindResponse, blindingSecretHex, signerKey);
+        return jsonResponse(200, { success: true, unblindedReceipt });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/pqblind/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { message, receipt, publicKeyHex } = body;
+      if (!message || !receipt || !publicKeyHex) {
+        return jsonResponse(400, { error: 'Missing message, receipt, or publicKeyHex.' });
+      }
+      try {
+        const result = PQBlindSignatureEngine.verifySignature(message, receipt, publicKeyHex);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ========================================================
+    // v19.0.0 Autonomous Agent Smart Contract Endpoints
+    // ========================================================
+
+    if (pathname === '/api/v1/agent-contract/create' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { principalDid, agentDid, taskSpec, bountyAmount, agentStakeAmount, challengeWindowSeconds } = body;
+      if (!principalDid || !agentDid || !taskSpec) {
+        return jsonResponse(400, { error: 'Missing principalDid, agentDid, or taskSpec.' });
+      }
+      try {
+        const contract = AgentContractEngine.createContract(
+          principalDid,
+          agentDid,
+          taskSpec,
+          bountyAmount || 1000,
+          agentStakeAmount || 500,
+          challengeWindowSeconds || 3600
+        );
+        return jsonResponse(200, { success: true, contract });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/agent-contract/submit' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { contract, outputPayload, executionSteps } = body;
+      if (!contract || !outputPayload) {
+        return jsonResponse(400, { error: 'Missing contract or outputPayload.' });
+      }
+      try {
+        const result = AgentContractEngine.submitExecution(contract, outputPayload, executionSteps);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/agent-contract/slash' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { contract, receipt, dispute } = body;
+      if (!contract || !receipt || !dispute) {
+        return jsonResponse(400, { error: 'Missing contract, receipt, or dispute.' });
+      }
+      try {
+        const result = AgentContractEngine.verifyAndSlash(contract, receipt, dispute);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/agent-contract/settle' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { contract, receipt } = body;
+      if (!contract || !receipt) {
+        return jsonResponse(400, { error: 'Missing contract or receipt.' });
+      }
+      try {
+        const result = AgentContractEngine.settleContract(contract, receipt);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
     // Default 404
     jsonResponse(404, { error: 'Route not found' });
   } catch (err) {
@@ -4213,7 +4493,7 @@ const server = http.createServer(async (req, res) => {
 
 if (require.main === module) {
   server.listen(PORT, () => {
-    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v17.0.0 running on http://localhost:${PORT}`);
+    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v19.0.0 running on http://localhost:${PORT}`);
   });
 }
 

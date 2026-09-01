@@ -188,7 +188,12 @@ const {
   ZKMLEngine,
   MPCGarbledCircuitEngine,
   SwarmConsensusEngine,
-  TimelockEncryptionEngine
+  TimelockEncryptionEngine,
+  // v19.0.0 Engines
+  ProactiveSecretSharingEngine,
+  VectorCommitmentEngine,
+  PQBlindSignatureEngine,
+  AgentContractEngine
 } = require('../dist/index.js');
 
 // 1. Cryptography Tests
@@ -4415,6 +4420,113 @@ test('115. SolidityEngine: verify Universal Verifier contract contains all v18.0
   assert.ok(contractSrc.includes('function verifySwarmConsensus'));
   assert.ok(contractSrc.includes('function verifyTimelockProof'));
 });
+
+// 116. Proactive Secret Sharing & Dynamic Committee Epoch Resharing (v19.0.0)
+test('116. ProactiveSecretSharingEngine: Feldman VSS, zero-constant polynomials, share renewal, and threshold Lagrange reconstruction', () => {
+  const masterSecret = '0x123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0';
+  const threshold = 3;
+  const total = 5;
+
+  const setup = ProactiveSecretSharingEngine.setupCommittee(masterSecret, threshold, total);
+  assert.equal(setup.committee.threshold, 3);
+  assert.equal(setup.shares.length, 5);
+
+  const recon0 = ProactiveSecretSharingEngine.reconstructSecret(setup.shares.slice(0, 3), threshold);
+  assert.equal(recon0.valid, true);
+  assert.equal(recon0.secretHex.toLowerCase(), setup.reconstructionCheckHex.toLowerCase());
+
+  // Proactively renew to epoch 1
+  const allPackets = [];
+  const allCoeffs = [];
+  for (let i = 1; i <= total; i++) {
+    const ren = ProactiveSecretSharingEngine.generateRenewalSubShares(i, threshold, total, 0);
+    allPackets.push(...ren.subSharePackets);
+    allCoeffs.push(ren.zeroCoefficients.map(c => BigInt('0x' + c)));
+  }
+
+  const epoch1Shares = setup.shares.map(s => {
+    const received = allPackets.filter(p => p.toParticipant === s.participantId);
+    return ProactiveSecretSharingEngine.applyRenewal(s, received, setup.committee);
+  });
+
+  const { updatedCommittee } = ProactiveSecretSharingEngine.finalizeResharingRound(setup.committee, allCoeffs, epoch1Shares);
+  assert.equal(updatedCommittee.epoch, 1);
+
+  const recon1 = ProactiveSecretSharingEngine.reconstructSecret(epoch1Shares.slice(1, 4), threshold);
+  assert.equal(recon1.valid, true);
+  assert.equal(recon1.secretHex.toLowerCase(), setup.reconstructionCheckHex.toLowerCase());
+});
+
+// 117. Succinct Vector Commitments & Subvector Openings (v19.0.0)
+test('117. VectorCommitmentEngine: O(1) constant-size vector commitments, single-position proofs, and batch subvector opening proofs', () => {
+  const vector = [
+    { attribute: 'jurisdiction', value: 'US-CA' },
+    { attribute: 'minimum_age', value: 21 },
+    { attribute: 'clearance_level', value: 'SECRET' },
+    { attribute: 'authorized_spend_limit', value: 500000 },
+    { attribute: 'kyc_tier', value: 'ENTERPRISE_3' }
+  ];
+
+  const commitment = VectorCommitmentEngine.commit(vector);
+  assert.ok(typeof commitment.commitmentHex === 'string' && commitment.commitmentHex.length === 64);
+
+  // Single position proof
+  const posProof = VectorCommitmentEngine.provePosition(vector, 2);
+  const posVer = VectorCommitmentEngine.verifyPosition(commitment.commitmentHex, posProof);
+  assert.equal(posVer.valid, true);
+
+  // Batch subvector opening
+  const subProof = VectorCommitmentEngine.proveSubvector(vector, [0, 2, 4]);
+  const subVer = VectorCommitmentEngine.verifySubvector(commitment.commitmentHex, subProof);
+  assert.equal(subVer.valid, true);
+});
+
+// 118. Post-Quantum Lattice Blind Signatures (v19.0.0)
+test('118. PQBlindSignatureEngine: ML-DSA lattice blinding, blind signing, unblinding, and public verification', () => {
+  const signerKey = PQBlindSignatureEngine.generateKeyPair();
+  const message = { subject: 'did:key:z6MkuAnonymous', vote: 'APPROVE_PROPOSAL' };
+
+  const { request, blindingSecretHex, messageHash } = PQBlindSignatureEngine.blindMessage(message, signerKey);
+  const blindSig = PQBlindSignatureEngine.signBlindedMessage(request, signerKey);
+  const receipt = PQBlindSignatureEngine.unblindSignature(messageHash, blindSig, blindingSecretHex, signerKey);
+
+  const ver = PQBlindSignatureEngine.verifySignature(message, receipt, signerKey.publicKeyHex);
+  assert.equal(ver.valid, true);
+});
+
+// 119. Autonomous Agent Smart Contracts & Slashing Engine (v19.0.0)
+test('119. AgentContractEngine: task escrow contracts, trace commitments, fraud-proof dispute verification, and stake slashing', () => {
+  const contract = AgentContractEngine.createContract(
+    'did:docutrust:principal:01',
+    'did:docutrust:agent:01',
+    { taskType: 'PRICE_ATTESTATION' },
+    1000,
+    500,
+    3600
+  );
+
+  const { updatedContract, receipt } = AgentContractEngine.submitExecution(
+    contract,
+    { price: 3500 },
+    [{ action: 'QUERY_DEX', stateHash: '0x111' }]
+  );
+
+  assert.equal(updatedContract.status, 'SUBMITTED');
+
+  const dispute = {
+    contractId: contract.contractId,
+    receiptId: receipt.receiptId,
+    challengerDid: 'did:docutrust:watchdog',
+    disputeReason: 'INVALID_STEP',
+    invalidStepIndex: 0,
+    actualStepHash: receipt.executionTraceHashes[0]
+  };
+
+  const slashRes = AgentContractEngine.verifyAndSlash(updatedContract, receipt, dispute);
+  assert.equal(slashRes.slashed, true);
+  assert.equal(slashRes.updatedContract.status, 'SLASHED');
+});
+
 
 
 

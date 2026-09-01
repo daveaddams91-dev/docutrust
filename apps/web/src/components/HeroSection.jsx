@@ -12,7 +12,8 @@ import {
   Globe2,
   Terminal,
   Grid,
-  Bot
+  Bot,
+  RefreshCw
 } from 'lucide-react';
 
 export default function HeroSection({ setActiveTab }) {
@@ -205,6 +206,70 @@ export default function HeroSection({ setActiveTab }) {
 
         {/* Feature Grid Highlights */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 max-w-6xl mx-auto mt-20 text-left">
+          <div 
+            onClick={() => setActiveTab('pss-studio')}
+            className="glass-card p-5 rounded-2xl border border-indigo-500/50 bg-indigo-950/20 hover:border-indigo-400 hover:bg-gray-900/60 transition-all cursor-pointer group shadow-lg shadow-indigo-500/10"
+          >
+            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-3 group-hover:scale-105 transition-transform">
+              <RefreshCw className="w-5 h-5" />
+            </div>
+            <h3 className="text-sm font-bold text-white mb-1.5 flex items-center gap-1">
+              Proactive Secret Sharing (PSS)
+              <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/30">v19</span>
+            </h3>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              Feldman VSS with periodic zero-constant share renewal, dynamic committee transitions, and threshold Lagrange recovery.
+            </p>
+          </div>
+
+          <div 
+            onClick={() => setActiveTab('vector-studio')}
+            className="glass-card p-5 rounded-2xl border border-cyan-500/50 bg-cyan-950/20 hover:border-cyan-400 hover:bg-gray-900/60 transition-all cursor-pointer group shadow-lg shadow-cyan-500/10"
+          >
+            <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 mb-3 group-hover:scale-105 transition-transform">
+              <Layers className="w-5 h-5" />
+            </div>
+            <h3 className="text-sm font-bold text-white mb-1.5 flex items-center gap-1">
+              Succinct Vector Commitments
+              <span className="text-[10px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded border border-cyan-500/30">v19</span>
+            </h3>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              O(1) constant-size vector commitments over BN254 scalar field with aggregated subvector opening proofs.
+            </p>
+          </div>
+
+          <div 
+            onClick={() => setActiveTab('pqblind-studio')}
+            className="glass-card p-5 rounded-2xl border border-purple-500/50 bg-purple-950/20 hover:border-purple-400 hover:bg-gray-900/60 transition-all cursor-pointer group shadow-lg shadow-purple-500/10"
+          >
+            <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 mb-3 group-hover:scale-105 transition-transform">
+              <EyeOff className="w-5 h-5" />
+            </div>
+            <h3 className="text-sm font-bold text-white mb-1.5 flex items-center gap-1">
+              PQ Lattice Blind Signatures
+              <span className="text-[10px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded border border-purple-500/30">v19</span>
+            </h3>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              Post-quantum ML-DSA / Dilithium blind signature protocol for zero-leakage anonymous credential issuance.
+            </p>
+          </div>
+
+          <div 
+            onClick={() => setActiveTab('agent-contract-studio')}
+            className="glass-card p-5 rounded-2xl border border-amber-500/50 bg-amber-950/20 hover:border-amber-400 hover:bg-gray-900/60 transition-all cursor-pointer group shadow-lg shadow-amber-500/10"
+          >
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-3 group-hover:scale-105 transition-transform">
+              <Bot className="w-5 h-5" />
+            </div>
+            <h3 className="text-sm font-bold text-white mb-1.5 flex items-center gap-1">
+              Autonomous Agent Smart Contracts
+              <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30">v19</span>
+            </h3>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              Verifiable AI agent task escrows, execution trace commitments, fraud-proof challenge windows, and stake slashing.
+            </p>
+          </div>
+
           <div 
             onClick={() => setActiveTab('zkml-studio')}
             className="glass-card p-5 rounded-2xl border border-teal-500/40 bg-teal-950/20 hover:border-teal-400 hover:bg-gray-900/60 transition-all cursor-pointer group"

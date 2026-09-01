@@ -70,6 +70,30 @@ class MPCGarbledCircuitEngine:
             in_wires = gate.get("inputWires", [])
             out_wire = gate.get("outputWire", "")
 
+            if g_type == "NOT" and len(in_wires) == 1:
+                wire_a = in_wires[0]
+                if wire_a not in wire_labels:
+                    wire_labels[wire_a] = cls._generate_wire_labels(wire_a, global_delta)
+                    wire_permutation_bits[wire_a] = int(wire_labels[wire_a]["zeroLabel"][:2], 16) % 2
+
+                wire_labels[out_wire] = cls._generate_wire_labels(out_wire, global_delta)
+                wire_permutation_bits[out_wire] = int(wire_labels[out_wire]["zeroLabel"][:2], 16) % 2
+
+                table: List[str] = ["", ""]
+                for bit_a in (0, 1):
+                    out_bit = 1 - bit_a
+                    label_a = wire_labels[wire_a]["oneLabel" if bit_a == 1 else "zeroLabel"]
+                    perm_a = (bit_a ^ wire_permutation_bits[wire_a]) & 1
+                    out_label = wire_labels[out_wire]["oneLabel" if out_bit == 1 else "zeroLabel"]
+                    table[perm_a] = cls._encrypt_gate_entry(label_a, "unary_not_key", g_id, perm_a, out_label)
+
+                garbled_tables.append({
+                    "gateId": g_id,
+                    "type": g_type,
+                    "table": table
+                })
+                continue
+
             if len(in_wires) < 2:
                 continue
 
@@ -193,6 +217,21 @@ class MPCGarbledCircuitEngine:
             g_type = gate.get("type", "AND")
             in_wires = gate.get("inputWires", [])
             out_wire = gate.get("outputWire", "")
+
+            if g_type == "NOT" and len(in_wires) == 1:
+                wire_a = in_wires[0]
+                label_a = current_labels.get(wire_a)
+                gt = garbled_table_map.get(g_id)
+                if label_a and gt:
+                    decrypted_label = None
+                    for entry_idx, enc_entry in enumerate(gt.get("table", [])):
+                        res = cls._decrypt_gate_entry(label_a, "unary_not_key", g_id, entry_idx, enc_entry)
+                        if res:
+                            decrypted_label = res
+                            break
+                    if decrypted_label:
+                        current_labels[out_wire] = decrypted_label
+                continue
 
             if len(in_wires) < 2:
                 continue

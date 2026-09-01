@@ -37,6 +37,12 @@ pnpm-debug.log*
 lerna-debug.log*
 *.log
 
+# Test Artifacts and Temporaries
+temp-*/
+**/temp-*/
+*.tmp
+*.temp
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -48,3 +54,4 @@ lerna-debug.log*
 *.sw?
 .DS_Store
 Thumbs.db
+

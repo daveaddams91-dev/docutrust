@@ -145,7 +145,25 @@ export class MPCGarbledCircuitEngine {
         continue;
       }
 
-      if (gate.inputWires.length === 2) {
+      if (gate.type === 'NOT' && gate.inputWires.length === 1) {
+        const [wA] = gate.inputWires;
+        const wOut = gate.outputWire;
+        const table: string[] = new Array(2).fill('');
+
+        for (let bitA = 0; bitA <= 1; bitA++) {
+          const outBit = 1 - bitA;
+          const labelA = bitA === 0 ? wireLabels[wA].zeroLabel : wireLabels[wA].oneLabel;
+          const labelOut = outBit === 0 ? wireLabels[wOut].zeroLabel : wireLabels[wOut].oneLabel;
+          const pA = (bitA ^ wirePermutationBits[wA]) & 1;
+          table[pA] = this.encryptGateEntry(labelA, 'unary_not_key', gate.id, pA, labelOut);
+        }
+
+        garbledTables.push({
+          gateId: gate.id,
+          type: gate.type,
+          table
+        });
+      } else if (gate.inputWires.length === 2) {
         const [wA, wB] = gate.inputWires;
         const wOut = gate.outputWire;
         const table: string[] = new Array(4).fill('');
@@ -249,6 +267,26 @@ export class MPCGarbledCircuitEngine {
             outBuf[i] = labelA[i] ^ labelB[i];
           }
           currentWireLabels[gate.outputWire] = outBuf.toString('hex');
+        }
+        continue;
+      }
+
+      if (gate.type === 'NOT' && gate.inputWires.length === 1) {
+        const [wA] = gate.inputWires;
+        const labelA = currentWireLabels[wA];
+        const gTable = tablesByGate.get(gate.id);
+        if (gTable && labelA) {
+          let decryptedLabel: string | null = null;
+          for (let entryIdx = 0; entryIdx < gTable.table.length; entryIdx++) {
+            const res = this.decryptGateEntry(labelA, 'unary_not_key', gate.id, entryIdx, gTable.table[entryIdx]);
+            if (res) {
+              decryptedLabel = res;
+              break;
+            }
+          }
+          if (decryptedLabel) {
+            currentWireLabels[gate.outputWire] = decryptedLabel;
+          }
         }
         continue;
       }

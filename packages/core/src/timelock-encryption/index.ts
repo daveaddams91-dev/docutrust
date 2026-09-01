@@ -217,6 +217,10 @@ export class TimelockEncryptionEngine {
       return { success: false, error: verification.error || 'Invalid VDF delay proof' };
     }
 
+    if (vdfProof.modulusHex !== envelope.vdfParams.modulusHex || vdfProof.difficultyT !== envelope.vdfParams.difficultyT) {
+      return { success: false, error: 'VDF proof parameters do not match envelope constraints' };
+    }
+
     try {
       const decryptionKey = Buffer.from(sha256Hex(`timelock_key:${vdfProof.outputY}`), 'hex');
       const decipher = crypto.createDecipheriv(

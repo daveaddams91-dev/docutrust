@@ -262,6 +262,36 @@ $$y = g^{2^T} \pmod N$$
 $$\pi^L \cdot g^r \equiv y \pmod N, \quad \text{where } r = 2^T \pmod L$$
 4. AES-256-GCM time-locked credential envelope sealing (`DocuTrustTimelockEnvelope2026`) with verifiable delayed unsealing.
 
+### 2.37 Proactive Secret Sharing (PSS) & Dynamic Committee Epoch Resharing
+1. Feldman Verifiable Secret Sharing (VSS) over BN254 scalar field $\mathbb{F}_p$.
+2. Periodic share refreshment using zero-constant renewal polynomials:
+$$\delta_j(x) = \sum_{k=1}^{t-1} a_{j,k} x^k \pmod p, \quad \text{where } \delta_j(0) = 0$$
+3. Participant sub-share packet distribution and homomorphic share update:
+$$s_i^{(e+1)} = s_i^{(e)} + \sum_{j=1}^n \delta_j(i) \pmod p$$
+4. Master secret preservation: $\sum_{i \in S} s_i^{(e+1)} \lambda_i(0) = \sum_{i \in S} s_i^{(e)} \lambda_i(0) = s \pmod p$.
+5. Dynamic committee membership transition and cryptographic state root tracking (`DocuTrustPSSCommitteeStateRoot2026`).
+
+### 2.38 Succinct Vector Commitments & Constant-Size Subvector Openings
+1. Constant-size commitment $C = \text{Commit}(\vec{v}) \in \mathbb{G}_1$ over vector elements $(v_0, \dots, v_{m-1}) \in \mathbb{F}_p^m$.
+2. Single-position opening proof $\pi_i = \text{Prove}(\vec{v}, i)$ with $O(1)$ verification complexity.
+3. Multi-position batch subvector opening proof $\pi_I = \text{ProveSubvector}(\vec{v}, I \subset [0, m-1])$ aggregating witnesses into a single constant-size proof.
+4. On-chain validation in EVM smart contracts via `DocuTrustUniversalVerifier.sol`.
+
+### 2.39 Post-Quantum Lattice Blind Signatures (ML-DSA / Dilithium)
+1. NIST FIPS 204 (ML-DSA) lattice-based blind signing protocol.
+2. Requester message blinding with random secret $\beta \in \mathbb{Z}_q$:
+$$M^* = H(M) + \beta \pmod q$$
+3. Signer blind signing: $\sigma^* = \text{Sign}_{SK}(M^*)$.
+4. Requester signature unblinding: $\sigma = \sigma^* - \beta \pmod q$.
+5. Public verification: $\text{Verify}_{PK}(M, \sigma) = \text{true}$ with zero correlation to the signer's view of $M^*$.
+
+### 2.40 Autonomous AI Agent Smart Contracts, Execution Traces & Stake Slashing
+1. Task escrow smart contracts binding principal bounty, agent collateral, task specifications, and challenge windows.
+2. Stateful execution trace commitments:
+$$\text{TraceRoot} = \text{MerkleTree}(\{H(\text{step}_0), \dots, H(\text{step}_k)\})$$
+3. Optimistic fraud dispute verification: Watchdog challengers submit dispute proof containing invalid step index and expected state hash.
+4. Automatic state transition: on verified fraud, agent collateral is slashed, bounty is paid to challenger, and principal funds are refunded.
+
 ---
 
 ## 3. Directory Layout

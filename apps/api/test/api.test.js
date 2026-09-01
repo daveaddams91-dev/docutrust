@@ -2958,7 +2958,154 @@ test('API Server Suite', async (t) => {
     assert.equal(unsealRes.body.success, true);
     assert.deepEqual(unsealRes.body.payload, secretDoc);
   });
+
+  await t.test('81. POST /api/v1/pss (Setup, Renew Generate, Renew Apply, Reconstruct)', async () => {
+    // 1. Setup
+    const setupRes = await makeRequest('POST', '/api/v1/pss/setup', {
+      secretHex: '0x1234567890abcdef',
+      threshold: 2,
+      totalParticipants: 3
+    });
+    assert.equal(setupRes.status, 200);
+    const shares = setupRes.body.shares;
+    const committee = setupRes.body.committee;
+
+    // 2. Generate Renewal SubShares
+    const renRes = await makeRequest('POST', '/api/v1/pss/renew/generate', {
+      participantId: 1,
+      threshold: 2,
+      totalParticipants: 3,
+      currentEpoch: 0
+    });
+    assert.equal(renRes.status, 200);
+
+    // 3. Apply Renewal
+    const applyRes = await makeRequest('POST', '/api/v1/pss/renew/apply', {
+      currentShare: shares[0],
+      receivedPackets: renRes.body.subSharePackets.filter(p => p.toParticipant === 1),
+      committee
+    });
+    assert.equal(applyRes.status, 200);
+
+    // 4. Reconstruct
+    const reconRes = await makeRequest('POST', '/api/v1/pss/reconstruct', {
+      shares: shares.slice(0, 2),
+      threshold: 2
+    });
+    assert.equal(reconRes.status, 200);
+    assert.equal(reconRes.body.valid, true);
+  });
+
+  await t.test('82. POST /api/v1/vector (Commit, Prove Position, Verify Position, Prove Subvector, Verify Subvector)', async () => {
+    const vector = [{ role: 'ADMIN' }, { clearance: 'LEVEL_5' }, { verified: true }];
+
+    // 1. Commit
+    const commitRes = await makeRequest('POST', '/api/v1/vector/commit', { vector });
+    assert.equal(commitRes.status, 200);
+    const commitmentHex = commitRes.body.commitment.commitmentHex;
+
+    // 2. Prove Position
+    const proveRes = await makeRequest('POST', '/api/v1/vector/prove-position', { vector, index: 1 });
+    assert.equal(proveRes.status, 200);
+    const proof = proveRes.body.proof;
+
+    // 3. Verify Position
+    const verRes = await makeRequest('POST', '/api/v1/vector/verify-position', { commitmentHex, proof });
+    assert.equal(verRes.status, 200);
+    assert.equal(verRes.body.valid, true);
+
+    // 4. Subvector Proof & Verify
+    const subProofRes = await makeRequest('POST', '/api/v1/vector/prove-subvector', { vector, indices: [0, 2] });
+    assert.equal(subProofRes.status, 200);
+    const subVerRes = await makeRequest('POST', '/api/v1/vector/verify-subvector', {
+      commitmentHex,
+      proof: subProofRes.body.proof
+    });
+    assert.equal(subVerRes.status, 200);
+    assert.equal(subVerRes.body.valid, true);
+  });
+
+  await t.test('83. POST /api/v1/pqblind (Keygen, Blind, Sign, Unblind, Verify)', async () => {
+    // 1. Keygen
+    const keyRes = await makeRequest('POST', '/api/v1/pqblind/keygen', {});
+    assert.equal(keyRes.status, 200);
+    const keyPair = keyRes.body.keyPair;
+
+    // 2. Blind
+    const msg = { vote: 'APPROVE_CHARTER' };
+    const blindRes = await makeRequest('POST', '/api/v1/pqblind/blind', { message: msg, signerKey: keyPair });
+    assert.equal(blindRes.status, 200);
+    const { request, blindingSecretHex, messageHash } = blindRes.body;
+
+    // 3. Sign
+    const signRes = await makeRequest('POST', '/api/v1/pqblind/sign', { request, signerKey: keyPair });
+    assert.equal(signRes.status, 200);
+    const blindResponse = signRes.body.blindResponse;
+
+    // 4. Unblind
+    const unblindRes = await makeRequest('POST', '/api/v1/pqblind/unblind', {
+      messageHash,
+      blindResponse,
+      blindingSecretHex,
+      signerKey: keyPair
+    });
+    assert.equal(unblindRes.status, 200);
+    const receipt = unblindRes.body.unblindedReceipt;
+
+    // 5. Verify
+    const verRes = await makeRequest('POST', '/api/v1/pqblind/verify', {
+      message: msg,
+      receipt,
+      publicKeyHex: keyPair.publicKeyHex
+    });
+    assert.equal(verRes.status, 200);
+    assert.equal(verRes.body.valid, true);
+  });
+
+  await t.test('84. POST /api/v1/agent-contract (Create, Submit, Slash, Settle)', async () => {
+    // 1. Create
+    const createRes = await makeRequest('POST', '/api/v1/agent-contract/create', {
+      principalDid: 'did:key:principal',
+      agentDid: 'did:key:agent',
+      taskSpec: { task: 'DATA_SCRAPE' },
+      bountyAmount: 500,
+      agentStakeAmount: 250,
+      challengeWindowSeconds: 1800
+    });
+    assert.equal(createRes.status, 200);
+    const contract = createRes.body.contract;
+
+    // 2. Submit Execution
+    const subRes = await makeRequest('POST', '/api/v1/agent-contract/submit', {
+      contract,
+      outputPayload: { recordCount: 1500 },
+      executionSteps: [{ action: 'FETCH', stateHash: '0x111' }]
+    });
+    assert.equal(subRes.status, 200);
+
+    // 3. Slash
+    const submittedContract = subRes.body.updatedContract;
+    const receipt = subRes.body.receipt;
+    const slashRes = await makeRequest('POST', '/api/v1/agent-contract/slash', {
+      contract: submittedContract,
+      receipt,
+      dispute: {
+        disputeId: 'disp_1',
+        contractId: submittedContract.contractId,
+        receiptId: receipt.receiptId,
+        challengerDid: 'did:key:challenger',
+        disputeReason: 'INVALID_STEP',
+        invalidStepIndex: 0,
+        actualStepHash: receipt.executionTraceHashes[0],
+        challengerBond: 50,
+        evidencePayload: {}
+      }
+    });
+    assert.equal(slashRes.status, 200);
+    assert.equal(slashRes.body.slashed, true);
+  });
 });
+
 
 
 

@@ -253,3 +253,20 @@ export * from './swarm-consensus';
 
 // Export Multi-Party Threshold Timelock Encryption & Verifiable Delay Witness Engine (DocuTrust v18.0.0)
 export * from './timelock-encryption';
+
+// ========================================================
+// DocuTrust v19.0.0 Sovereign Trust & Agentic Frontier
+// ========================================================
+
+// Export Proactive Secret Sharing (PSS) & Dynamic Committee Resharing Engine (DocuTrust v19.0.0)
+export * from './proactive-sharing';
+
+// Export Succinct Vector Commitments & Subvector Openings Engine (DocuTrust v19.0.0)
+export * from './vector-commitments';
+
+// Export Post-Quantum Blind Signatures Engine (DocuTrust v19.0.0)
+export * from './pq-blind';
+
+// Export Verifiable Autonomous Agent Smart Contracts & Slashing Engine (DocuTrust v19.0.0)
+export * from './agent-contract';
+

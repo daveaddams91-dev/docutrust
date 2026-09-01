@@ -510,7 +510,7 @@ async function runDemoWizard() {
 
 async function main() {
   if (command === 'version' || command === '--version' || command === '-v') {
-    console.log('17.0.0');
+    console.log('19.0.0');
     return;
   }
 
@@ -5065,6 +5065,223 @@ async function main() {
     } else {
       console.error(`\x1b[31m✖\x1b[0m Timelock Unseal \x1b[1m\x1b[31mFAILED\x1b[0m:`, unsealed.error);
       process.exit(1);
+    }
+    return;
+  }
+
+  // ========================================================
+  // v19.0.0 Proactive Secret Sharing (PSS) CLI Commands
+  // ========================================================
+
+  if (command === 'pss-init') {
+    const secret = getArgValue('--secret') || getArgValue('-s') || 'docutrust_master_secret_seed';
+    const threshold = parseInt(getArgValue('--threshold') || getArgValue('-t') || '3', 10);
+    const total = parseInt(getArgValue('--total') || getArgValue('-n') || '5', 10);
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    const result = core.ProactiveSecretSharingEngine.setupCommittee(secret, threshold, total);
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(result, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m PSS Committee setup saved to \x1b[1m${outFile}\x1b[0m (Threshold: ${threshold}/${total})`);
+    } else {
+      console.log(JSON.stringify(result, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'pss-reshare') {
+    const participantId = parseInt(getArgValue('--participant') || getArgValue('-p') || '1', 10);
+    const threshold = parseInt(getArgValue('--threshold') || getArgValue('-t') || '3', 10);
+    const total = parseInt(getArgValue('--total') || getArgValue('-n') || '5', 10);
+    const epoch = parseInt(getArgValue('--epoch') || getArgValue('-e') || '0', 10);
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    const result = core.ProactiveSecretSharingEngine.generateRenewalSubShares(participantId, threshold, total, epoch);
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(result, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m PSS Renewal Sub-shares saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(result, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'pss-reconstruct') {
+    const sharesFile = getArgValue('--shares') || getArgValue('-s');
+    const threshold = parseInt(getArgValue('--threshold') || getArgValue('-t') || '3', 10);
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!sharesFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --shares <shares.json>');
+      process.exit(1);
+    }
+
+    const shares = JSON.parse(fs.readFileSync(sharesFile, 'utf-8'));
+    const sharesList = Array.isArray(shares) ? shares : (shares.shares || []);
+    const reconstructed = core.ProactiveSecretSharingEngine.reconstructSecret(sharesList, threshold);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(reconstructed, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m PSS Reconstructed Secret saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(reconstructed, null, 2));
+    }
+    return;
+  }
+
+  // ========================================================
+  // v19.0.0 Succinct Vector Commitments CLI Commands
+  // ========================================================
+
+  if (command === 'vector-commit') {
+    const vectorFile = getArgValue('--vector') || getArgValue('-v');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!vectorFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --vector <vector.json>');
+      process.exit(1);
+    }
+
+    const vector = JSON.parse(fs.readFileSync(vectorFile, 'utf-8'));
+    const commitment = core.VectorCommitmentEngine.commit(vector);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(commitment, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Vector Commitment saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(commitment, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'vector-prove') {
+    const vectorFile = getArgValue('--vector') || getArgValue('-v');
+    const indicesStr = getArgValue('--indices') || getArgValue('-i') || '0,1';
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!vectorFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --vector <vector.json>');
+      process.exit(1);
+    }
+
+    const vector = JSON.parse(fs.readFileSync(vectorFile, 'utf-8'));
+    const indices = indicesStr.split(',').map(idx => parseInt(idx.trim(), 10));
+    const proof = core.VectorCommitmentEngine.proveSubvector(vector, indices);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(proof, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Subvector Proof saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(proof, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'vector-verify') {
+    const commitmentHex = getArgValue('--commitment') || getArgValue('-c');
+    const proofFile = getArgValue('--proof') || getArgValue('-p');
+
+    if (!commitmentHex || !proofFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --commitment <hex> or --proof <proof.json>');
+      process.exit(1);
+    }
+
+    const proof = JSON.parse(fs.readFileSync(proofFile, 'utf-8'));
+    const result = core.VectorCommitmentEngine.verifySubvector(commitmentHex, proof);
+
+    if (result.valid) {
+      console.log(`\x1b[32m✔\x1b[0m Subvector Proof is \x1b[1m\x1b[32mVALID\x1b[0m`);
+    } else {
+      console.log(`\x1b[31m✖\x1b[0m Subvector Proof is \x1b[1m\x1b[31mINVALID\x1b[0m:`, result.error);
+      process.exit(1);
+    }
+    return;
+  }
+
+  // ========================================================
+  // v19.0.0 Post-Quantum Blind Signatures CLI Commands
+  // ========================================================
+
+  if (command === 'pq-blind-keygen') {
+    const outFile = getArgValue('--out') || getArgValue('-o') || 'pqblind-key.json';
+    const keyPair = core.PQBlindSignatureEngine.generateKeyPair();
+    fs.writeFileSync(outFile, JSON.stringify(keyPair, null, 2));
+    console.log(`\x1b[32m✔\x1b[0m PQ Blind KeyPair generated and saved to \x1b[1m${outFile}\x1b[0m (DID: ${keyPair.signerDid})`);
+    return;
+  }
+
+  if (command === 'pq-blind-request') {
+    const msgFile = getArgValue('--msg') || getArgValue('-m');
+    const signerKeyFile = getArgValue('--signer-key') || getArgValue('-k');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!msgFile || !signerKeyFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --msg <message.json> or --signer-key <key.json>');
+      process.exit(1);
+    }
+
+    const msg = JSON.parse(fs.readFileSync(msgFile, 'utf-8'));
+    const signerKey = JSON.parse(fs.readFileSync(signerKeyFile, 'utf-8'));
+    const result = core.PQBlindSignatureEngine.blindMessage(msg, signerKey);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(result, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Blinded Message Request saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(result, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'pq-blind-sign') {
+    const reqFile = getArgValue('--request') || getArgValue('-r');
+    const signerKeyFile = getArgValue('--signer-key') || getArgValue('-k');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    if (!reqFile || !signerKeyFile) {
+      console.error('\x1b[31mError:\x1b[0m Missing --request <req.json> or --signer-key <key.json>');
+      process.exit(1);
+    }
+
+    const reqData = JSON.parse(fs.readFileSync(reqFile, 'utf-8'));
+    const signerKey = JSON.parse(fs.readFileSync(signerKeyFile, 'utf-8'));
+    const request = reqData.request || reqData;
+    const blindSig = core.PQBlindSignatureEngine.signBlindedMessage(request, signerKey);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(blindSig, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Blind Signature saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(blindSig, null, 2));
+    }
+    return;
+  }
+
+  // ========================================================
+  // v19.0.0 Autonomous Agent Smart Contract CLI Commands
+  // ========================================================
+
+  if (command === 'agent-contract-create') {
+    const principalDid = getArgValue('--principal') || getArgValue('-p') || 'did:docutrust:principal:1';
+    const agentDid = getArgValue('--agent') || getArgValue('-a') || 'did:docutrust:agent:1';
+    const taskType = getArgValue('--task-type') || getArgValue('-t') || 'DATA_VERIFICATION';
+    const bounty = parseInt(getArgValue('--bounty') || '1000', 10);
+    const stake = parseInt(getArgValue('--stake') || '500', 10);
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    const contract = core.AgentContractEngine.createContract(
+      principalDid,
+      agentDid,
+      { taskType, description: 'Autonomous agent verifiable task execution', inputParameters: {} },
+      bounty,
+      stake
+    );
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(contract, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Agent Escrow Contract created and saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(contract, null, 2));
     }
     return;
   }
