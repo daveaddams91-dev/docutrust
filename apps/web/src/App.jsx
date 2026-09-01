@@ -67,6 +67,10 @@ import ZKRollupStudio from './components/ZKRollupStudio.jsx';
 import MemoryQuarantineStudio from './components/MemoryQuarantineStudio.jsx';
 import PQAbeStudio from './components/PQAbeStudio.jsx';
 import AgentAuctionStudio from './components/AgentAuctionStudio.jsx';
+import AgentFederationStudio from './components/AgentFederationStudio.jsx';
+import ConfidentialShuffleStudio from './components/ConfidentialShuffleStudio.jsx';
+import RAGProvenanceStudio from './components/RAGProvenanceStudio.jsx';
+import ZKStateMachineStudio from './components/ZKStateMachineStudio.jsx';
 import Footer from './components/Footer.jsx';
 
 export default function App() {
@@ -84,6 +88,10 @@ export default function App() {
 
       <main className="flex-1">
         {activeTab === 'hero' && <HeroSection setActiveTab={setActiveTab} />}
+        {activeTab === 'agent-federation-studio' && <AgentFederationStudio />}
+        {activeTab === 'confidential-shuffle-studio' && <ConfidentialShuffleStudio />}
+        {activeTab === 'rag-provenance-studio' && <RAGProvenanceStudio />}
+        {activeTab === 'zk-statemachine-studio' && <ZKStateMachineStudio />}
         {activeTab === 'zk-rollup-studio' && <ZKRollupStudio />}
         {activeTab === 'quarantine-studio' && <MemoryQuarantineStudio />}
         {activeTab === 'pqabe-studio' && <PQAbeStudio />}

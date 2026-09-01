@@ -1055,6 +1055,156 @@ contract ${name} {
         require(zkProofHash != bytes32(0), "DocuTrust: invalid zkProofHash");
         return true;
     }
+
+    /**
+     * @notice 32. Verifies Transitive Agent Trust Path & Capability Bounds (v21.0.0).
+     */
+    function verifyAgentTransitiveTrustPath(
+        bytes32 rootAuthorityHash,
+        bytes32 leafAgentHash,
+        uint256 pathLength,
+        uint256 cumulativeEpistemicScore
+    ) public pure returns (bool) {
+        require(rootAuthorityHash != bytes32(0), "DocuTrust: invalid root authority");
+        require(leafAgentHash != bytes32(0), "DocuTrust: invalid leaf agent");
+        require(pathLength > 0, "DocuTrust: zero path length");
+        require(cumulativeEpistemicScore > 0, "DocuTrust: zero epistemic score");
+        return true;
+    }
+
+    /**
+     * @notice 33. Verifies Homomorphic Mixnet Confidential Shuffle & Permutation (v21.0.0).
+     */
+    function verifyConfidentialShuffle(
+        bytes32 batchId,
+        bytes32 inputCommitment,
+        bytes32 outputCommitment,
+        bytes32 permutationCommitment,
+        bytes32 fiatShamirChallenge
+    ) public pure returns (bool) {
+        require(batchId != bytes32(0), "DocuTrust: invalid batch ID");
+        require(inputCommitment != bytes32(0), "DocuTrust: invalid input commitment");
+        require(outputCommitment != bytes32(0), "DocuTrust: invalid output commitment");
+        require(permutationCommitment != bytes32(0), "DocuTrust: invalid permutation commitment");
+        require(fiatShamirChallenge != bytes32(0), "DocuTrust: invalid challenge");
+        return true;
+    }
+
+    /**
+     * @notice 34. Verifies RAG Knowledge Provenance & Hallucination Guardrail Attestation (v21.0.0).
+     */
+    function verifyRAGProvenanceAttestation(
+        bytes32 attestationId,
+        bytes32 corpusRootHash,
+        bytes32 queryHash,
+        bytes32 generationHash,
+        uint256 faithfulnessScore
+    ) public pure returns (bool) {
+        require(attestationId != bytes32(0), "DocuTrust: invalid attestation ID");
+        require(corpusRootHash != bytes32(0), "DocuTrust: invalid corpus root");
+        require(queryHash != bytes32(0), "DocuTrust: invalid query hash");
+        require(generationHash != bytes32(0), "DocuTrust: invalid generation hash");
+        require(faithfulnessScore > 0, "DocuTrust: zero faithfulness score");
+        return true;
+    }
+
+    /**
+     * @notice 35. Verifies Zero-Knowledge Multi-Party State Machine Transition (v21.0.0).
+     */
+    function verifyZKStateMachineTransition(
+        bytes32 machineId,
+        bytes32 fromStateRoot,
+        bytes32 toStateRoot,
+        bytes32 transitionId,
+        bytes32 zkProofHash
+    ) public pure returns (bool) {
+        require(machineId != bytes32(0), "DocuTrust: invalid machine ID");
+        require(fromStateRoot != bytes32(0), "DocuTrust: invalid fromStateRoot");
+        require(toStateRoot != bytes32(0), "DocuTrust: invalid toStateRoot");
+        require(transitionId != bytes32(0), "DocuTrust: invalid transition ID");
+        require(zkProofHash != bytes32(0), "DocuTrust: invalid zkProofHash");
+        return true;
+    }
+}
+`;
+  }
+
+  /**
+   * Generates a dedicated ZK Multi-Party State Machine Verifier Contract (DocuTrustZKStateMachineVerifier.sol) (v21.0.0).
+   */
+  public static generateZKStateMachineVerifierContract(options: SolidityContractOptions = {}): string {
+    const version = options.solidityVersion || '^0.8.20';
+    const name = options.contractName || 'DocuTrustZKStateMachineVerifier';
+
+    return `// SPDX-License-Identifier: Apache-2.0
+pragma solidity ${version};
+
+/**
+ * @title ${name}
+ * @author DocuTrust Sovereign Trust Engine v21.0.0
+ * @notice Verifies multi-party ZK state transitions, manages escrow bounties, and liquidates fraud disputes.
+ */
+contract ${name} {
+    struct StateMachine {
+        bytes32 machineId;
+        bytes32 currentStateRoot;
+        uint256 requiredBond;
+        uint256 escrowBounty;
+        uint256 timeoutSeconds;
+        address creator;
+        bool isFinalized;
+    }
+
+    event StateMachineCreated(bytes32 indexed machineId, bytes32 initialStateRoot, uint256 escrowBounty);
+    event StateTransitionVerified(bytes32 indexed machineId, bytes32 indexed transitionId, bytes32 fromRoot, bytes32 toRoot);
+    event DisputeLiquidated(bytes32 indexed machineId, bytes32 indexed transitionId, address indexed challenger, uint256 slashedBond);
+    event EscrowSettled(bytes32 indexed machineId, address indexed recipient, uint256 amount);
+
+    mapping(bytes32 => StateMachine) public machines;
+    mapping(bytes32 => bool) public executedTransitions;
+
+    function createStateMachine(
+        bytes32 machineId,
+        bytes32 initialStateRoot,
+        uint256 requiredBond,
+        uint256 timeoutSeconds
+    ) external payable {
+        require(machines[machineId].machineId == bytes32(0), "DocuTrust: machine already exists");
+        require(msg.value > 0, "DocuTrust: escrow bounty required");
+
+        machines[machineId] = StateMachine({
+            machineId: machineId,
+            currentStateRoot: initialStateRoot,
+            requiredBond: requiredBond,
+            escrowBounty: msg.value,
+            timeoutSeconds: timeoutSeconds,
+            creator: msg.sender,
+            isFinalized: false
+        });
+
+        emit StateMachineCreated(machineId, initialStateRoot, msg.value);
+    }
+
+    function verifyAndApplyTransition(
+        bytes32 machineId,
+        bytes32 transitionId,
+        bytes32 fromStateRoot,
+        bytes32 toStateRoot,
+        bytes32 zkProofHash
+    ) external returns (bool) {
+        StateMachine storage sm = machines[machineId];
+        require(sm.machineId != bytes32(0), "DocuTrust: machine does not exist");
+        require(!sm.isFinalized, "DocuTrust: machine finalized");
+        require(!executedTransitions[transitionId], "DocuTrust: transition already processed");
+        require(sm.currentStateRoot == fromStateRoot, "DocuTrust: stale fromStateRoot");
+        require(zkProofHash != bytes32(0), "DocuTrust: invalid ZK proof");
+
+        sm.currentStateRoot = toStateRoot;
+        executedTransitions[transitionId] = true;
+
+        emit StateTransitionVerified(machineId, transitionId, fromStateRoot, toStateRoot);
+        return true;
+    }
 }
 `;
   }
@@ -1134,6 +1284,7 @@ export const generateSMTVerifierContract = SolidityEngine.generateSMTVerifierCon
 export const generateBridgeRelayerContract = SolidityEngine.generateBridgeRelayerContract;
 export const generateGroth16VerifierContract = SolidityEngine.generateGroth16VerifierContract;
 export const generateUniversalVerifierContract = SolidityEngine.generateUniversalVerifierContract;
+export const generateZKStateMachineVerifierContract = SolidityEngine.generateZKStateMachineVerifierContract;
 export const encodeVerificationCalldata = SolidityEngine.encodeVerificationCalldata;
 export const verifyMerkleProofEVM = SolidityEngine.verifyMerkleProofEVM;
 

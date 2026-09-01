@@ -592,6 +592,52 @@ describe('DocuTrust TypeScript SDK (@docutrust/sdk)', () => {
     assert.strictEqual(mockCalls[185].url, 'https://test-api.docutrust.org/api/v1/agent-auction/settle');
     await client.agentAuctionSlash({}, {});
     assert.strictEqual(mockCalls[186].url, 'https://test-api.docutrust.org/api/v1/agent-auction/slash');
+
+    // 82. v21.0.0 Autonomous Agent Identity & Epistemic Federation
+    await client.createAgentIdentity({});
+    assert.strictEqual(mockCalls[187].url, 'https://test-api.docutrust.org/api/v1/agent-federation/identity');
+    await client.issueAgentDelegationToken({}, 'did:w', ['inference']);
+    assert.strictEqual(mockCalls[188].url, 'https://test-api.docutrust.org/api/v1/agent-federation/delegate');
+    await client.verifyAgentTransitiveTrust([], {});
+    assert.strictEqual(mockCalls[189].url, 'https://test-api.docutrust.org/api/v1/agent-federation/verify');
+    await client.initiateAgentHandshake({}, 'did:resp');
+    assert.strictEqual(mockCalls[190].url, 'https://test-api.docutrust.org/api/v1/agent-federation/handshake/init');
+    await client.respondAgentHandshake({}, {}, 'pk');
+    assert.strictEqual(mockCalls[191].url, 'https://test-api.docutrust.org/api/v1/agent-federation/handshake/respond');
+    await client.completeAgentHandshake('sec', {}, {}, 'pk');
+    assert.strictEqual(mockCalls[192].url, 'https://test-api.docutrust.org/api/v1/agent-federation/handshake/complete');
+
+    // 83. v21.0.0 Confidential Mixnet & Verifiable Shuffling
+    await client.confidentialShuffleKeygen();
+    assert.strictEqual(mockCalls[193].url, 'https://test-api.docutrust.org/api/v1/confidential-shuffle/keygen');
+    await client.confidentialShuffle(['10', '20'], {});
+    assert.strictEqual(mockCalls[194].url, 'https://test-api.docutrust.org/api/v1/confidential-shuffle/shuffle');
+    await client.verifyConfidentialShuffle([], [], {}, {});
+    assert.strictEqual(mockCalls[195].url, 'https://test-api.docutrust.org/api/v1/confidential-shuffle/verify');
+    await client.decryptConfidentialShuffle([], 'sk');
+    assert.strictEqual(mockCalls[196].url, 'https://test-api.docutrust.org/api/v1/confidential-shuffle/decrypt');
+
+    // 84. v21.0.0 RAG Knowledge Provenance & Hallucination Auditing
+    await client.indexRAGCorpus('corpus:1', [{ uri: 'doc:1', text: 'hello' }]);
+    assert.strictEqual(mockCalls[197].url, 'https://test-api.docutrust.org/api/v1/rag-provenance/index');
+    await client.attestRAGProvenance({}, 'query', 'response', [], {});
+    assert.strictEqual(mockCalls[198].url, 'https://test-api.docutrust.org/api/v1/rag-provenance/attest');
+    await client.verifyRAGAttestation({}, 'root', 'pk');
+    assert.strictEqual(mockCalls[199].url, 'https://test-api.docutrust.org/api/v1/rag-provenance/verify');
+    await client.auditRAGHallucinationRisk({});
+    assert.strictEqual(mockCalls[200].url, 'https://test-api.docutrust.org/api/v1/rag-provenance/audit');
+
+    // 85. v21.0.0 ZK State Machine & Verifiable Escrow
+    await client.createZKStateMachine({});
+    assert.strictEqual(mockCalls[201].url, 'https://test-api.docutrust.org/api/v1/zk-statemachine/create');
+    await client.executeZKStateTransition({}, {}, 'ACT', {}, {});
+    assert.strictEqual(mockCalls[202].url, 'https://test-api.docutrust.org/api/v1/zk-statemachine/transition');
+    await client.verifyZKStateTransition({}, {}, 'pk');
+    assert.strictEqual(mockCalls[203].url, 'https://test-api.docutrust.org/api/v1/zk-statemachine/verify');
+    await client.disputeZKStateTransition({}, {}, {});
+    assert.strictEqual(mockCalls[204].url, 'https://test-api.docutrust.org/api/v1/zk-statemachine/dispute');
+    await client.settleZKStateMachine({}, 'root', 'did:exec');
+    assert.strictEqual(mockCalls[205].url, 'https://test-api.docutrust.org/api/v1/zk-statemachine/settle');
   });
 
   test('DocuTrustClient handles HTTP error responses gracefully', async () => {

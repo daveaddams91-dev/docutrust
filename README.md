@@ -2,20 +2,20 @@
 
 # 🛡️ DocuTrust
 
-### The Open-Source Sovereign Trust Fabric for Verifiable Credentials, Validium ZK-Rollups, Memory Quarantine, MA-PQ-ABE & AI Agent Capability Auctions
+### The Open-Source Sovereign Trust Fabric for Verifiable Credentials, Autonomous Agent Identity Federation, Confidential Mixnets, RAG Provenance & ZK State Machines
 
-[![Version](https://img.shields.io/badge/Version-v20.0.0-cyan.svg)]()
+[![Version](https://img.shields.io/badge/Version-v21.0.0-cyan.svg)]()
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CI Status](https://img.shields.io/badge/CI-100%25%20Passing-brightgreen.svg)]()
-[![ZK-Rollups](https://img.shields.io/badge/ZK--Rollup-Validium%20STARK%20Compression-teal.svg)]()
-[![Memory Quarantine](https://img.shields.io/badge/Memory%20Quarantine-Verifiable%20ZK--Rollback-indigo.svg)]()
-[![MA-PQ-ABE](https://img.shields.io/badge/MA--PQ--ABE-Lattice%20Attribute%20Encryption-amber.svg)]()
-[![Agent Auctions](https://img.shields.io/badge/Agent%20Auctions-Vickrey%20Commit--Reveal-cyan.svg)]()
+[![Agent Federation](https://img.shields.io/badge/Agent%20Federation-Epistemic%20Trust%20Vectors-teal.svg)]()
+[![Confidential Mixnets](https://img.shields.io/badge/Confidential%20Mixnets-Homomorphic%20Shuffle-indigo.svg)]()
+[![RAG Provenance](https://img.shields.io/badge/RAG%20Provenance-Merkle%20Grounding-amber.svg)]()
+[![ZK State Machine](https://img.shields.io/badge/ZK%20State%20Machine-Optimistic%20Escrow-cyan.svg)]()
 [![Python SDK](https://img.shields.io/badge/Python-3.8+-3776AB?logo=python&logoColor=white)]()
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)]()
 
 <p align="center">
-  <b>DocuTrust</b> enables universities, enterprises, AI agent swarms, and decentralized networks to issue tamper-proof academic degrees, credentials, and autonomous agent attestations with <b>Validium ZK-Rollup batch state compression</b>, <b>Verifiable Agent Memory Poisoning Quarantine & ZK-Rollback</b>, <b>Multi-Authority Post-Quantum Attribute-Based Encryption (MA-PQ-ABE)</b>, <b>Decentralized Agent Capability Auctions (Vickrey)</b>, <b>Proactive Secret Sharing (PSS)</b>, and <b>Post-Quantum Lattice Signatures (ML-DSA)</b>.
+  <b>DocuTrust</b> enables universities, enterprises, AI agent swarms, and decentralized networks to issue tamper-proof academic degrees, credentials, and autonomous agent attestations with <b>Autonomous Agent Identity & Epistemic Federation</b>, <b>Homomorphic Mixnet & Verifiable Confidential Shuffling</b>, <b>RAG Knowledge Provenance & Hallucination Auditing</b>, <b>ZK Multi-Party State Machines & Verifiable Escrow</b>, <b>Validium ZK-Rollups</b>, and <b>Post-Quantum Lattice Signatures (ML-DSA)</b>.
 </p>
 
 [Quickstart Demo](#-10-second-quickstart-demo) • [Architecture](#-system-architecture--workflow) • [Security Hardening](#-defense-in-depth-security-hardening-uncrackable-guarantee) • [CLI Toolkit](#-cli-toolkit) • [Python SDK](#-python-sdk-docutrust) • [REST API](#-rest-api-endpoints)
@@ -61,7 +61,7 @@ Output:
 
 ```
  ┌───────────────────────────┐      ┌──────────────────────────┐
- │  University / Institution │      │  High-Entropy Keys & KMS │
+ │  University / Institution │      │  Autonomous Agent Swarms │
  └─────────────┬─────────────┘      └────────────┬─────────────┘
                │                                 │
                ▼                                 ▼
@@ -69,24 +69,24 @@ Output:
  │       RFC 8785 JSON Canonicalization Scheme (JCS)           │
  └─────────────────────────────┬───────────────────────────────┘
                                │
-       ┌───────────────────────┴───────────────────────┐
-       ▼                                               ▼
- ┌───────────────────────────┐          ┌───────────────────────────┐
- │   Classical Signature     │          │   Post-Quantum Hybrid     │
- │     (Ed25519 did:key)     │          │  (NIST ML-DSA / Dilithium)│
- └─────────────┬─────────────┘          └─────────────┬─────────────┘
-               │                                      │
-               └───────────────────┬──────────────────┘
-                                   ▼
+       ┌───────────────────────┼───────────────────────┐
+       ▼                       ▼                       ▼
+ ┌───────────┐          ┌─────────────┐         ┌─────────────┐
+ │ Ed25519   │          │ NIST ML-DSA │         │ ZK-STARK &  │
+ │ Classical │          │ Post-Quantum│         │ Groth16     │
+ └─────┬─────┘          └──────┬──────┘         └──────┬──────┘
+       │                       │                       │
+       └───────────────────────┼───────────────────────┘
+                               ▼
  ┌─────────────────────────────────────────────────────────────┐
- │      RFC 6962 Domain-Separated Merkle Batch Aggregator      │
+ │  Autonomous Agent Federation & RAG Provenance Attestation   │
  └─────────────────────────────┬───────────────────────────────┘
                                │
        ┌───────────────────────┴───────────────────────┐
        ▼                                               ▼
  ┌───────────────────────────┐          ┌───────────────────────────┐
- │   Polygon / EVM Anchor    │          │  StatusList2021 Bitstring │
- │   (Immutable Root Hash)   │          │  (1M Revocations in 30KB) │
+ │   Polygon / EVM Anchor    │          │  Confidential Mixnet &    │
+ │   (Immutable Root Hash)   │          │  ZK State Machine Escrow  │
  └─────────────┬─────────────┘          └─────────────┬─────────────┘
                │                                      │
                └───────────────────┬──────────────────┘
@@ -117,15 +117,17 @@ DocuTrust incorporates enterprise-grade defensive cryptography to ensure absolut
 
 ## 📊 DocuTrust vs Legacy & Proprietary Vendors
 
-| Capability | DocuTrust v1.2 (Open Source) | Proprietary SaaS Vendors | Legacy Background Checks |
+| Capability | DocuTrust v21.0.0 (Open Source) | Proprietary SaaS Vendors | Legacy Background Checks |
 | :--- | :--- | :--- | :--- |
 | **Verification Latency** | **< 50 milliseconds** | 1 – 5 seconds | 2 – 3 weeks |
-| **Governance Scheme** | **M-of-N Multi-Signature** | Single Server Key | Manual Signatures |
-| **Post-Quantum Resistance** | **NIST ML-DSA Hybrid** | None (RSA/ECDSA) | None |
-| **Verifiable PDF 2.0** | **Embedded /DocuTrustProof** | Visual Text Only | Paper / Scanned PDF |
+| **Governance Scheme** | **M-of-N Multi-Signature & ZK State Machine** | Single Server Key | Manual Signatures |
+| **Post-Quantum Resistance** | **NIST ML-DSA & Lattice MA-PQ-ABE** | None (RSA/ECDSA) | None |
+| **Agent Epistemic Federation**| **Attenuated Multi-Hop Tokens & ZK Handshakes**| None | None |
+| **Confidential Mixnets** | **Homomorphic ElGamal & ZK Permutation Proofs** | None | None |
+| **RAG Knowledge Provenance**| **Merkle Citation Inclusion & Grounding Audits** | None | None |
 | **Verification Cost** | **$0.00 (Self-Hosted)** | $0.50 – $5.00 / check | $25 – $100 / check |
-| **ZK Selective Disclosure** | **Salted Merkle Sub-trees** | None (Full Doc Leak) | Complete Data Exposure |
-| **Revocation Mechanism** | **StatusList2021 (1M in 30KB)** | Database Queries | Phone / Email calls |
+| **ZK Selective Disclosure** | **Salted Merkle Sub-trees & Groth16 SNARKs** | None (Full Doc Leak) | Complete Data Exposure |
+| **Revocation Mechanism** | **StatusList2021 & 2D Revocation Lattices** | Database Queries | Phone / Email calls |
 
 ---
 
@@ -135,42 +137,25 @@ DocuTrust incorporates enterprise-grade defensive cryptography to ensure absolut
 # 1. Generate an institutional KeyPair & DID
 node packages/cli/bin/docutrust.js keygen --out issuer-keys.json
 
-# 2. Generate a Post-Quantum Hybrid KeyPair (ML-DSA-65)
-node packages/cli/bin/docutrust.js pqc-keygen --out pqc-keys.json
+# 2. Agent Identity Federation & Attenuation Delegation
+node packages/cli/bin/docutrust.js agent-federation-identity --capabilities "inference,state_write" --epistemic 95 --out agent-id.json
+node packages/cli/bin/docutrust.js agent-federation-delegate --key issuer-keys.json --subject "did:docutrust:agent:worker" --capabilities "inference" --out delegation.json
+node packages/cli/bin/docutrust.js agent-federation-verify --chain delegation.json --root agent-id.json --cap "inference"
 
-# 3. Issue a signed W3C Verifiable Credential
-node packages/cli/bin/docutrust.js issue \
-  --subject examples/certificates/stanford-degree-vc.json \
-  --key issuer-keys.json \
-  --out issued-degree.json
+# 3. Homomorphic Mixnet Confidential Shuffling
+node packages/cli/bin/docutrust.js confidential-shuffle-keygen --out mixnet-keys.json
+node packages/cli/bin/docutrust.js confidential-shuffle-run --items "vote_A,vote_B,vote_C" --pub mixnet-keys.json --out shuffled.json
+node packages/cli/bin/docutrust.js confidential-shuffle-verify --batch shuffled.json --pub mixnet-keys.json
 
-# 4. Batch issue from CSV with Polygon Merkle Tree Anchor
-node packages/cli/bin/docutrust.js batch \
-  --csv examples/csv-batches/university-class-of-2026.csv \
-  --key issuer-keys.json \
-  --out batch-output/
+# 4. RAG Knowledge Provenance & Hallucination Audits
+node packages/cli/bin/docutrust.js rag-provenance-index --corpus docs.json --out indexed-corpus.json
+node packages/cli/bin/docutrust.js rag-provenance-attest --corpus indexed-corpus.json --query "What is quantum cryptography?" --response "Quantum cryptography uses lattice math." --citations "chk_123" --key issuer-keys.json --out rag-attestation.json
+node packages/cli/bin/docutrust.js rag-provenance-audit --attestation rag-attestation.json
 
-# 5. Verify cryptographic authenticity offline
-node packages/cli/bin/docutrust.js verify --vc issued-degree.json
-
-# 6. Recursive Zero-Knowledge Proof Aggregation
-node packages/cli/bin/docutrust.js zk-aggregate \
-  --proofs proof1.json,proof2.json \
-  --depth 4 \
-  --out recursive-proof.json
-
-# 7. 2D Temporal-Spatial Revocation Lattice
-node packages/cli/bin/docutrust.js lattice-init --epochs 10 --shards 4 --out lattice.json
-node packages/cli/bin/docutrust.js lattice-prove --lattice lattice.json --id "did:key:alice" --epoch 0 --shard 0 --out witness.json
-node packages/cli/bin/docutrust.js lattice-verify --lattice lattice.json --proof witness.json
-
-# 8. Autonomous AI Agent Action Attestation
-node packages/cli/bin/docutrust.js agent-attest \
-  --agent "did:key:agent-42" \
-  --action "FINANCIAL_SETTLEMENT" \
-  --params '{"amount":1000,"currency":"USD"}' \
-  --out agent-attestation.json
-node packages/cli/bin/docutrust.js agent-verify --attestation agent-attestation.json
+# 5. ZK State Machine & Verifiable Escrow Settlement
+node packages/cli/bin/docutrust.js zk-statemachine-create --name "SettlementMachine" --key issuer-keys.json --out sm-spec.json
+node packages/cli/bin/docutrust.js zk-statemachine-transition --spec sm-spec.json --current '{"step":"INITIALIZED"}' --action "DEPOSIT" --next '{"step":"DEPOSITED"}' --key issuer-keys.json --out transition.json
+node packages/cli/bin/docutrust.js zk-statemachine-settle --spec sm-spec.json --state "0x123..." --executor "did:docutrust:agent:executor"
 ```
 
 ---
@@ -182,28 +167,45 @@ import docutrust
 
 client = docutrust.DocuTrustClient(api_url="http://localhost:4000/api/v1")
 
-# 1. Recursive ZK Proof Folding
-recursive_proof = client.aggregate_recursive_zk_proofs(
-    sub_proofs=[{"type": "ZKRangeProof", "claim": "age >= 21"}],
-    folding_depth=3
+# 1. Sovereign AI Agent Epistemic Federation
+identity = client.agent_federation_generate_identity({"capabilities": ["inference"], "epistemicScore": 95})
+delegation = client.agent_federation_issue_delegation(
+    issuer_key_pair=identity["keyPair"],
+    subject_did="did:docutrust:agent:worker",
+    delegated_capabilities=["inference"]
 )
 
-# 2. 2D Revocation Lattice O(1) Witness
-lattice = client.initialize_revocation_lattice(epoch_count=12, shard_count=4)
-witness = client.generate_revocation_lattice_proof(
-    lattice=lattice,
-    credential_id="cred-9876",
-    target_epoch=0,
-    target_shard=0
+# 2. Homomorphic Mixnet Verifiable Shuffling
+mix_keys = client.confidential_shuffle_keygen()
+batch = client.confidential_shuffle_batch(["item1", "item2", "item3"], mix_keys["publicKey"])
+is_valid = client.confidential_shuffle_verify(
+    batch["inputCiphertexts"],
+    batch["shuffledCiphertexts"],
+    batch["shuffleProof"],
+    mix_keys["publicKey"]
 )
 
-# 3. AI Agent Action Attestation
-attestation = client.issue_agent_attestation(
-    agent_did="did:key:agent-007",
-    action_type="EXECUTE_TRANSACTION",
-    action_payload={"txId": "0x123..."},
-    model_card={"model": "claude-3-5-sonnet", "weightsDigest": "sha256:abc..."}
+# 3. RAG Knowledge Grounding & Hallucination Auditing
+corpus = client.rag_provenance_index_corpus("corpus_ai", [{"uri": "doc://ai", "text": "Post-quantum lattice math protects data."}])
+attestation = client.rag_provenance_attest(
+    corpus=corpus,
+    query_text="Explain lattice math",
+    generated_response="Post-quantum lattice math protects data.",
+    claimed_citations=[{"chunkId": corpus["chunks"][0]["chunkId"]}],
+    curator_key_pair=identity["keyPair"]
 )
+audit = client.rag_provenance_audit_hallucination(attestation)
+
+# 4. ZK Arbitrated State Machine & Escrow
+spec = client.zk_statemachine_create(identity["keyPair"], {"name": "AuditEscrow"})
+transition = client.zk_statemachine_execute_transition(
+    spec=spec,
+    current_state=spec["initialState"],
+    action="DEPOSIT",
+    next_state={"step": "DEPOSITED", "counter": 1},
+    prover_key_pair=identity["keyPair"]
+)
+settlement = client.zk_statemachine_settle_escrow(spec, transition["toStateRoot"], "did:docutrust:executor")
 ```
 
 ---
@@ -213,22 +215,26 @@ attestation = client.issue_agent_attestation(
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
 | `GET` | `/api/v1/health` | Service status, DID authority, and system feature list |
-| `POST` | `/api/v1/zk/recursive/aggregate` | Aggregates heterogeneous ZK sub-proofs via Fiat-Shamir folding |
-| `POST` | `/api/v1/zk/recursive/verify` | Verifies constant-size recursive ZK proof and calldata |
-| `POST` | `/api/v1/revocation/lattice/init` | Initializes 2D temporal-spatial revocation lattice |
-| `POST` | `/api/v1/revocation/lattice/accumulate`| Updates dynamic prime accumulator on specific slice |
-| `POST` | `/api/v1/revocation/lattice/prove` | Generates O(1) witness proof for non-revocation / revocation |
-| `POST` | `/api/v1/revocation/lattice/verify` | Verifies O(1) lattice witness against root commitments |
-| `POST` | `/api/v1/agent/attest` | Issues cryptographic action attestation for autonomous AI agents |
-| `POST` | `/api/v1/agent/verify` | Verifies agent provenance, model card fingerprint & guardrails |
-| `POST` | `/api/v1/trustscore/evaluate` | Evaluates 0-1000 quantitative risk score & AAA-F tier |
-| `POST` | `/api/v1/compute/run` | Executes deterministic AST opcode program and returns compute receipt |
-| `POST` | `/api/v1/vanish/issue` | Issues time-decaying ephemeral forward-secret token |
-| `POST` | `/api/v1/statesync/delta` | Generates compact O(Δ) cross-ledger state delta proof |
-| `POST` | `/api/v1/solidity/export-universal`| Generates Master Universal EVM Verifier Solidity contract |
-| `GET` | `/api/v1/vault/credentials` | Searchable persistent credential registry with status filters |
-| `GET` | `/api/v1/vault/metrics` | Real-time institutional telemetry (latency, gas savings, PQC) |
-| `POST` | `/api/v1/vault/auto-anchor` | Triggers background Merkle batch worker |
+| `POST` | `/api/v1/agent-federation/identity` | Generates sovereign AI agent identity with epistemic trust vector |
+| `POST` | `/api/v1/agent-federation/delegate` | Issues attenuated multi-hop agent delegation token |
+| `POST` | `/api/v1/agent-federation/verify-path` | Validates transitive delegation attenuation trust path |
+| `POST` | `/api/v1/agent-federation/handshake-init` | Initiates mutual ZK agent handshake session |
+| `POST` | `/api/v1/agent-federation/handshake-respond` | Responds to mutual ZK agent handshake |
+| `POST` | `/api/v1/agent-federation/handshake-complete`| Completes mutual authentication session |
+| `POST` | `/api/v1/confidential-shuffle/keygen` | Generates ElGamal homomorphic encryption keypair |
+| `POST` | `/api/v1/confidential-shuffle/run` | Permutes, re-randomizes, and generates ZK shuffle argument |
+| `POST` | `/api/v1/confidential-shuffle/verify` | Validates ZK permutation shuffle proof |
+| `POST` | `/api/v1/confidential-shuffle/decrypt` | Batch decrypts homomorphic ciphertexts |
+| `POST` | `/api/v1/rag-provenance/index` | Merkleizes and indexes knowledge corpus with embeddings |
+| `POST` | `/api/v1/rag-provenance/attest` | Generates signed RAG knowledge provenance attestation |
+| `POST` | `/api/v1/rag-provenance/verify` | Validates RAG provenance attestation signature and Merkle root |
+| `POST` | `/api/v1/rag-provenance/audit` | Audits citation grounding and hallucination risk |
+| `POST` | `/api/v1/zk-statemachine/create` | Defines and initializes a ZK state machine specification |
+| `POST` | `/api/v1/zk-statemachine/transition` | Executes state transition with Fiat-Shamir trace proof |
+| `POST` | `/api/v1/zk-statemachine/verify` | Verifies ZK state transition record |
+| `POST` | `/api/v1/zk-statemachine/dispute` | Arbitrates optimistic transition fraud dispute |
+| `POST` | `/api/v1/zk-statemachine/settle` | Settles escrow bounty with on-chain calldata |
+
 
 ---
 

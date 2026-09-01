@@ -1,5 +1,51 @@
 # 📝 DocuTrust Changelog & Release Notes
 
+## [v21.0.0] - Autonomous Agent Identity Federation, Confidential Mixnet Shuffling, RAG Provenance & ZK Multi-Party State Machines - 2026-09-01
+
+### 🌟 Release Overview (v21.0.0 - Major Milestone Release)
+DocuTrust 21.0.0 is a milestone architectural release introducing Autonomous AI Agent Identity Federation with attenuated multi-hop delegation tokens and epistemic trust vectors, Homomorphic Mixnet Verifiable Confidential Shuffling with zero-knowledge permutation arguments, RAG Knowledge Provenance & Hallucination Auditing with Merkle chunk proofs and cosine grounding scores, and Zero-Knowledge Multi-Party State Machines with Fiat-Shamir trace execution and optimistic fraud dispute escrow settlement:
+
+1. **Decentralized AI Agent Identity & Epistemic Federation Engine (`@docutrust/core/agent-federation`, `docutrust.agent_federation`)**:
+   - Implemented `AgentFederationEngine` establishing sovereign AI agent identities with `did:docutrust:agent:...` decentralized identifiers, Ed25519 public key bindings, and multi-dimensional epistemic trust vectors $\vec{T}_{\text{epistemic}} = [C_{\text{accuracy}}, C_{\text{coherence}}, C_{\text{safety}}, C_{\text{latency}}]$.
+   - Attenuated multi-hop delegation tokens (`DocuTrustAgentDelegationToken2026`) enforcing strict capability subset restriction ($\text{Caps}_{\text{child}} \subseteq \text{Caps}_{\text{parent}}$), execution call quotas, and maximum delegation depths.
+   - Transitive trust path validation over multi-tier agent hierarchies and quantitative epistemic credibility scoring ($C_{\text{epistemic}} \in [0, 100]$).
+   - Mutual Zero-Knowledge Agent Handshake protocol (`DocuTrustAgentHandshake2026`) with ephemeral challenge-response nonce verification.
+
+2. **Homomorphic Mixnet & Verifiable Confidential Shuffling Engine (`@docutrust/core/confidential-shuffle`, `docutrust.confidential_shuffle`)**:
+   - Implemented `ConfidentialShuffleEngine` providing multi-party verifiable mixnet shuffling with homomorphic ElGamal encryption and lattice re-randomization over cyclic groups ($p = 65537$).
+   - Non-interactive Zero-Knowledge Permutation Shuffle Arguments (`DocuTrustVerifiableShuffleProof2026`) proving correct permutation and multiset conservation without leaking the permutation matrix or link between inputs and outputs.
+   - Batch threshold decryption and cryptographic length conservation validation.
+
+3. **RAG Knowledge Provenance & Hallucination Auditing Engine (`@docutrust/core/rag-provenance`, `docutrust.rag_provenance`)**:
+   - Implemented `RAGProvenanceEngine` enabling cryptographic Merkleization and chunk indexing of heterogeneous knowledge corpora.
+   - Vector embedding generation and cosine similarity alignment verifying source citation grounding.
+   - Signed RAG Knowledge Provenance Attestations (`DocuTrustRAGProvenanceAttestation2026`) embedding Merkle inclusion audit paths for cited knowledge fragments.
+   - Automated Hallucination Risk Auditing (`DocuTrustHallucinationAuditProof2026`) classifying grounding metrics into MINIMAL, MODERATE, and HIGH risk profiles.
+
+4. **Zero-Knowledge Multi-Party State Machine & Verifiable Escrow Engine (`@docutrust/core/zk-statemachine`, `docutrust.zk_statemachine`)**:
+   - Implemented `ZKStateMachineEngine` formalizing verifiable multi-party state machine specifications with allowed actions, precondition constraints, required bonds, and escrow bounties.
+   - Verifiable state transitions with Fiat-Shamir execution trace ZK proofs (`DocuTrustZKStateMachineProof2026`).
+   - Optimistic fraud dispute arbitration enabling challengers to dispute faulty transitions and claim bond rewards.
+   - Escrow settlement producing EVM-compatible execution calldata.
+
+5. **Solidity On-Chain Verifier Contracts**:
+   - Added verification methods 32–35 in `SolidityEngine`: `verifyAgentTransitiveTrustPath`, `verifyConfidentialShuffle`, `verifyRAGProvenanceAttestation`, and `verifyZKStateMachineTransition`.
+   - Created `generateZKStateMachineVerifierContract` producing `DocuTrustZKStateMachineVerifier.sol`.
+
+6. **Interactive Web Studios (`AgentFederationStudio.jsx`, `ConfidentialShuffleStudio.jsx`, `RAGProvenanceStudio.jsx`, `ZKStateMachineStudio.jsx`)**:
+   - `AgentFederationStudio.jsx`: Sovereign DID generator, attenuated delegation token issuer, transitive trust path validator, and mutual ZK handshake session manager.
+   - `ConfidentialShuffleStudio.jsx`: ElGamal keygen, batch encryptor, homomorphic re-randomizer, ZK permutation argument verifier, and batch decryptor.
+   - `RAGProvenanceStudio.jsx`: Knowledge corpus Merkleizer, citation grounding scorer, signed provenance attestation generator, and hallucination auditor.
+   - `ZKStateMachineStudio.jsx`: State machine specification creator, ZK trace transition executor, optimistic dispute arbitrator, and escrow settler.
+
+7. **Full-Stack CLI, REST API & Python/TypeScript SDK Parity**:
+   - CLI: Added 14 new CLI commands across `agent-federation-*`, `confidential-shuffle-*`, `rag-provenance-*`, and `zk-statemachine-*`.
+   - REST API: Added 17 new REST endpoints across `/api/v1/agent-federation/*`, `/api/v1/confidential-shuffle/*`, `/api/v1/rag-provenance/*`, and `/api/v1/zk-statemachine/*`.
+   - TypeScript SDK (`@docutrust/sdk`): Re-exported v21 engines, added typed client methods, and 100% test coverage.
+   - Python SDK (`docutrust`): Added 4 new engine modules, dual naming conventions, client wrapper methods, and 115/115 passing unit tests.
+
+---
+
 ## [v20.0.0] - ZK-Rollup & Validium State Compression, Verifiable Memory Quarantine, Multi-Authority PQ-ABE & Decentralized Agent Capability Auctions - 2026-09-01
 
 ### 🌟 Release Overview (v20.0.0 - Major Milestone Release)

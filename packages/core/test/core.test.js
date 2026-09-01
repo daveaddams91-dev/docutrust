@@ -198,7 +198,13 @@ const {
   ZKRollupEngine,
   MemoryQuarantineEngine,
   PQAbeEngine,
-  AgentAuctionEngine
+  AgentAuctionEngine,
+  // v21.0.0 Engines
+  AgentFederationEngine,
+  ConfidentialShuffleEngine,
+  RAGProvenanceEngine,
+  ZKStateMachineEngine,
+  generateZKStateMachineVerifierContract
 } = require('../dist/index.js');
 
 // 1. Cryptography Tests
@@ -4720,8 +4726,8 @@ test('123. AgentAuctionEngine: sealed-bid commit-reveal, second-price Vickrey pr
   assert.equal(receipt.stakeReturned, 500);
 });
 
-// 124. Universal Verifier Contract (v20.0.0 Verifiers)
-test('124. SolidityEngine: verify Universal Verifier contract contains all v19.0.0 and v20.0.0 on-chain verification functions', () => {
+// 124. Universal Verifier Contract (v20.0.0 & v21.0.0 Verifiers)
+test('124. SolidityEngine: verify Universal Verifier contract contains all v19.0.0, v20.0.0, and v21.0.0 on-chain verification functions', () => {
   const contractSrc = SolidityEngine.generateUniversalVerifierContract();
   // v19 verifiers
   assert.ok(contractSrc.includes('function verifyProactiveShareRenewal'));
@@ -4734,6 +4740,236 @@ test('124. SolidityEngine: verify Universal Verifier contract contains all v19.0
   assert.ok(contractSrc.includes('function verifyMemoryRollbackProof'));
   assert.ok(contractSrc.includes('function verifyPQAbePolicyReceipt'));
   assert.ok(contractSrc.includes('function verifyAgentAuctionClearing'));
+  // v21 verifiers
+  assert.ok(contractSrc.includes('function verifyAgentTransitiveTrustPath'));
+  assert.ok(contractSrc.includes('function verifyConfidentialShuffle'));
+  assert.ok(contractSrc.includes('function verifyRAGProvenanceAttestation'));
+  assert.ok(contractSrc.includes('function verifyZKStateMachineTransition'));
+
+  // Dedicated ZK state machine contract
+  const smContractSrc = generateZKStateMachineVerifierContract();
+  assert.ok(smContractSrc.includes('contract DocuTrustZKStateMachineVerifier'));
+  assert.ok(smContractSrc.includes('function createStateMachine'));
+  assert.ok(smContractSrc.includes('function verifyAndApplyTransition'));
+});
+
+// 125. Decentralized AI Agent Identity & Epistemic Trust Federation Engine (DocuTrust v21.0.0)
+test('125. AgentFederationEngine: Identity creation, delegation chain, capability attenuation, and mutual ZK handshake', () => {
+  // 1. Root authority and agents
+  const root = AgentFederationEngine.createAgentIdentity({
+    authorityType: 'root_authority',
+    capabilities: ['*'],
+    maxDelegationDepth: 5,
+    epistemicBaseScore: 100
+  });
+
+  const coordinator = AgentFederationEngine.createAgentIdentity({
+    authorityType: 'delegated_agent',
+    capabilities: ['inference:execute', 'knowledge:query', 'state:update']
+  });
+
+  const worker = AgentFederationEngine.createAgentIdentity({
+    authorityType: 'autonomous_worker',
+    capabilities: ['inference:execute']
+  });
+
+  // 2. Issue 2-hop delegation chain: Root -> Coordinator -> Worker
+  const token1 = AgentFederationEngine.issueDelegationToken(
+    root.keyPair,
+    coordinator.identity.did,
+    ['inference:execute', 'knowledge:query'],
+    { maxDepth: 3, epistemicWeight: 0.95 }
+  );
+  assert.equal(token1.currentDepth, 1);
+  assert.ok(AgentFederationEngine.verifyDelegationToken(token1, root.keyPair.publicKeyHex));
+
+  const token2 = AgentFederationEngine.issueDelegationToken(
+    coordinator.keyPair,
+    worker.identity.did,
+    ['inference:execute'],
+    { parentToken: token1, epistemicWeight: 0.9 }
+  );
+  assert.equal(token2.currentDepth, 2);
+  assert.ok(AgentFederationEngine.verifyDelegationToken(token2, coordinator.keyPair.publicKeyHex));
+
+  // 3. Verify transitive trust path
+  const chain = [token1, token2];
+  const verification = AgentFederationEngine.verifyTransitiveTrustChain(
+    chain,
+    { did: root.identity.did, publicKeyHex: root.keyPair.publicKeyHex, baseEpistemicScore: 100 },
+    'inference:execute'
+  );
+  assert.equal(verification.isValid, true);
+  assert.equal(verification.pathLength, 2);
+  assert.deepEqual(verification.effectiveCapabilities, ['inference:execute']);
+  assert.ok(verification.cumulativeEpistemicScore > 80 && verification.cumulativeEpistemicScore <= 100);
+
+  // 4. Mutual ZK Agent Handshake
+  const { handshakeInit, ephemeralSecret } = AgentFederationEngine.initiateHandshake(
+    coordinator.keyPair,
+    worker.identity.did
+  );
+
+  const { handshakeResponse, session: responderSession } = AgentFederationEngine.respondHandshake(
+    worker.keyPair,
+    handshakeInit,
+    coordinator.keyPair.publicKeyHex
+  );
+  assert.equal(responderSession.status, 'ESTABLISHED');
+
+  const initiatorSession = AgentFederationEngine.completeHandshake(
+    ephemeralSecret,
+    handshakeInit,
+    handshakeResponse,
+    worker.keyPair.publicKeyHex
+  );
+  assert.equal(initiatorSession.status, 'ESTABLISHED');
+  assert.equal(initiatorSession.sessionKeyHex, responderSession.sessionKeyHex);
+});
+
+// 126. Homomorphic Threshold Decryption & Multi-Party Confidential Shuffling Engine (DocuTrust v21.0.0)
+test('126. ConfidentialShuffleEngine: ElGamal key generation, homomorphic re-randomization, mixnet ZK shuffle & proof verification', () => {
+  const kp = ConfidentialShuffleEngine.generateKeyPair();
+  assert.ok(kp.publicKey);
+  assert.ok(kp.secretKey);
+
+  // 1. Encrypt 4 values
+  const plaintexts = [101n, 202n, 303n, 404n];
+  const ciphertexts = plaintexts.map(m => ConfidentialShuffleEngine.encrypt(m, kp.publicKey));
+  assert.equal(ciphertexts.length, 4);
+
+  // Decrypt check
+  const d0 = ConfidentialShuffleEngine.decrypt(ciphertexts[0], kp.secretKey);
+  assert.equal(d0, 101n);
+
+  // 2. Homomorphic re-randomize
+  const { reRandomized } = ConfidentialShuffleEngine.reRandomize(ciphertexts[0], kp.publicKey);
+  assert.notEqual(reRandomized.c1, ciphertexts[0].c1);
+  const dReRand = ConfidentialShuffleEngine.decrypt(reRandomized, kp.secretKey);
+  assert.equal(dReRand, 101n);
+
+  // 3. Verifiable Mixnet Shuffle & Proof Generation
+  const shuffleBatch = ConfidentialShuffleEngine.shuffleAndProve(ciphertexts, kp.publicKey);
+  assert.equal(shuffleBatch.elementCount, 4);
+  assert.equal(shuffleBatch.proof.proofType, 'DocuTrustVerifiableShuffleProof2026');
+
+  // 4. Verify ZK Shuffle Proof
+  const isValidProof = ConfidentialShuffleEngine.verifyShuffleProof(
+    ciphertexts,
+    shuffleBatch.shuffledCiphertexts,
+    shuffleBatch.proof,
+    kp.publicKey
+  );
+  assert.equal(isValidProof, true);
+
+  // 5. Batch Decrypt shuffled output
+  const decryptedBatch = ConfidentialShuffleEngine.batchDecrypt(shuffleBatch.shuffledCiphertexts, kp.secretKey);
+  assert.equal(decryptedBatch.length, 4);
+  const decryptedSet = new Set(decryptedBatch.map(b => b.toString()));
+  assert.ok(decryptedSet.has('101'));
+  assert.ok(decryptedSet.has('202'));
+  assert.ok(decryptedSet.has('303'));
+  assert.ok(decryptedSet.has('404'));
+});
+
+// 127. Verifiable Dynamic Knowledge Provenance & RAG Hallucination Attestation Engine (DocuTrust v21.0.0)
+test('127. RAGProvenanceEngine: Corpus indexing, Merkle inclusion proof, semantic cosine relevance & hallucination guardrails', () => {
+  const curatorKp = generateKeyPair();
+
+  // 1. Index knowledge corpus
+  const docs = [
+    { uri: 'doc://policy/crypto-2026', text: 'Post-quantum lattice signatures provide 128-bit quantum security against Shor algorithm factoring attacks.' },
+    { uri: 'doc://policy/agent-governance', text: 'Autonomous agents must hold verifiable delegation tokens bounded by cryptographic capability envelopes.' }
+  ];
+
+  const corpus = RAGProvenanceEngine.indexKnowledgeCorpus('corpus-alpha-01', docs, { chunkSizeChars: 100 });
+  assert.ok(corpus.rootMerkleHash);
+  assert.ok(corpus.chunkCount >= 2);
+
+  // 2. Generate RAG Attestation
+  const query = 'What security guarantees do lattice signatures provide?';
+  const generatedText = 'Lattice signatures offer post-quantum resistance against Shor factoring attacks.';
+  const claimedCitations = [
+    { chunkId: corpus.chunks[0].chunkId, snippet: 'Post-quantum lattice signatures provide 128-bit quantum security' }
+  ];
+
+  const attestation = RAGProvenanceEngine.generateRAGAttestation(
+    corpus,
+    query,
+    generatedText,
+    claimedCitations,
+    curatorKp
+  );
+
+  assert.equal(attestation.attestationType, 'DocuTrustRAGProvenanceAttestation2026');
+  assert.equal(attestation.corpusRootHash, corpus.rootMerkleHash);
+  assert.ok(attestation.overallFaithfulnessScore > 70);
+
+  // 3. Verify RAG Attestation
+  const isVerified = RAGProvenanceEngine.verifyRAGAttestation(attestation, corpus.rootMerkleHash, curatorKp.publicKeyHex);
+  assert.equal(isVerified, true);
+
+  // 4. Hallucination Risk Audit
+  const auditReport = RAGProvenanceEngine.auditHallucinationRisk(attestation, 0.6);
+  assert.equal(auditReport.isAudited, true);
+  assert.equal(auditReport.allCitationsBound, true);
+  assert.equal(auditReport.hallucinationRisk, 'MINIMAL');
+});
+
+// 128. Zero-Knowledge Multi-Party Verifiable State Machine & Escrow Engine (DocuTrust v21.0.0)
+test('128. ZKStateMachineEngine: State machine creation, ZK transition proof, verification, dispute challenge & escrow settlement', () => {
+  const creatorKp = generateKeyPair();
+  const proverKp = generateKeyPair();
+  const challengerKp = generateKeyPair();
+
+  // 1. Create State Machine Spec
+  const spec = ZKStateMachineEngine.createStateMachine(creatorKp, {
+    name: 'VerifiableEscrowContract',
+    requiredBond: 300,
+    escrowBounty: 1500
+  });
+  assert.ok(spec.machineId);
+  assert.ok(spec.initialStateRoot);
+
+  // 2. Execute valid transition: INIT -> ACTIVE via START
+  const currentState = { stateName: 'INIT', variables: { step: 0, balance: 1000 }, stepIndex: 0 };
+  const nextState = { stateName: 'ACTIVE', newVariables: { step: 1, balance: 1000 } };
+
+  const transitionRecord = ZKStateMachineEngine.executeTransition(
+    spec,
+    currentState,
+    'START',
+    nextState,
+    proverKp
+  );
+  assert.equal(transitionRecord.stepIndex, 1);
+  assert.equal(transitionRecord.action, 'START');
+  assert.equal(transitionRecord.zkProof.proofType, 'DocuTrustZKStateMachineProof2026');
+
+  // 3. Verify Transition
+  const isValidTransition = ZKStateMachineEngine.verifyTransition(spec, transitionRecord, proverKp.publicKeyHex);
+  assert.equal(isValidTransition, true);
+
+  // 4. Test dispute simulation on fraudulent action
+  const fraudulentRecord = {
+    ...transitionRecord,
+    action: 'UNAUTHORIZED_HACK',
+    toStateName: 'DRAINED'
+  };
+  const disputeReport = ZKStateMachineEngine.disputeTransition(
+    spec,
+    fraudulentRecord,
+    challengerKp,
+    'INVALID_TRANSITION'
+  );
+  assert.equal(disputeReport.isFraudDetected, true);
+  assert.equal(disputeReport.slashedBondAmount, 300);
+  assert.equal(disputeReport.challengerReward, 240);
+
+  // 5. Final settlement
+  const settlement = ZKStateMachineEngine.settleStateMachine(spec, transitionRecord.toStateRoot, proverKp.did);
+  assert.equal(settlement.isSettled, true);
+  assert.equal(settlement.payoutAmount, 1500);
 });
 
 

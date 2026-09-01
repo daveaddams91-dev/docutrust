@@ -133,7 +133,13 @@ const {
   ZKRollupEngine,
   MemoryQuarantineEngine,
   PQAbeEngine,
-  AgentAuctionEngine
+  AgentAuctionEngine,
+  // v21.0.0 Engines
+  AgentFederationEngine,
+  ConfidentialShuffleEngine,
+  RAGProvenanceEngine,
+  ZKStateMachineEngine,
+  generateZKStateMachineVerifierContract
 } = require('@docutrust/core');
 
 const PORT = process.env.PORT || 4000;
@@ -4717,6 +4723,286 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // ========================================================
+    // 73. Decentralized AI Agent Identity & Epistemic Federation Endpoints (v21.0.0)
+    // ========================================================
+
+    if (pathname === '/api/v1/agent-federation/identity' && req.method === 'POST') {
+      const body = await readJsonBody();
+      try {
+        const result = AgentFederationEngine.createAgentIdentity(body || {});
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/agent-federation/delegate' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { issuerKeyPair, subjectDid, capabilities, options } = body;
+      if (!issuerKeyPair || !subjectDid || !capabilities) {
+        return jsonResponse(400, { error: 'Missing issuerKeyPair, subjectDid, or capabilities.' });
+      }
+      try {
+        const token = AgentFederationEngine.issueDelegationToken(issuerKeyPair, subjectDid, capabilities, options);
+        return jsonResponse(200, { success: true, token });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/agent-federation/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { delegationChain, rootAuthority, requestedCapability } = body;
+      if (!delegationChain || !rootAuthority) {
+        return jsonResponse(400, { error: 'Missing delegationChain or rootAuthority.' });
+      }
+      try {
+        const verification = AgentFederationEngine.verifyTransitiveTrustChain(delegationChain, rootAuthority, requestedCapability);
+        return jsonResponse(200, { success: true, ...verification });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/agent-federation/handshake/init' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { initiatorKeyPair, responderDid } = body;
+      if (!initiatorKeyPair || !responderDid) {
+        return jsonResponse(400, { error: 'Missing initiatorKeyPair or responderDid.' });
+      }
+      try {
+        const result = AgentFederationEngine.initiateHandshake(initiatorKeyPair, responderDid);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/agent-federation/handshake/respond' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { responderKeyPair, handshakeInit, initiatorPublicKeyHex } = body;
+      if (!responderKeyPair || !handshakeInit || !initiatorPublicKeyHex) {
+        return jsonResponse(400, { error: 'Missing responderKeyPair, handshakeInit, or initiatorPublicKeyHex.' });
+      }
+      try {
+        const result = AgentFederationEngine.respondHandshake(responderKeyPair, handshakeInit, initiatorPublicKeyHex);
+        return jsonResponse(200, { success: true, ...result });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/agent-federation/handshake/complete' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { ephemeralSecret, handshakeInit, handshakeResponse, responderPublicKeyHex } = body;
+      if (!ephemeralSecret || !handshakeInit || !handshakeResponse || !responderPublicKeyHex) {
+        return jsonResponse(400, { error: 'Missing parameters for handshake completion.' });
+      }
+      try {
+        const session = AgentFederationEngine.completeHandshake(ephemeralSecret, handshakeInit, handshakeResponse, responderPublicKeyHex);
+        return jsonResponse(200, { success: true, session });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ========================================================
+    // 74. Homomorphic Mixnet Confidential Shuffling Endpoints (v21.0.0)
+    // ========================================================
+
+    if (pathname === '/api/v1/confidential-shuffle/keygen' && req.method === 'POST') {
+      try {
+        const keyPair = ConfidentialShuffleEngine.generateKeyPair();
+        return jsonResponse(200, { success: true, keyPair });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/confidential-shuffle/shuffle' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { plaintexts, publicKey, ciphertexts } = body;
+      if (!publicKey) {
+        return jsonResponse(400, { error: 'Missing publicKey in request.' });
+      }
+      try {
+        let cts = ciphertexts;
+        if (!cts && plaintexts) {
+          cts = plaintexts.map(p => ConfidentialShuffleEngine.encrypt(BigInt(p), publicKey));
+        }
+        if (!cts || cts.length === 0) {
+          return jsonResponse(400, { error: 'Missing plaintexts or ciphertexts.' });
+        }
+        const batch = ConfidentialShuffleEngine.shuffleAndProve(cts, publicKey);
+        return jsonResponse(200, { success: true, batch });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/confidential-shuffle/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { inputCiphertexts, shuffledCiphertexts, proof, publicKey } = body;
+      if (!inputCiphertexts || !shuffledCiphertexts || !proof || !publicKey) {
+        return jsonResponse(400, { error: 'Missing inputCiphertexts, shuffledCiphertexts, proof, or publicKey.' });
+      }
+      try {
+        const isValid = ConfidentialShuffleEngine.verifyShuffleProof(inputCiphertexts, shuffledCiphertexts, proof, publicKey);
+        return jsonResponse(200, { success: true, isValid });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/confidential-shuffle/decrypt' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { ciphertexts, secretKey } = body;
+      if (!ciphertexts || !secretKey) {
+        return jsonResponse(400, { error: 'Missing ciphertexts or secretKey.' });
+      }
+      try {
+        const plaintexts = ConfidentialShuffleEngine.batchDecrypt(ciphertexts, secretKey);
+        return jsonResponse(200, { success: true, plaintexts: plaintexts.map(p => p.toString()) });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ========================================================
+    // 75. RAG Knowledge Provenance & Hallucination Auditing Endpoints (v21.0.0)
+    // ========================================================
+
+    if (pathname === '/api/v1/rag-provenance/index' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { corpusId, documents, options } = body;
+      if (!documents || !Array.isArray(documents)) {
+        return jsonResponse(400, { error: 'Missing documents array in corpus request.' });
+      }
+      try {
+        const corpus = RAGProvenanceEngine.indexKnowledgeCorpus(corpusId || 'corpus-api-default', documents, options);
+        return jsonResponse(200, { success: true, corpus });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/rag-provenance/attest' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { corpus, queryText, generatedResponse, claimedCitations, curatorKeyPair } = body;
+      if (!corpus || !queryText || !generatedResponse || !claimedCitations || !curatorKeyPair) {
+        return jsonResponse(400, { error: 'Missing corpus, queryText, generatedResponse, claimedCitations, or curatorKeyPair.' });
+      }
+      try {
+        const attestation = RAGProvenanceEngine.generateRAGAttestation(corpus, queryText, generatedResponse, claimedCitations, curatorKeyPair);
+        return jsonResponse(200, { success: true, attestation });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/rag-provenance/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { attestation, expectedCorpusRootHash, signerPublicKeyHex } = body;
+      if (!attestation || !expectedCorpusRootHash || !signerPublicKeyHex) {
+        return jsonResponse(400, { error: 'Missing attestation, expectedCorpusRootHash, or signerPublicKeyHex.' });
+      }
+      try {
+        const isValid = RAGProvenanceEngine.verifyRAGAttestation(attestation, expectedCorpusRootHash, signerPublicKeyHex);
+        return jsonResponse(200, { success: true, isValid });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/rag-provenance/audit' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { attestation, similarityThreshold } = body;
+      if (!attestation) {
+        return jsonResponse(400, { error: 'Missing attestation.' });
+      }
+      try {
+        const auditReport = RAGProvenanceEngine.auditHallucinationRisk(attestation, similarityThreshold || 0.6);
+        return jsonResponse(200, { success: true, auditReport });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    // ========================================================
+    // 76. ZK Multi-Party State Machine & Verifiable Escrow Endpoints (v21.0.0)
+    // ========================================================
+
+    if (pathname === '/api/v1/zk-statemachine/create' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { creatorKeyPair, options } = body;
+      if (!creatorKeyPair) {
+        return jsonResponse(400, { error: 'Missing creatorKeyPair.' });
+      }
+      try {
+        const spec = ZKStateMachineEngine.createStateMachine(creatorKeyPair, options);
+        return jsonResponse(200, { success: true, spec });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/zk-statemachine/transition' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { spec, currentState, action, nextState, proverKeyPair } = body;
+      if (!spec || !currentState || !action || !nextState || !proverKeyPair) {
+        return jsonResponse(400, { error: 'Missing spec, currentState, action, nextState, or proverKeyPair.' });
+      }
+      try {
+        const transitionRecord = ZKStateMachineEngine.executeTransition(spec, currentState, action, nextState, proverKeyPair);
+        return jsonResponse(200, { success: true, transitionRecord });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/zk-statemachine/verify' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { spec, transitionRecord, proverPublicKeyHex } = body;
+      if (!spec || !transitionRecord || !proverPublicKeyHex) {
+        return jsonResponse(400, { error: 'Missing spec, transitionRecord, or proverPublicKeyHex.' });
+      }
+      try {
+        const isValid = ZKStateMachineEngine.verifyTransition(spec, transitionRecord, proverPublicKeyHex);
+        return jsonResponse(200, { success: true, isValid });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/zk-statemachine/dispute' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { spec, transitionRecord, challengerKeyPair, disputeReason } = body;
+      if (!spec || !transitionRecord || !challengerKeyPair) {
+        return jsonResponse(400, { error: 'Missing spec, transitionRecord, or challengerKeyPair.' });
+      }
+      try {
+        const disputeReport = ZKStateMachineEngine.disputeTransition(spec, transitionRecord, challengerKeyPair, disputeReason);
+        return jsonResponse(200, { success: true, disputeReport });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
+    if (pathname === '/api/v1/zk-statemachine/settle' && req.method === 'POST') {
+      const body = await readJsonBody();
+      const { spec, finalStateRoot, executorDid } = body;
+      if (!spec || !finalStateRoot || !executorDid) {
+        return jsonResponse(400, { error: 'Missing spec, finalStateRoot, or executorDid.' });
+      }
+      try {
+        const settlement = ZKStateMachineEngine.settleStateMachine(spec, finalStateRoot, executorDid);
+        return jsonResponse(200, { success: true, settlement });
+      } catch (e) {
+        return jsonResponse(400, { error: e.message });
+      }
+    }
+
     // Default 404
     jsonResponse(404, { error: 'Route not found' });
   } catch (err) {
@@ -4726,11 +5012,12 @@ const server = http.createServer(async (req, res) => {
 
 if (require.main === module) {
   server.listen(PORT, () => {
-    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v20.0.0 running on http://localhost:${PORT}`);
+    console.log(`\x1b[32m✔\x1b[0m DocuTrust API v21.0.0 running on http://localhost:${PORT}`);
   });
 }
 
 module.exports = { server, generateKeyPair, generatePQCKeyPair, canonicalizeJson, sha256Hex, MerkleTree };
+
 
 
 

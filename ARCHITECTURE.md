@@ -320,6 +320,36 @@ $$C_{\text{bid}} = \text{SHA-256}(\text{"bid:"} \parallel \text{AuctionId} \para
 3. Automated second-price clearing algorithm determining lowest bidder as task executor while paying the second-lowest bid price.
 4. Built-in escrow lockup, verified execution settlement, and fraud dispute slashing.
 
+### 2.45 Decentralized AI Agent Identity & Epistemic Federation Engine
+1. Sovereign AI Agent Identity generation (`DocuTrustAgentIdentity2026`) with decentralized identifiers (`did:docutrust:agent:...`), public key bindings, and multi-dimensional epistemic trust vectors:
+$$\vec{T}_{\text{epistemic}} = [C_{\text{accuracy}}, C_{\text{coherence}}, C_{\text{safety}}, C_{\text{latency}}]$$
+2. Attenuated multi-hop delegation tokens (`DocuTrustAgentDelegationToken2026`) restricting downstream sub-delegation, execution counts, and capability subsets:
+$$\text{Caps}_{\text{child}} \subseteq \text{Caps}_{\text{parent}}$$
+3. Epistemic credibility scoring ($C_{\text{epistemic}} \in [0, 100]$) and transitive trust path validation over multi-tier agent hierarchies.
+4. Mutual Zero-Knowledge Agent Handshake protocol (`DocuTrustAgentHandshake2026`) establishing authenticated inter-agent sessions with ephemeral challenge-response nonces.
+
+### 2.46 Homomorphic Mixnet & Verifiable Confidential Shuffling Engine
+1. Multi-party verifiable mixnet based on homomorphic ElGamal encryption and lattice re-randomization over cyclic groups with prime modulus $p = 65537$:
+$$(c_1', c_2') = (c_1 \cdot g^{r'}, c_2 \cdot h^{r'}) \pmod p$$
+2. Non-interactive Zero-Knowledge Permutation Shuffle Arguments (`DocuTrustVerifiableShuffleProof2026`) proving correct permutation and multiset conservation without revealing the secret permutation $\pi$:
+$$H_{\text{perm}} = \text{SHA-256}(\text{JCS}(\pi)), \quad c_{\text{FS}} = \text{SHA-256}(\text{JCS}(\vec{C}_{\text{in}}) \parallel \text{JCS}(\vec{C}_{\text{out}}))$$
+3. Threshold batch decryption and mathematical proof of item length and multiset integrity.
+
+### 2.47 RAG Knowledge Provenance & Hallucination Auditing Engine
+1. Cryptographic knowledge corpus Merkleization and chunk indexing producing verifiable corpus root hashes:
+$$H_{\text{corpus}} = \text{MerkleTree}(\{\text{Chunk}_1, \dots, \text{Chunk}_k\}).\text{Root}$$
+2. Vector embedding alignment and cosine similarity metric for citation grounding:
+$$\text{GroundingScore} = \frac{\sum_{i=1}^m \cos(\vec{v}_{\text{response}}, \vec{v}_{\text{chunk}_i})}{m}$$
+3. Signed RAG Knowledge Provenance Attestations (`DocuTrustRAGProvenanceAttestation2026`) containing Merkle inclusion audit paths for cited knowledge fragments.
+4. Automated Hallucination Risk Auditing (`DocuTrustHallucinationAuditProof2026`) classifying grounding confidence into MINIMAL, MODERATE, and HIGH risk categories.
+
+### 2.48 Zero-Knowledge Multi-Party State Machine & Verifiable Escrow Engine
+1. State machine specification compiler (`DocuTrustZKStateMachineSpec2026`) formalizing allowed actions, precondition constraints, required bonds, and escrow bounties.
+2. Verifiable state transitions with Fiat-Shamir execution trace ZK proofs (`DocuTrustZKStateMachineProof2026`):
+$$T_{\text{commit}} = \text{SHA-256}(\text{MachineId} \parallel \text{Root}_{\text{from}} \parallel \text{Action} \parallel \text{Root}_{\text{to}} \parallel \text{Trace})$$
+3. Optimistic fraud dispute arbitration enabling challengers to challenge faulty transitions and claim bond rewards.
+4. Automated escrow settlement producing EVM-compatible execution calldata.
+
 ---
 
 ## 3. Directory Layout
@@ -327,11 +357,11 @@ $$C_{\text{bid}} = \text{SHA-256}(\text{"bid:"} \parallel \text{AuctionId} \para
 ```
 docutrust/
 ├── packages/
-│   ├── core/            # Cryptographic & W3C VC engine (STARK, FROST, Memory, PSI, Ed25519)
-│   └── cli/             # Command-line tool ('docutrust stark-prove', 'frost-consensus-verify', etc.)
+│   ├── core/            # Cryptographic & W3C VC engine (Agent Federation, Mixnets, RAG Provenance, ZK State Machine)
+│   └── cli/             # Command-line tool ('docutrust agent-federation-*', 'confidential-shuffle-*', etc.)
 ├── apps/
 │   ├── api/             # High-performance Node.js REST API
-│   └── web/             # Modern React/Tailwind Web Studio & Verification Explorer
+│   └── web/             # Modern React/Tailwind Web Studio (Agent Federation, Mixnets, RAG, ZK State Machine)
 ├── sdks/
 │   ├── python/          # Pip installable Python SDK ('docutrust')
 │   └── typescript/      # TypeScript / JavaScript client

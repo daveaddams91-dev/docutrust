@@ -2391,9 +2391,137 @@ class TestDocuTrustPython(unittest.TestCase):
         self.assertTrue(hasattr(client, "swarm_create_cluster"))
         self.assertTrue(hasattr(client, "timelock_generate_vdf_parameters"))
 
+    def test_agent_federation(self):
+        from docutrust.agent_federation import AgentFederationEngine
+        from docutrust.crypto import generate_ed25519_keypair
+
+        # 1. Agent Identity
+        res = AgentFederationEngine.generate_agent_identity({"capabilities": ["read", "inference"], "epistemicScore": 92})
+        identity = res["identity"]
+        keypair = res["keyPair"]
+        self.assertEqual(identity["type"], "DocuTrustAgentIdentity2026")
+        self.assertEqual(identity["epistemicScore"], 92)
+        self.assertTrue(identity["signature"])
+
+        # 2. Delegation
+        worker_kp = generate_ed25519_keypair()
+        worker_did = "did:docutrust:agent:worker_99"
+        del_token = AgentFederationEngine.issue_delegation_token(keypair, worker_did, ["inference"])
+        self.assertEqual(del_token["type"], "DocuTrustAgentDelegationToken2026")
+        self.assertEqual(del_token["delegatedCapabilities"], ["inference"])
+
+        # 3. Transitive Trust Verification
+        path_res = AgentFederationEngine.verify_transitive_trust_path([del_token], identity, "inference")
+        self.assertTrue(path_res["isValid"])
+        self.assertEqual(path_res["effectiveCapabilities"], ["inference"])
+
+        # 4. Mutual Handshake
+        hs_init = AgentFederationEngine.initiate_agent_handshake(keypair, worker_did)
+        self.assertEqual(hs_init["handshakeInit"]["protocol"], "DocuTrustAgentHandshake2026")
+
+        hs_resp = AgentFederationEngine.respond_agent_handshake(worker_kp, hs_init["handshakeInit"], keypair["publicKeyHex"])
+        self.assertEqual(hs_resp["session"]["status"], "AUTHENTICATED")
+
+        hs_complete = AgentFederationEngine.complete_agent_handshake(
+            hs_init["ephemeralSecret"],
+            hs_init["handshakeInit"],
+            hs_resp["handshakeResponse"],
+            worker_kp["publicKeyHex"]
+        )
+        self.assertEqual(hs_complete["session"]["status"], "ESTABLISHED")
+
+    def test_confidential_shuffle(self):
+        from docutrust.confidential_shuffle import ConfidentialShuffleEngine
+
+        kp = ConfidentialShuffleEngine.generate_keypair()
+        plaintexts = ["item_alpha", "item_beta", "item_gamma"]
+
+        batch = ConfidentialShuffleEngine.shuffle_and_rerandomize(plaintexts, kp["publicKey"])
+        self.assertEqual(batch["itemCount"], 3)
+        self.assertEqual(len(batch["shuffledCiphertexts"]), 3)
+
+        ver = ConfidentialShuffleEngine.verify_shuffle(
+            batch["inputCiphertexts"],
+            batch["shuffledCiphertexts"],
+            batch["shuffleProof"],
+            kp["publicKey"]
+        )
+        self.assertTrue(ver)
+
+        decrypted = ConfidentialShuffleEngine.batch_decrypt(batch["shuffledCiphertexts"], kp["secretKey"])
+        self.assertEqual(len(decrypted), 3)
+
+    def test_rag_provenance(self):
+        from docutrust.rag_provenance import RAGProvenanceEngine
+        from docutrust.crypto import generate_ed25519_keypair
+
+        curator_kp = generate_ed25519_keypair()
+        docs = [
+            {"uri": "doc://lattice", "text": "Lattice cryptography provides post quantum security."},
+            {"uri": "doc://merkle", "text": "Merkle trees provide cryptographic inclusion proofs."}
+        ]
+        corpus = RAGProvenanceEngine.index_corpus("corpus_01", docs)
+        self.assertEqual(corpus["documentCount"], 2)
+        self.assertTrue(corpus["rootMerkleHash"])
+
+        citations = [{"chunkId": corpus["chunks"][0]["chunkId"]}]
+        att = RAGProvenanceEngine.attest_provenance(
+            corpus,
+            "What is lattice security?",
+            "Lattice cryptography provides post quantum security guarantees.",
+            citations,
+            curator_kp
+        )
+        self.assertEqual(att["type"], "DocuTrustRAGProvenanceAttestation2026")
+        self.assertTrue(att["groundingScore"] > 0.6)
+
+        ver = RAGProvenanceEngine.verify_attestation(att, corpus["rootMerkleHash"], curator_kp["publicKeyHex"])
+        self.assertTrue(ver)
+
+        audit = RAGProvenanceEngine.audit_hallucination_risk(att)
+        self.assertEqual(audit["type"], "DocuTrustHallucinationAuditProof2026")
+        self.assertTrue(audit["isAudited"])
+
+    def test_zk_statemachine(self):
+        from docutrust.zk_statemachine import ZKStateMachineEngine
+        from docutrust.crypto import generate_ed25519_keypair
+
+        creator_kp = generate_ed25519_keypair()
+        prover_kp = generate_ed25519_keypair()
+        challenger_kp = generate_ed25519_keypair()
+
+        spec = ZKStateMachineEngine.create_state_machine(creator_kp, {"name": "TestEscrow"})
+        self.assertEqual(spec["type"], "DocuTrustZKStateMachineSpec2026")
+
+        trans = ZKStateMachineEngine.execute_transition(
+            spec,
+            spec["initialState"],
+            "DEPOSIT",
+            {"step": "DEPOSITED", "counter": 1},
+            prover_kp
+        )
+        self.assertEqual(trans["type"], "DocuTrustZKStateTransitionRecord2026")
+
+        ver = ZKStateMachineEngine.verify_transition(spec, trans, prover_kp["publicKeyHex"])
+        self.assertTrue(ver)
+
+        disp = ZKStateMachineEngine.dispute_transition(spec, trans, challenger_kp)
+        self.assertEqual(disp["arbitrationStatus"], "RESOLVED_REJECTED_TRANSITION_VALID")
+
+        settle = ZKStateMachineEngine.settle_escrow(spec, trans["toStateRoot"], trans["proverDid"])
+        self.assertTrue(settle["isSettled"])
+
+    def test_client_v21_methods(self):
+        client = DocuTrustClient()
+        self.assertTrue(hasattr(client, "agent_federation_generate_identity"))
+        self.assertTrue(hasattr(client, "confidential_shuffle_batch"))
+        self.assertTrue(hasattr(client, "rag_provenance_index_corpus"))
+        self.assertTrue(hasattr(client, "zk_statemachine_create"))
+
 
 if __name__ == '__main__':
     unittest.main()
+
 
 
 

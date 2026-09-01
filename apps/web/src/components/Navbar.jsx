@@ -32,7 +32,9 @@ import {
   Menu,
   X,
   Compass,
-  RefreshCw
+  RefreshCw,
+  Shuffle,
+  BookOpen
 } from 'lucide-react';
 
 export default function Navbar({ activeTab, setActiveTab }) {
@@ -40,6 +42,10 @@ export default function Navbar({ activeTab, setActiveTab }) {
 
   const navItems = [
     { id: 'hero', label: 'Overview', icon: ShieldCheck, cat: 'Core' },
+    { id: 'agent-federation-studio', label: 'Agent Federation', icon: Users, cat: 'v21' },
+    { id: 'confidential-shuffle-studio', label: 'Confidential Shuffle', icon: Shuffle, cat: 'v21' },
+    { id: 'rag-provenance-studio', label: 'RAG Provenance', icon: BookOpen, cat: 'v21' },
+    { id: 'zk-statemachine-studio', label: 'ZK State Machine', icon: Cpu, cat: 'v21' },
     { id: 'zk-rollup-studio', label: 'ZK-Rollup', icon: Layers, cat: 'v20' },
     { id: 'quarantine-studio', label: 'Memory Quarantine', icon: ShieldAlert, cat: 'v20' },
     { id: 'pqabe-studio', label: 'MA-PQ-ABE', icon: Key, cat: 'v20' },
@@ -112,7 +118,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
           <div>
             <div className="flex items-center gap-2">
               <span className="font-bold text-base bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-100 to-gray-400 tracking-tight">DocuTrust</span>
-              <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono font-semibold">v20.0.0</span>
+              <span className="text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono font-semibold">v21.0.0</span>
             </div>
             <span className="text-[10px] text-gray-400 tracking-wide block font-mono">Autonomous Sovereign Trust Mesh</span>
           </div>

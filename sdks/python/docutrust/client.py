@@ -2979,6 +2979,209 @@ class DocuTrustClient:
         from .agent_auction import AgentAuctionEngine
         return AgentAuctionEngine.slash_agent(auction, dispute_proof)
 
+    # ========================================================
+    # v21.0.0 Autonomous Agent Identity & Epistemic Federation Methods
+    # ========================================================
+
+    def agent_federation_generate_identity(
+        self,
+        options: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Creates a sovereign AI Agent Identity document with cryptographic public key and epistemic vector."""
+        from .agent_federation import AgentFederationEngine
+        return AgentFederationEngine.generate_agent_identity(options)
+
+    def agent_federation_issue_delegation(
+        self,
+        issuer_key_pair: Dict[str, str],
+        subject_did: str,
+        delegated_capabilities: List[str],
+        options: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Issues an attenuated multi-hop delegation token authorizing capability execution."""
+        from .agent_federation import AgentFederationEngine
+        return AgentFederationEngine.issue_delegation_token(issuer_key_pair, subject_did, delegated_capabilities, options)
+
+    def agent_federation_verify_path(
+        self,
+        delegation_chain: List[Dict[str, Any]],
+        root_authority: Dict[str, Any],
+        requested_capability: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Validates capability attenuation and cryptographic provenance across a multi-hop delegation chain."""
+        from .agent_federation import AgentFederationEngine
+        return AgentFederationEngine.verify_transitive_trust_path(delegation_chain, root_authority, requested_capability)
+
+    def agent_federation_init_handshake(
+        self,
+        initiator_key_pair: Dict[str, str],
+        responder_did: str
+    ) -> Dict[str, Any]:
+        """Initiates mutual Zero-Knowledge Agent Handshake session."""
+        from .agent_federation import AgentFederationEngine
+        return AgentFederationEngine.initiate_agent_handshake(initiator_key_pair, responder_did)
+
+    def agent_federation_respond_handshake(
+        self,
+        responder_key_pair: Dict[str, str],
+        handshake_init: Dict[str, Any],
+        initiator_public_key_hex: str
+    ) -> Dict[str, Any]:
+        """Processes handshake initiation and generates mutual authentication response."""
+        from .agent_federation import AgentFederationEngine
+        return AgentFederationEngine.respond_agent_handshake(responder_key_pair, handshake_init, initiator_public_key_hex)
+
+    def agent_federation_complete_handshake(
+        self,
+        ephemeral_secret: str,
+        handshake_init: Dict[str, Any],
+        handshake_response: Dict[str, Any],
+        responder_public_key_hex: str
+    ) -> Dict[str, Any]:
+        """Finalizes mutual ZK handshake verification on initiator side."""
+        from .agent_federation import AgentFederationEngine
+        return AgentFederationEngine.complete_agent_handshake(ephemeral_secret, handshake_init, handshake_response, responder_public_key_hex)
+
+    # ========================================================
+    # v21.0.0 Homomorphic Mixnet Confidential Shuffling Methods
+    # ========================================================
+
+    def confidential_shuffle_keygen(self) -> Dict[str, Any]:
+        """Generates ElGamal homomorphic encryption keypair."""
+        from .confidential_shuffle import ConfidentialShuffleEngine
+        return ConfidentialShuffleEngine.generate_keypair()
+
+    def confidential_shuffle_batch(
+        self,
+        plaintexts: List[str],
+        public_key: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Encrypts plaintexts, permutes them, applies homomorphic re-randomization, and constructs a ZK shuffle argument."""
+        from .confidential_shuffle import ConfidentialShuffleEngine
+        return ConfidentialShuffleEngine.shuffle_and_rerandomize(plaintexts, public_key)
+
+    def confidential_shuffle_verify(
+        self,
+        input_ciphertexts: List[Dict[str, Any]],
+        shuffled_ciphertexts: List[Dict[str, Any]],
+        proof: Dict[str, Any],
+        public_key: Dict[str, Any]
+    ) -> bool:
+        """Verifies zero-knowledge shuffle proof and length conservation."""
+        from .confidential_shuffle import ConfidentialShuffleEngine
+        return ConfidentialShuffleEngine.verify_shuffle(input_ciphertexts, shuffled_ciphertexts, proof, public_key)
+
+    def confidential_shuffle_decrypt(
+        self,
+        ciphertexts: List[Dict[str, Any]],
+        secret_key: str
+    ) -> List[str]:
+        """Decrypts a batch of ElGamal ciphertexts."""
+        from .confidential_shuffle import ConfidentialShuffleEngine
+        return ConfidentialShuffleEngine.batch_decrypt(ciphertexts, secret_key)
+
+    # ========================================================
+    # v21.0.0 RAG Knowledge Provenance & Hallucination Auditing Methods
+    # ========================================================
+
+    def rag_provenance_index_corpus(
+        self,
+        corpus_id: str,
+        documents: List[Dict[str, str]],
+        options: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Indexes knowledge documents into Merkleized chunk nodes."""
+        from .rag_provenance import RAGProvenanceEngine
+        return RAGProvenanceEngine.index_corpus(corpus_id, documents, options)
+
+    def rag_provenance_attest(
+        self,
+        corpus: Dict[str, Any],
+        query_text: str,
+        generated_response: str,
+        claimed_citations: List[Dict[str, Any]],
+        curator_key_pair: Dict[str, str]
+    ) -> Dict[str, Any]:
+        """Creates a signed RAG Knowledge Provenance Attestation with Merkle inclusion and cosine similarity."""
+        from .rag_provenance import RAGProvenanceEngine
+        return RAGProvenanceEngine.attest_provenance(corpus, query_text, generated_response, claimed_citations, curator_key_pair)
+
+    def rag_provenance_verify_attestation(
+        self,
+        attestation: Dict[str, Any],
+        expected_corpus_root_hash: str,
+        signer_public_key_hex: str
+    ) -> bool:
+        """Cryptographically validates RAG provenance attestation signature and Merkle root."""
+        from .rag_provenance import RAGProvenanceEngine
+        return RAGProvenanceEngine.verify_attestation(attestation, expected_corpus_root_hash, signer_public_key_hex)
+
+    def rag_provenance_audit_hallucination(
+        self,
+        attestation: Dict[str, Any],
+        similarity_threshold: float = 0.5
+    ) -> Dict[str, Any]:
+        """Audits hallucination risk based on citation grounding scores."""
+        from .rag_provenance import RAGProvenanceEngine
+        return RAGProvenanceEngine.audit_hallucination_risk(attestation, similarity_threshold)
+
+    # ========================================================
+    # v21.0.0 ZK Multi-Party State Machine & Escrow Methods
+    # ========================================================
+
+    def zk_statemachine_create(
+        self,
+        creator_key_pair: Dict[str, str],
+        options: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Defines and initializes a verifiable ZK state machine specification."""
+        from .zk_statemachine import ZKStateMachineEngine
+        return ZKStateMachineEngine.create_state_machine(creator_key_pair, options)
+
+    def zk_statemachine_execute_transition(
+        self,
+        spec: Dict[str, Any],
+        current_state: Dict[str, Any],
+        action: str,
+        next_state: Dict[str, Any],
+        prover_key_pair: Dict[str, str]
+    ) -> Dict[str, Any]:
+        """Executes a verifiable state transition with Fiat-Shamir execution trace ZK proof."""
+        from .zk_statemachine import ZKStateMachineEngine
+        return ZKStateMachineEngine.execute_transition(spec, current_state, action, next_state, prover_key_pair)
+
+    def zk_statemachine_verify_transition(
+        self,
+        spec: Dict[str, Any],
+        transition_record: Dict[str, Any],
+        prover_public_key_hex: str
+    ) -> bool:
+        """Verifies zero-knowledge transition validity, signature, and state root consistency."""
+        from .zk_statemachine import ZKStateMachineEngine
+        return ZKStateMachineEngine.verify_transition(spec, transition_record, prover_public_key_hex)
+
+    def zk_statemachine_dispute_transition(
+        self,
+        spec: Dict[str, Any],
+        transition_record: Dict[str, Any],
+        challenger_key_pair: Dict[str, str],
+        dispute_reason: str = "INVALID_STATE_PRECONDITION"
+    ) -> Dict[str, Any]:
+        """Arbitrates an optimistic state transition challenge against the state machine rules."""
+        from .zk_statemachine import ZKStateMachineEngine
+        return ZKStateMachineEngine.dispute_transition(spec, transition_record, challenger_key_pair, dispute_reason)
+
+    def zk_statemachine_settle_escrow(
+        self,
+        spec: Dict[str, Any],
+        final_state_root: str,
+        executor_did: str
+    ) -> Dict[str, Any]:
+        """Settles escrow balance and generates on-chain calldata."""
+        from .zk_statemachine import ZKStateMachineEngine
+        return ZKStateMachineEngine.settle_escrow(spec, final_state_root, executor_did)
+
+
 
 
 

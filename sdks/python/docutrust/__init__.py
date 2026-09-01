@@ -96,8 +96,13 @@ from .zk_rollup import ZKRollupEngine
 from .memory_quarantine import MemoryQuarantineEngine
 from .pq_abe import PQAbeEngine
 from .agent_auction import AgentAuctionEngine
+from .agent_federation import AgentFederationEngine
+from .confidential_shuffle import ConfidentialShuffleEngine
+from .rag_provenance import RAGProvenanceEngine
+from .zk_statemachine import ZKStateMachineEngine
 
-__version__ = "20.0.0"
+__version__ = "21.0.0"
+
 __all__ = [
     "DocuTrustClient",
     "canonicalize_json",
@@ -212,5 +217,9 @@ __all__ = [
     "ZKRollupEngine",
     "MemoryQuarantineEngine",
     "PQAbeEngine",
-    "AgentAuctionEngine"
+    "AgentAuctionEngine",
+    "AgentFederationEngine",
+    "ConfidentialShuffleEngine",
+    "RAGProvenanceEngine",
+    "ZKStateMachineEngine"
 ]

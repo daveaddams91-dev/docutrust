@@ -3274,7 +3274,200 @@ test('API Server Suite', async (t) => {
     assert.equal(settleRes.status, 200);
     assert.equal(settleRes.body.receipt.amountPaid, 2200);
   });
+
+  await t.test('74. Agent Federation Endpoints (v21.0.0)', async () => {
+    // 1. Create root & worker identities
+    const rootRes = await makeRequest('POST', '/api/v1/agent-federation/identity', {
+      authorityType: 'root_authority',
+      capabilities: ['*'],
+      epistemicBaseScore: 100
+    });
+    assert.equal(rootRes.status, 200);
+    assert.equal(rootRes.body.success, true);
+    const root = rootRes.body;
+
+    const workerRes = await makeRequest('POST', '/api/v1/agent-federation/identity', {
+      authorityType: 'autonomous_worker',
+      capabilities: ['inference:execute']
+    });
+    assert.equal(workerRes.status, 200);
+    const worker = workerRes.body;
+
+    // 2. Delegate
+    const delRes = await makeRequest('POST', '/api/v1/agent-federation/delegate', {
+      issuerKeyPair: root.keyPair,
+      subjectDid: worker.identity.did,
+      capabilities: ['inference:execute']
+    });
+    assert.equal(delRes.status, 200);
+    const token = delRes.body.token;
+
+    // 3. Verify
+    const verifyRes = await makeRequest('POST', '/api/v1/agent-federation/verify', {
+      delegationChain: [token],
+      rootAuthority: { did: root.identity.did, publicKeyHex: root.keyPair.publicKeyHex },
+      requestedCapability: 'inference:execute'
+    });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.body.isValid, true);
+
+    // 4. Handshake
+    const initRes = await makeRequest('POST', '/api/v1/agent-federation/handshake/init', {
+      initiatorKeyPair: root.keyPair,
+      responderDid: worker.identity.did
+    });
+    assert.equal(initRes.status, 200);
+
+    const respRes = await makeRequest('POST', '/api/v1/agent-federation/handshake/respond', {
+      responderKeyPair: worker.keyPair,
+      handshakeInit: initRes.body.handshakeInit,
+      initiatorPublicKeyHex: root.keyPair.publicKeyHex
+    });
+    assert.equal(respRes.status, 200);
+
+    const compRes = await makeRequest('POST', '/api/v1/agent-federation/handshake/complete', {
+      ephemeralSecret: initRes.body.ephemeralSecret,
+      handshakeInit: initRes.body.handshakeInit,
+      handshakeResponse: respRes.body.handshakeResponse,
+      responderPublicKeyHex: worker.keyPair.publicKeyHex
+    });
+    assert.equal(compRes.status, 200);
+    assert.equal(compRes.body.session.status, 'ESTABLISHED');
+  });
+
+  await t.test('75. Confidential Mixnet Shuffling Endpoints (v21.0.0)', async () => {
+    // 1. Keygen
+    const keyRes = await makeRequest('POST', '/api/v1/confidential-shuffle/keygen', {});
+    assert.equal(keyRes.status, 200);
+    const kp = keyRes.body.keyPair;
+
+    // 2. Shuffle
+    const shuffleRes = await makeRequest('POST', '/api/v1/confidential-shuffle/shuffle', {
+      plaintexts: ['10', '20', '30'],
+      publicKey: kp.publicKey
+    });
+    assert.equal(shuffleRes.status, 200);
+    const batch = shuffleRes.body.batch;
+
+    // 3. Verify
+    const verRes = await makeRequest('POST', '/api/v1/confidential-shuffle/verify', {
+      inputCiphertexts: batch.inputCiphertexts,
+      shuffledCiphertexts: batch.shuffledCiphertexts,
+      proof: batch.proof,
+      publicKey: kp.publicKey
+    });
+    assert.equal(verRes.status, 200);
+    assert.equal(verRes.body.isValid, true);
+
+    // 4. Decrypt
+    const decRes = await makeRequest('POST', '/api/v1/confidential-shuffle/decrypt', {
+      ciphertexts: batch.shuffledCiphertexts,
+      secretKey: kp.secretKey
+    });
+    assert.equal(decRes.status, 200);
+    assert.equal(decRes.body.plaintexts.length, 3);
+  });
+
+  await t.test('76. RAG Knowledge Provenance Endpoints (v21.0.0)', async () => {
+    const curatorKp = generateKeyPair();
+
+    // 1. Index
+    const indexRes = await makeRequest('POST', '/api/v1/rag-provenance/index', {
+      corpusId: 'corpus-api-test',
+      documents: [
+        { uri: 'doc://pqc/security', text: 'Quantum computers require lattice-based cryptography.' },
+        { uri: 'doc://ai/agents', text: 'Autonomous agents must be verifiable and bounded.' }
+      ]
+    });
+    assert.equal(indexRes.status, 200);
+    const corpus = indexRes.body.corpus;
+
+    // 2. Attest
+    const attestRes = await makeRequest('POST', '/api/v1/rag-provenance/attest', {
+      corpus,
+      queryText: 'Why lattice cryptography?',
+      generatedResponse: 'Quantum computers require lattice-based cryptography.',
+      claimedCitations: [
+        { chunkId: corpus.chunks[0].chunkId, snippet: 'Quantum computers require lattice-based cryptography.' }
+      ],
+      curatorKeyPair: curatorKp
+    });
+    assert.equal(attestRes.status, 200);
+    const attestation = attestRes.body.attestation;
+
+    // 3. Verify
+    const verRes = await makeRequest('POST', '/api/v1/rag-provenance/verify', {
+      attestation,
+      expectedCorpusRootHash: corpus.rootMerkleHash,
+      signerPublicKeyHex: curatorKp.publicKeyHex
+    });
+    assert.equal(verRes.status, 200);
+    assert.equal(verRes.body.isValid, true);
+
+    // 4. Audit
+    const auditRes = await makeRequest('POST', '/api/v1/rag-provenance/audit', {
+      attestation,
+      similarityThreshold: 0.5
+    });
+    assert.equal(auditRes.status, 200);
+    assert.equal(auditRes.body.auditReport.isAudited, true);
+  });
+
+  await t.test('77. ZK State Machine Escrow Endpoints (v21.0.0)', async () => {
+    const creatorKp = generateKeyPair();
+    const proverKp = generateKeyPair();
+    const challengerKp = generateKeyPair();
+
+    // 1. Create
+    const createRes = await makeRequest('POST', '/api/v1/zk-statemachine/create', {
+      creatorKeyPair: creatorKp,
+      options: { name: 'EscrowContractAPI', requiredBond: 250, escrowBounty: 1000 }
+    });
+    assert.equal(createRes.status, 200);
+    const spec = createRes.body.spec;
+
+    // 2. Transition
+    const transRes = await makeRequest('POST', '/api/v1/zk-statemachine/transition', {
+      spec,
+      currentState: { stateName: 'INIT', variables: { step: 0 }, stepIndex: 0 },
+      action: 'START',
+      nextState: { stateName: 'ACTIVE', newVariables: { step: 1 } },
+      proverKeyPair: proverKp
+    });
+    assert.equal(transRes.status, 200);
+    const transitionRecord = transRes.body.transitionRecord;
+
+    // 3. Verify
+    const verRes = await makeRequest('POST', '/api/v1/zk-statemachine/verify', {
+      spec,
+      transitionRecord,
+      proverPublicKeyHex: proverKp.publicKeyHex
+    });
+    assert.equal(verRes.status, 200);
+    assert.equal(verRes.body.isValid, true);
+
+    // 4. Dispute
+    const disputeRes = await makeRequest('POST', '/api/v1/zk-statemachine/dispute', {
+      spec,
+      transitionRecord,
+      challengerKeyPair: challengerKp,
+      disputeReason: 'INVALID_TRANSITION'
+    });
+    assert.equal(disputeRes.status, 200);
+    assert.ok(disputeRes.body.disputeReport.challengerDid);
+
+    // 5. Settle
+    const settleRes = await makeRequest('POST', '/api/v1/zk-statemachine/settle', {
+      spec,
+      finalStateRoot: transitionRecord.toStateRoot,
+      executorDid: proverKp.did
+    });
+    assert.equal(settleRes.status, 200);
+    assert.equal(settleRes.body.settlement.isSettled, true);
+    assert.equal(settleRes.body.settlement.payoutAmount, 1000);
+  });
 });
+
 
 
 

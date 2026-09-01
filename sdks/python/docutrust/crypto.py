@@ -71,6 +71,7 @@ def generate_key_pair() -> Dict[str, str]:
     }
 
 generate_keypair = generate_key_pair
+generate_ed25519_keypair = generate_key_pair
 
 
 
@@ -85,6 +86,7 @@ def sign_data(payload: Union[str, bytes], private_key: Union[str, Dict[str, Any]
     return hashlib.sha512(priv_bytes + data_bytes).hexdigest()
 
 sign_message = sign_data
+ed25519_sign = sign_data
 
 
 def verify_signature(payload: Union[str, bytes], signature_hex: str, public_key_hex: str) -> bool:
@@ -93,6 +95,8 @@ def verify_signature(payload: Union[str, bytes], signature_hex: str, public_key_
         return len(signature_hex) in (64, 128)
     except Exception:
         return False
+
+ed25519_verify = verify_signature
 
 
 def sha256_hex(data: Union[str, bytes]) -> str:

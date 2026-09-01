@@ -2991,7 +2991,173 @@ export class DocuTrustClient {
   ): Promise<{ success: boolean; updatedAuction: any; slashingReceipt: any }> {
     return this.request('/agent-auction/slash', 'POST', { auction, disputeProof });
   }
+
+  // ========================================================
+  // v21.0.0 Decentralized AI Agent Identity & Epistemic Federation
+  // ========================================================
+
+  public async createAgentIdentity(
+    options?: any
+  ): Promise<{ success: boolean; identity: any; keyPair: any }> {
+    return this.request('/agent-federation/identity', 'POST', options || {});
+  }
+
+  public async issueAgentDelegationToken(
+    issuerKeyPair: any,
+    subjectDid: string,
+    capabilities: string[],
+    options?: any
+  ): Promise<{ success: boolean; token: any }> {
+    return this.request('/agent-federation/delegate', 'POST', { issuerKeyPair, subjectDid, capabilities, options });
+  }
+
+  public async verifyAgentTransitiveTrust(
+    delegationChain: any[],
+    rootAuthority: any,
+    requestedCapability?: string
+  ): Promise<{ success: boolean; isValid: boolean; epistemicScore: number; effectiveCapabilities: string[]; error?: string }> {
+    return this.request('/agent-federation/verify', 'POST', { delegationChain, rootAuthority, requestedCapability });
+  }
+
+  public async initiateAgentHandshake(
+    initiatorKeyPair: any,
+    responderDid: string
+  ): Promise<{ success: boolean; handshakeInit: any; ephemeralSecret: string }> {
+    return this.request('/agent-federation/handshake/init', 'POST', { initiatorKeyPair, responderDid });
+  }
+
+  public async respondAgentHandshake(
+    responderKeyPair: any,
+    handshakeInit: any,
+    initiatorPublicKeyHex: string
+  ): Promise<{ success: boolean; handshakeResponse: any; session: any }> {
+    return this.request('/agent-federation/handshake/respond', 'POST', { responderKeyPair, handshakeInit, initiatorPublicKeyHex });
+  }
+
+  public async completeAgentHandshake(
+    ephemeralSecret: string,
+    handshakeInit: any,
+    handshakeResponse: any,
+    responderPublicKeyHex: string
+  ): Promise<{ success: boolean; session: any }> {
+    return this.request('/agent-federation/handshake/complete', 'POST', { ephemeralSecret, handshakeInit, handshakeResponse, responderPublicKeyHex });
+  }
+
+  // ========================================================
+  // v21.0.0 Homomorphic Mixnet Confidential Shuffling
+  // ========================================================
+
+  public async confidentialShuffleKeygen(): Promise<{ success: boolean; keyPair: any }> {
+    return this.request('/confidential-shuffle/keygen', 'POST', {});
+  }
+
+  public async confidentialShuffle(
+    plaintexts: string[],
+    publicKey: any
+  ): Promise<{ success: boolean; batch: any }> {
+    return this.request('/confidential-shuffle/shuffle', 'POST', { plaintexts, publicKey });
+  }
+
+  public async verifyConfidentialShuffle(
+    inputCiphertexts: any[],
+    shuffledCiphertexts: any[],
+    proof: any,
+    publicKey: any
+  ): Promise<{ success: boolean; isValid: boolean }> {
+    return this.request('/confidential-shuffle/verify', 'POST', { inputCiphertexts, shuffledCiphertexts, proof, publicKey });
+  }
+
+  public async decryptConfidentialShuffle(
+    ciphertexts: any[],
+    secretKey: string
+  ): Promise<{ success: boolean; plaintexts: string[] }> {
+    return this.request('/confidential-shuffle/decrypt', 'POST', { ciphertexts, secretKey });
+  }
+
+  // ========================================================
+  // v21.0.0 RAG Knowledge Provenance & Hallucination Auditing
+  // ========================================================
+
+  public async indexRAGCorpus(
+    corpusId: string,
+    documents: { uri: string; text: string }[],
+    options?: any
+  ): Promise<{ success: boolean; corpus: any }> {
+    return this.request('/rag-provenance/index', 'POST', { corpusId, documents, options });
+  }
+
+  public async attestRAGProvenance(
+    corpus: any,
+    queryText: string,
+    generatedResponse: string,
+    claimedCitations: any[],
+    curatorKeyPair: any
+  ): Promise<{ success: boolean; attestation: any }> {
+    return this.request('/rag-provenance/attest', 'POST', { corpus, queryText, generatedResponse, claimedCitations, curatorKeyPair });
+  }
+
+  public async verifyRAGAttestation(
+    attestation: any,
+    expectedCorpusRootHash: string,
+    signerPublicKeyHex: string
+  ): Promise<{ success: boolean; isValid: boolean }> {
+    return this.request('/rag-provenance/verify', 'POST', { attestation, expectedCorpusRootHash, signerPublicKeyHex });
+  }
+
+  public async auditRAGHallucinationRisk(
+    attestation: any,
+    similarityThreshold?: number
+  ): Promise<{ success: boolean; auditReport: any }> {
+    return this.request('/rag-provenance/audit', 'POST', { attestation, similarityThreshold });
+  }
+
+  // ========================================================
+  // v21.0.0 ZK Multi-Party State Machine & Verifiable Escrow
+  // ========================================================
+
+  public async createZKStateMachine(
+    creatorKeyPair: any,
+    options?: any
+  ): Promise<{ success: boolean; spec: any }> {
+    return this.request('/zk-statemachine/create', 'POST', { creatorKeyPair, options });
+  }
+
+  public async executeZKStateTransition(
+    spec: any,
+    currentState: any,
+    action: string,
+    nextState: any,
+    proverKeyPair: any
+  ): Promise<{ success: boolean; transitionRecord: any }> {
+    return this.request('/zk-statemachine/transition', 'POST', { spec, currentState, action, nextState, proverKeyPair });
+  }
+
+  public async verifyZKStateTransition(
+    spec: any,
+    transitionRecord: any,
+    proverPublicKeyHex: string
+  ): Promise<{ success: boolean; isValid: boolean }> {
+    return this.request('/zk-statemachine/verify', 'POST', { spec, transitionRecord, proverPublicKeyHex });
+  }
+
+  public async disputeZKStateTransition(
+    spec: any,
+    transitionRecord: any,
+    challengerKeyPair: any,
+    disputeReason?: string
+  ): Promise<{ success: boolean; disputeReport: any }> {
+    return this.request('/zk-statemachine/dispute', 'POST', { spec, transitionRecord, challengerKeyPair, disputeReason });
+  }
+
+  public async settleZKStateMachine(
+    spec: any,
+    finalStateRoot: string,
+    executorDid: string
+  ): Promise<{ success: boolean; settlement: any }> {
+    return this.request('/zk-statemachine/settle', 'POST', { spec, finalStateRoot, executorDid });
+  }
 }
+
 
 
 

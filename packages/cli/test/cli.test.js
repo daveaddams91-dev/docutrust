@@ -1806,6 +1806,78 @@ test('CLI Suite', async (t) => {
     const clearOut = execSync(`node "${cliPath}" agent-auction-clear --out "${clearFile}"`).toString();
     assert.ok(clearOut.includes('Auction cleared'));
   });
+
+  await t.test('74. docutrust agent-federation-identity, delegate, verify, and handshake (v21.0.0)', () => {
+    const idFile = path.join(tempDir, 'agent-id.json');
+    const tokenFile = path.join(tempDir, 'agent-token.json');
+    const handshakeFile = path.join(tempDir, 'agent-handshake.json');
+
+    const idOut = execSync(`node "${cliPath}" agent-federation-identity --authority "root_authority" --caps "inference:execute,state:update" --out "${idFile}"`).toString();
+    assert.ok(idOut.includes('Agent Identity generated and saved'));
+
+    const delOut = execSync(`node "${cliPath}" agent-federation-delegate --issuer-key "${idFile}" --subject "did:docutrust:agent:worker1" --caps "inference:execute" --out "${tokenFile}"`).toString();
+    assert.ok(delOut.includes('Delegation Token issued and saved'));
+
+    const hsOut = execSync(`node "${cliPath}" agent-federation-handshake --out "${handshakeFile}"`).toString();
+    assert.ok(hsOut.includes('Mutual ZK Agent Handshake established and saved'));
+  });
+
+  await t.test('75. docutrust confidential-shuffle-create, verify, and decrypt (v21.0.0)', () => {
+    const shuffleFile = path.join(tempDir, 'shuffle-batch.json');
+
+    const createOut = execSync(`node "${cliPath}" confidential-shuffle-create --inputs "11,22,33,44" --out "${shuffleFile}"`).toString();
+    assert.ok(createOut.includes('Confidential Mixnet Shuffle Batch generated and saved'));
+
+    const data = JSON.parse(fs.readFileSync(shuffleFile, 'utf-8'));
+    const verifyOut = execSync(`node "${cliPath}" confidential-shuffle-verify --batch "${shuffleFile}"`).toString();
+    const verifyResult = JSON.parse(verifyOut);
+    assert.equal(verifyResult.isValid, true);
+
+    const secretKeyHex = data.keyPair.secretKey;
+    const decOut = execSync(`node "${cliPath}" confidential-shuffle-decrypt --batch "${shuffleFile}" --secret-key "${secretKeyHex}"`).toString();
+    const decResult = JSON.parse(decOut);
+    assert.equal(decResult.decryptedPlaintexts.length, 4);
+    assert.ok(decResult.decryptedPlaintexts.includes('11'));
+  });
+
+  await t.test('76. docutrust rag-provenance-index, attest, verify, and audit (v21.0.0)', () => {
+    const corpusFile = path.join(tempDir, 'rag-corpus.json');
+    const attestFile = path.join(tempDir, 'rag-attestation.json');
+
+    const idxOut = execSync(`node "${cliPath}" rag-provenance-index --out "${corpusFile}"`).toString();
+    assert.ok(idxOut.includes('Knowledge Corpus indexed'));
+
+    const attOut = execSync(`node "${cliPath}" rag-provenance-attest --corpus "${corpusFile}" --query "security" --response "lattice security" --out "${attestFile}"`).toString();
+    assert.ok(attOut.includes('RAG Provenance Attestation generated and saved'));
+
+    const verOut = execSync(`node "${cliPath}" rag-provenance-verify --attestation "${attestFile}"`).toString();
+    const verResult = JSON.parse(verOut);
+    assert.equal(verResult.isValid, true);
+
+    const auditOut = execSync(`node "${cliPath}" rag-provenance-audit --attestation "${attestFile}" --threshold 0.5`).toString();
+    const auditReport = JSON.parse(auditOut);
+    assert.equal(auditReport.isAudited, true);
+  });
+
+  await t.test('77. docutrust zk-statemachine-init, transition, dispute, and settle (v21.0.0)', () => {
+    const specFile = path.join(tempDir, 'sm-spec.json');
+    const transFile = path.join(tempDir, 'sm-transition.json');
+
+    const initOut = execSync(`node "${cliPath}" zk-statemachine-init --name "AutonomousEscrow" --bond 400 --bounty 1200 --out "${specFile}"`).toString();
+    assert.ok(initOut.includes('State Machine initialized'));
+
+    const transOut = execSync(`node "${cliPath}" zk-statemachine-transition --spec "${specFile}" --from-state "INIT" --to-state "ACTIVE" --action "START" --out "${transFile}"`).toString();
+    assert.ok(transOut.includes('ZK State Transition executed'));
+
+    const disputeOut = execSync(`node "${cliPath}" zk-statemachine-dispute --spec "${specFile}" --record "${transFile}" --challenger "did:docutrust:challenger:9"`).toString();
+    const disputeReport = JSON.parse(disputeOut);
+    assert.ok(disputeReport.challengerDid);
+
+    const settleOut = execSync(`node "${cliPath}" zk-statemachine-settle --spec "${specFile}" --state-root "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890" --executor "did:docutrust:executor:01"`).toString();
+    const settlement = JSON.parse(settleOut);
+    assert.equal(settlement.isSettled, true);
+    assert.equal(settlement.payoutAmount, 1200);
+  });
 });
 
 

@@ -286,3 +286,19 @@ export * from './pq-abe';
 // Export Decentralized AI Agent Capability Auction & Settlement Protocol (DocuTrust v20.0.0)
 export * from './agent-auction';
 
+// ========================================================
+// DocuTrust v21.0.0 Sovereign Trust & Agentic Intelligence Epoch
+// ========================================================
+
+// Export Decentralized AI Agent Identity & Epistemic Trust Federation Engine (DocuTrust v21.0.0)
+export * from './agent-federation';
+
+// Export Homomorphic Threshold Decryption & Multi-Party Confidential Shuffling Engine (DocuTrust v21.0.0)
+export * from './confidential-shuffle';
+
+// Export Verifiable Dynamic Knowledge Provenance & RAG Hallucination Attestation Engine (DocuTrust v21.0.0)
+export * from './rag-provenance';
+
+// Export Zero-Knowledge Multi-Party Verifiable State Machine & Escrow Engine (DocuTrust v21.0.0)
+export * from './zk-statemachine';
+

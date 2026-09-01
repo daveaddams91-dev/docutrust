@@ -213,7 +213,30 @@ const command = args[0];
 
 function printHelp() {
   console.log(`
-\x1b[1m\x1b[36m🛡️ DocuTrust CLI v13.0.0\x1b[0m — Sovereign Trust Mesh Evolution: Recursive ZK, Revocation Lattice & AI Agent Provenance
+\x1b[1m\x1b[36m🛡️ DocuTrust CLI v21.0.0\x1b[0m — Sovereign Trust Mesh: Agent Federation, Confidential Shuffling, RAG Provenance & ZK State Machines
+
+\x1b[1mDECENTRALIZED AI AGENT IDENTITY & EPISTEMIC FEDERATION (v21.0.0):\x1b[0m
+  \x1b[32magent-federation-identity\x1b[0m [--authority <type>] [--caps <c1,c2>] [--out <f>] Generate agent identity descriptor and keypair
+  \x1b[32magent-federation-delegate\x1b[0m --issuer-key <k> --subject <did> --caps <c> [--out <f>] Issue signed federated delegation token
+  \x1b[32magent-federation-verify\x1b[0m --chain <f> --root-did <did> --root-key <k> [--cap <c>] Verify multi-hop transitive trust delegation chain
+  \x1b[32magent-federation-handshake\x1b[0m --init-key <k> --resp-key <k> [--out <f>] Execute mutual ZK agent handshake session
+
+\x1b[1mHOMOMORPHIC MIXNET CONFIDENTIAL SHUFFLING (v21.0.0):\x1b[0m
+  \x1b[32mconfidential-shuffle-create\x1b[0m --inputs <f|n1,n2,n3> [--out <f>] Encrypt and generate verifiable mixnet shuffle proof
+  \x1b[32mconfidential-shuffle-verify\x1b[0m --batch <f> Verify ZK permutation shuffle proof
+  \x1b[32mconfidential-shuffle-decrypt\x1b[0m --batch <f> --secret-key <hex> Batch decrypt shuffled ciphertexts
+
+\x1b[1mRAG KNOWLEDGE PROVENANCE & HALLUCINATION AUDITING (v21.0.0):\x1b[0m
+  \x1b[32mrag-provenance-index\x1b[0m --docs <f> [--out <f>] Build Merkleized knowledge corpus index
+  \x1b[32mrag-provenance-attest\x1b[0m --corpus <f> --query <q> --response <r> --key <k> [--out <f>] Generate signed RAG source attribution attestation
+  \x1b[32mrag-provenance-verify\x1b[0m --attestation <f> --corpus-root <hex> --key <k> Verify RAG provenance attestation
+  \x1b[32mrag-provenance-audit\x1b[0m --attestation <f> [--threshold <n>] Run automated hallucination risk audit
+
+\x1b[1mZERO-KNOWLEDGE MULTI-PARTY STATE MACHINE ESCROW (v21.0.0):\x1b[0m
+  \x1b[32mzk-statemachine-init\x1b[0m --key <k> [--name <n>] [--bond <n>] [--bounty <n>] [--out <f>] Create verifiable state machine spec
+  \x1b[32mzk-statemachine-transition\x1b[0m --spec <f> --from-state <st> --to-state <st> --action <a> --key <k> Execute verified ZK transition
+  \x1b[32mzk-statemachine-dispute\x1b[0m --spec <f> --record <f> --challenger <did> [--out <f>] Evaluate optimistic fraud dispute
+  \x1b[32mzk-statemachine-settle\x1b[0m --spec <f> --state-root <hex> --executor <did> Settle final escrow bounty payout
 
 \x1b[1mRECURSIVE ZERO-KNOWLEDGE PROOF AGGREGATION (v13.0.0):\x1b[0m
   \x1b[32mzk-aggregate\x1b[0m --proofs <f> --key <k> [--depth <d>] [--evm] [--out <f>] Aggregate heterogeneous ZK sub-proofs via Fiat-Shamir folding
@@ -5612,6 +5635,381 @@ async function main() {
     } else {
       console.log(JSON.stringify({ updatedAuction, result }, null, 2));
     }
+    return;
+  }
+
+  // ========================================================
+  // v21.0.0 Decentralized AI Agent Identity & Epistemic Federation CLI Commands
+  // ========================================================
+
+  if (command === 'agent-federation-identity') {
+    const authorityType = getArgValue('--authority') || 'delegated_agent';
+    const capsRaw = getArgValue('--caps') || 'inference:execute,knowledge:query';
+    const capabilities = capsRaw.split(',').map(s => s.trim());
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    const result = core.AgentFederationEngine.createAgentIdentity({
+      authorityType,
+      capabilities,
+      epistemicBaseScore: 90
+    });
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(result, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Agent Identity generated and saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(result, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'agent-federation-delegate') {
+    const issuerKey = getArgValue('--issuer-key') || getArgValue('-k');
+    const subjectDid = getArgValue('--subject') || getArgValue('-s');
+    const capsRaw = getArgValue('--caps') || 'inference:execute';
+    const capabilities = capsRaw.split(',').map(s => s.trim());
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    let issuerKp;
+    if (issuerKey && fs.existsSync(issuerKey)) {
+      issuerKp = JSON.parse(fs.readFileSync(issuerKey, 'utf-8'));
+      if (issuerKp.keyPair) issuerKp = issuerKp.keyPair;
+    } else {
+      issuerKp = core.generateKeyPair();
+    }
+
+    const token = core.AgentFederationEngine.issueDelegationToken(
+      issuerKp,
+      subjectDid || 'did:docutrust:agent:worker',
+      capabilities
+    );
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(token, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Delegation Token issued and saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(token, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'agent-federation-verify') {
+    const chainFile = getArgValue('--chain') || getArgValue('-c');
+    const rootDid = getArgValue('--root-did') || 'did:docutrust:root';
+    const rootKeyHex = getArgValue('--root-key');
+    const cap = getArgValue('--cap');
+
+    if (!chainFile || !fs.existsSync(chainFile)) {
+      console.error('\x1b[31mError:\x1b[0m Missing --chain <chain.json>');
+      process.exit(1);
+    }
+
+    const chainData = JSON.parse(fs.readFileSync(chainFile, 'utf-8'));
+    const chain = Array.isArray(chainData) ? chainData : (chainData.chain || [chainData]);
+
+    const verification = core.AgentFederationEngine.verifyTransitiveTrustChain(
+      chain,
+      { did: rootDid, publicKeyHex: rootKeyHex || '00'.repeat(32) },
+      cap
+    );
+
+    console.log(JSON.stringify(verification, null, 2));
+    return;
+  }
+
+  if (command === 'agent-federation-handshake') {
+    const outFile = getArgValue('--out') || getArgValue('-o');
+    const kpA = core.generateKeyPair();
+    const kpB = core.generateKeyPair();
+
+    const { handshakeInit, ephemeralSecret } = core.AgentFederationEngine.initiateHandshake(kpA, kpB.did);
+    const { handshakeResponse, session: respSession } = core.AgentFederationEngine.respondHandshake(kpB, handshakeInit, kpA.publicKeyHex);
+    const initSession = core.AgentFederationEngine.completeHandshake(ephemeralSecret, handshakeInit, handshakeResponse, kpB.publicKeyHex);
+
+    const result = {
+      status: 'ESTABLISHED',
+      sessionId: initSession.sessionId,
+      sharedSessionKeyHex: initSession.sessionKeyHex,
+      initiator: kpA.did,
+      responder: kpB.did,
+      authenticatedAt: initSession.authenticatedAt
+    };
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(result, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Mutual ZK Agent Handshake established and saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(result, null, 2));
+    }
+    return;
+  }
+
+  // ========================================================
+  // v21.0.0 Homomorphic Mixnet Confidential Shuffling CLI Commands
+  // ========================================================
+
+  if (command === 'confidential-shuffle-create') {
+    const inputsRaw = getArgValue('--inputs') || '101,202,303,404';
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    const kp = core.ConfidentialShuffleEngine.generateKeyPair();
+    const elements = inputsRaw.split(',').map(s => BigInt(s.trim()));
+    const ciphertexts = elements.map(e => core.ConfidentialShuffleEngine.encrypt(e, kp.publicKey));
+    const batch = core.ConfidentialShuffleEngine.shuffleAndProve(ciphertexts, kp.publicKey);
+
+    const result = {
+      keyPair: kp,
+      batch
+    };
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(result, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Confidential Mixnet Shuffle Batch generated and saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(result, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'confidential-shuffle-verify') {
+    const batchFile = getArgValue('--batch') || getArgValue('-b');
+    if (!batchFile || !fs.existsSync(batchFile)) {
+      console.error('\x1b[31mError:\x1b[0m Missing --batch <batch.json>');
+      process.exit(1);
+    }
+
+    const data = JSON.parse(fs.readFileSync(batchFile, 'utf-8'));
+    const batch = data.batch || data;
+    const pubKey = data.keyPair?.publicKey || batch.publicKey;
+
+    const isValid = core.ConfidentialShuffleEngine.verifyShuffleProof(
+      batch.inputCiphertexts,
+      batch.shuffledCiphertexts,
+      batch.proof,
+      pubKey
+    );
+
+    console.log(JSON.stringify({ isValid, batchId: batch.batchId, proofType: batch.proof.proofType }, null, 2));
+    return;
+  }
+
+  if (command === 'confidential-shuffle-decrypt') {
+    const batchFile = getArgValue('--batch') || getArgValue('-b');
+    const secretKey = getArgValue('--secret-key') || getArgValue('-s');
+
+    if (!batchFile || !fs.existsSync(batchFile) || !secretKey) {
+      console.error('\x1b[31mError:\x1b[0m Missing --batch <batch.json> or --secret-key <hex>');
+      process.exit(1);
+    }
+
+    const data = JSON.parse(fs.readFileSync(batchFile, 'utf-8'));
+    const batch = data.batch || data;
+    const decrypted = core.ConfidentialShuffleEngine.batchDecrypt(batch.shuffledCiphertexts, secretKey);
+
+    console.log(JSON.stringify({ batchId: batch.batchId, decryptedPlaintexts: decrypted.map(d => d.toString()) }, null, 2));
+    return;
+  }
+
+  // ========================================================
+  // v21.0.0 RAG Knowledge Provenance & Hallucination CLI Commands
+  // ========================================================
+
+  if (command === 'rag-provenance-index') {
+    const docsFile = getArgValue('--docs') || getArgValue('-d');
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    let docs = [
+      { uri: 'doc://policy/crypto-2026', text: 'Post-quantum lattice signatures provide 128-bit quantum security against Shor algorithm attacks.' },
+      { uri: 'doc://policy/agent-bounds', text: 'Autonomous agents must hold verifiable delegation tokens bounded by cryptographic capability envelopes.' }
+    ];
+
+    if (docsFile && fs.existsSync(docsFile)) {
+      docs = JSON.parse(fs.readFileSync(docsFile, 'utf-8'));
+    }
+
+    const corpus = core.RAGProvenanceEngine.indexKnowledgeCorpus('corpus-cli-01', docs);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify(corpus, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m Knowledge Corpus indexed (${corpus.chunkCount} chunks, Root: ${corpus.rootMerkleHash}) and saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(corpus, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'rag-provenance-attest') {
+    const corpusFile = getArgValue('--corpus') || getArgValue('-c');
+    const query = getArgValue('--query') || getArgValue('-q') || 'What security do lattice signatures provide?';
+    const response = getArgValue('--response') || getArgValue('-r') || 'Lattice signatures offer post-quantum resistance.';
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    let corpus;
+    if (corpusFile && fs.existsSync(corpusFile)) {
+      corpus = JSON.parse(fs.readFileSync(corpusFile, 'utf-8'));
+    } else {
+      corpus = core.RAGProvenanceEngine.indexKnowledgeCorpus('corpus-auto', [
+        { uri: 'doc://policy/crypto-2026', text: 'Post-quantum lattice signatures provide 128-bit quantum security against Shor algorithm attacks.' }
+      ]);
+    }
+
+    const kp = core.generateKeyPair();
+    const citations = [
+      { chunkId: corpus.chunks[0].chunkId, snippet: 'Post-quantum lattice signatures provide 128-bit quantum security' }
+    ];
+
+    const attestation = core.RAGProvenanceEngine.generateRAGAttestation(corpus, query, response, citations, kp);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify({ attestation, signerKeyPair: kp }, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m RAG Provenance Attestation generated and saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(attestation, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'rag-provenance-verify') {
+    const attFile = getArgValue('--attestation') || getArgValue('-a');
+    const rootHash = getArgValue('--corpus-root') || getArgValue('-r');
+    const pubKey = getArgValue('--key') || getArgValue('-k');
+
+    if (!attFile || !fs.existsSync(attFile)) {
+      console.error('\x1b[31mError:\x1b[0m Missing --attestation <attestation.json>');
+      process.exit(1);
+    }
+
+    const data = JSON.parse(fs.readFileSync(attFile, 'utf-8'));
+    const att = data.attestation || data;
+    const root = rootHash || att.corpusRootHash;
+    const pub = pubKey || data.signerKeyPair?.publicKeyHex;
+
+    const isValid = core.RAGProvenanceEngine.verifyRAGAttestation(att, root, pub);
+    console.log(JSON.stringify({ isValid, attestationId: att.attestationId, faithfulnessScore: att.overallFaithfulnessScore }, null, 2));
+    return;
+  }
+
+  if (command === 'rag-provenance-audit') {
+    const attFile = getArgValue('--attestation') || getArgValue('-a');
+    const threshold = parseFloat(getArgValue('--threshold') || '0.6');
+
+    if (!attFile || !fs.existsSync(attFile)) {
+      console.error('\x1b[31mError:\x1b[0m Missing --attestation <attestation.json>');
+      process.exit(1);
+    }
+
+    const data = JSON.parse(fs.readFileSync(attFile, 'utf-8'));
+    const att = data.attestation || data;
+    const auditReport = core.RAGProvenanceEngine.auditHallucinationRisk(att, threshold);
+
+    console.log(JSON.stringify(auditReport, null, 2));
+    return;
+  }
+
+  // ========================================================
+  // v21.0.0 ZK Multi-Party State Machine & Escrow CLI Commands
+  // ========================================================
+
+  if (command === 'zk-statemachine-init') {
+    const name = getArgValue('--name') || 'DocuTrustAutonomousEscrow';
+    const bond = parseInt(getArgValue('--bond') || '500', 10);
+    const bounty = parseInt(getArgValue('--bounty') || '2000', 10);
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    const creatorKp = core.generateKeyPair();
+    const spec = core.ZKStateMachineEngine.createStateMachine(creatorKp, {
+      name,
+      requiredBond: bond,
+      escrowBounty: bounty
+    });
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify({ spec, creatorKeyPair: creatorKp }, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m State Machine initialized (${spec.machineId}) and saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(spec, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'zk-statemachine-transition') {
+    const specFile = getArgValue('--spec') || getArgValue('-s');
+    const fromState = getArgValue('--from-state') || 'INIT';
+    const toState = getArgValue('--to-state') || 'ACTIVE';
+    const action = getArgValue('--action') || 'START';
+    const outFile = getArgValue('--out') || getArgValue('-o');
+
+    const creatorKp = core.generateKeyPair();
+    const proverKp = core.generateKeyPair();
+
+    let spec;
+    if (specFile && fs.existsSync(specFile)) {
+      const data = JSON.parse(fs.readFileSync(specFile, 'utf-8'));
+      spec = data.spec || data;
+    } else {
+      spec = core.ZKStateMachineEngine.createStateMachine(creatorKp);
+    }
+
+    const currentState = { stateName: fromState, variables: { step: 0, balance: 1000 }, stepIndex: 0 };
+    const nextState = { stateName: toState, newVariables: { step: 1, balance: 1000 } };
+
+    const record = core.ZKStateMachineEngine.executeTransition(spec, currentState, action, nextState, proverKp);
+
+    if (outFile) {
+      fs.writeFileSync(outFile, JSON.stringify({ record, proverKeyPair: proverKp }, null, 2));
+      console.log(`\x1b[32m✔\x1b[0m ZK State Transition executed (${record.transitionId}) and saved to \x1b[1m${outFile}\x1b[0m`);
+    } else {
+      console.log(JSON.stringify(record, null, 2));
+    }
+    return;
+  }
+
+  if (command === 'zk-statemachine-dispute') {
+    const specFile = getArgValue('--spec') || getArgValue('-s');
+    const recordFile = getArgValue('--record') || getArgValue('-r');
+    const challengerDid = getArgValue('--challenger') || 'did:docutrust:challenger:01';
+
+    const creatorKp = core.generateKeyPair();
+    const proverKp = core.generateKeyPair();
+    const spec = core.ZKStateMachineEngine.createStateMachine(creatorKp);
+
+    let record;
+    if (recordFile && fs.existsSync(recordFile)) {
+      const data = JSON.parse(fs.readFileSync(recordFile, 'utf-8'));
+      record = data.record || data;
+    } else {
+      const cur = { stateName: 'INIT', variables: { step: 0, balance: 1000 }, stepIndex: 0 };
+      const nxt = { stateName: 'ACTIVE', newVariables: { step: 1, balance: 1000 } };
+      record = core.ZKStateMachineEngine.executeTransition(spec, cur, 'START', nxt, proverKp);
+    }
+
+    const disputeReport = core.ZKStateMachineEngine.disputeTransition(
+      spec,
+      record,
+      { did: challengerDid },
+      'INVALID_TRANSITION'
+    );
+
+    console.log(JSON.stringify(disputeReport, null, 2));
+    return;
+  }
+
+  if (command === 'zk-statemachine-settle') {
+    const specFile = getArgValue('--spec') || getArgValue('-s');
+    const stateRoot = getArgValue('--state-root') || '00'.repeat(32);
+    const executorDid = getArgValue('--executor') || 'did:docutrust:executor:01';
+
+    const creatorKp = core.generateKeyPair();
+    let spec;
+    if (specFile && fs.existsSync(specFile)) {
+      const data = JSON.parse(fs.readFileSync(specFile, 'utf-8'));
+      spec = data.spec || data;
+    } else {
+      spec = core.ZKStateMachineEngine.createStateMachine(creatorKp);
+    }
+
+    const settlement = core.ZKStateMachineEngine.settleStateMachine(spec, stateRoot, executorDid);
+    console.log(JSON.stringify(settlement, null, 2));
     return;
   }
 
