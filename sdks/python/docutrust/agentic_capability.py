@@ -1,13 +1,26 @@
+"""Module for mathematical computation and analysis."""
+
+from datetime import datetime, timezone, timedelta
+from typing import Dict, Any, List, Optional
 import hashlib
 import hmac
 import json
 import secrets
-from typing import Dict, Any, List, Optional
-from datetime import datetime, timezone, timedelta
+
 
 class AgenticCapabilityEngine:
     @classmethod
     def _matches_pattern(cls, pattern: str, target: str) -> bool:
+        """Matches pattern.
+        
+        Args:
+            pattern:
+            target:
+        
+        Returns:
+            bool: Result of type bool
+        
+        """
         if pattern == "*" or pattern == target:
             return True
         if pattern.endswith("*"):
@@ -25,6 +38,20 @@ class AgenticCapabilityEngine:
         expires_in_seconds: int,
         issuer_private_key_hex: str
     ) -> Dict[str, Any]:
+        """Issue root capability.
+        
+        Args:
+            issuer_did:
+            audience_did:
+            capabilities:
+            caveats:
+            expires_in_seconds:
+            issuer_private_key_hex:
+        
+        Returns:
+            dict: Result of type dict
+        
+        """
         token_id = f"ucan_{secrets.token_hex(8)}"
         now = datetime.now(timezone.utc)
         exp = now + timedelta(seconds=expires_in_seconds)
@@ -59,6 +86,21 @@ class AgenticCapabilityEngine:
         expires_in_seconds: int,
         delegator_private_key_hex: str
     ) -> Dict[str, Any]:
+        """Attenuate capability.
+        
+        Args:
+            parent_token:
+            delegator_did:
+            delegatee_did:
+            restricted_capabilities:
+            additional_caveats:
+            expires_in_seconds:
+            delegator_private_key_hex:
+        
+        Returns:
+            dict: Result of type dict
+        
+        """
         if parent_token.get("audience") != delegator_did:
             raise ValueError("Delegator DID must match parent token audience")
 
@@ -110,6 +152,18 @@ class AgenticCapabilityEngine:
         target_resource: str,
         context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
+        """Check whether delegation path.
+        
+        Args:
+            token_chain:
+            target_action:
+            target_resource:
+            context:
+        
+        Returns:
+            dict: Result of type dict
+        
+        """
         if not token_chain:
             return {"valid": False, "error": "Token chain is empty"}
 
@@ -160,6 +214,19 @@ class AgenticCapabilityEngine:
         execution_payload: Any,
         agent_private_key_hex: str
     ) -> Dict[str, Any]:
+        """Create execution receipt.
+        
+        Args:
+            agent_did:
+            invoked_capability:
+            token_chain:
+            execution_payload:
+            agent_private_key_hex:
+        
+        Returns:
+            dict: Result of type dict
+        
+        """
         receipt_id = f"exec_{secrets.token_hex(8)}"
         payload_canonical = json.dumps(execution_payload, sort_keys=True, separators=(',', ':')).encode('utf-8')
         execution_digest = "0x" + hashlib.sha256(payload_canonical).hexdigest()
@@ -188,6 +255,16 @@ class AgenticCapabilityEngine:
         receipt: Dict[str, Any],
         expected_agent_private_key_hex: Optional[str] = None
     ) -> Dict[str, Any]:
+        """Check whether execution receipt.
+        
+        Args:
+            receipt:
+            expected_agent_private_key_hex:
+        
+        Returns:
+            dict: Result of type dict
+        
+        """
         if receipt.get("type") != "DocuTrustAgentExecutionReceipt2026":
             return {"valid": False, "error": "Invalid execution receipt type"}
 
