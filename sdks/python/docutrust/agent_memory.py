@@ -1,9 +1,12 @@
+"""Module for mathematical computation and analysis."""
+
+from datetime import datetime, timezone
+from typing import Dict, Any, List, Optional
 import hashlib
 import json
 import math
 import re
-from typing import Dict, Any, List, Optional
-from datetime import datetime, timezone
+
 
 class AgentMemoryEngine:
     """
@@ -13,6 +16,16 @@ class AgentMemoryEngine:
     """
     @classmethod
     def _cosine_similarity(cls, vec_a: List[float], vec_b: List[float]) -> float:
+        """Cosine similarity.
+        
+        Args:
+            vec_a (list):
+            vec_b (list):
+        
+        Returns:
+            float: Result of type float
+        
+        """
         if len(vec_a) != len(vec_b):
             raise ValueError("Embedding dimensions must match")
         dot_product = sum(a * b for a, b in zip(vec_a, vec_b))
@@ -28,6 +41,16 @@ class AgentMemoryEngine:
         agent_did: str,
         memory_nodes: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
+        """Commit memory graph.
+        
+        Args:
+            agent_did:
+            memory_nodes (list):
+        
+        Returns:
+            dict: Result of type dict
+        
+        """
         if not memory_nodes:
             raise ValueError("Memory graph must contain at least one node")
 
@@ -88,6 +111,19 @@ class AgentMemoryEngine:
         graph_commitment: Optional[Dict[str, Any]] = None,
         min_cosine_threshold: float = 0.75
     ) -> Dict[str, Any]:
+        """Create similarity proof.
+        
+        Args:
+            query_embedding:
+            target_node:
+            node_index (int):
+            graph_commitment:
+            min_cosine_threshold (float):
+        
+        Returns:
+            dict: Result of type dict
+        
+        """
         sim = cls._cosine_similarity(query_embedding, target_node["embedding"])
         if sim < min_cosine_threshold:
             raise ValueError(f"Similarity {sim:.4f} below threshold {min_cosine_threshold}")
@@ -122,6 +158,16 @@ class AgentMemoryEngine:
         graph_commitment: Dict[str, Any],
         proof: Dict[str, Any]
     ) -> Dict[str, Any]:
+        """Check whether similarity proof.
+        
+        Args:
+            graph_commitment:
+            proof:
+        
+        Returns:
+            dict: Result of type dict
+        
+        """
         if proof.get("type") != "DocuTrustZKEmbeddingSimilarityProof2026":
             return {"valid": False, "error": "Invalid proof type"}
 
@@ -140,6 +186,17 @@ class AgentMemoryEngine:
         incoming_content: str,
         incoming_embedding: List[float]
     ) -> Dict[str, Any]:
+        """Audit memory poisoning.
+        
+        Args:
+            graph:
+            incoming_content:
+            incoming_embedding:
+        
+        Returns:
+            dict: Result of type dict
+        
+        """
         threats: List[str] = []
         anomaly_score = 0
 
