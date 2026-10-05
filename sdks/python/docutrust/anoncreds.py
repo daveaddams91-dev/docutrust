@@ -1,11 +1,13 @@
 from __future__ import annotations
+"""Module for mathematical computation and analysis."""
+
 import os
 import hashlib
-import json
 import datetime
 from typing import Dict, Any, List, Optional
 from .crypto import sha256_hex, canonicalize_json, encode_base58
 from .bbs import generate_bbs_keypair, sign_bbs, derive_bbs_proof, verify_bbs_proof
+
 
 class AnonCredsEngine:
     """AnonCreds 2.0 & Privacy-Preserving Blind Credential Issuance Engine for Python."""
@@ -272,7 +274,7 @@ class AnonCredsEngine:
                     errors.append(f"Malformed predicate proof for claim {p.get('claimKey')}")
 
         return {
-            "valid": len(errors) == 0,
+            "valid": not errors,
             "issuer": presentation.get("issuerDid", ""),
             "schemaId": presentation.get("schemaId", ""),
             "disclosedClaims": presentation.get("disclosedClaims", {}),

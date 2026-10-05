@@ -1,4 +1,6 @@
 from __future__ import annotations
+"""Module for mathematical computation and analysis."""
+
 from .client import DocuTrustClient
 from .crypto import canonicalize_json, sha256_hex, MerkleTree, encode_base58, decode_base58
 from .pqc import generate_pqc_hybrid_keys

@@ -1,8 +1,13 @@
 from __future__ import annotations
+"""Module for mathematical computation and analysis."""
+
+
+from typing import Dict, Any, List, Optional, Union
 import secrets
 import time
-from typing import Dict, Any, List, Optional, Union
+
 from .crypto import canonicalize_json, sha256_hex, sign_message, verify_signature
+
 
 class AgentProvenanceEngine:
     """
@@ -12,6 +17,15 @@ class AgentProvenanceEngine:
 
     @staticmethod
     def compute_model_fingerprint(model_card: Dict[str, Any]) -> str:
+        """Compute model fingerprint using optimized algorithms.
+        
+        Args:
+            model_card:
+        
+        Returns:
+            The computed result
+        
+        """
         canonical = canonicalize_json({
             'modelName': model_card.get('modelName', ''),
             'modelVersion': model_card.get('modelVersion', ''),
@@ -24,6 +38,15 @@ class AgentProvenanceEngine:
 
     @staticmethod
     def compute_context_digest(context_payload: Union[Dict[str, Any], str]) -> str:
+        """Compute context digest using optimized algorithms.
+        
+        Args:
+            context_payload:
+        
+        Returns:
+            The computed result
+        
+        """
         canonical = context_payload if isinstance(context_payload, str) else canonicalize_json(context_payload)
         return sha256_hex(f"AGENT_CONTEXT:{canonical}")
 
@@ -33,6 +56,16 @@ class AgentProvenanceEngine:
         payload: Dict[str, Any],
         agent_key_pair: Dict[str, Any]
     ) -> Dict[str, Any]:
+        """Issue attestation.
+        
+        Args:
+            payload:
+            agent_key_pair:
+        
+        Returns:
+            dict: Result of type dict
+        
+        """
         attestation_id = f"agent-att-{secrets.token_hex(8)}"
         timestamp = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
 
@@ -100,6 +133,17 @@ class AgentProvenanceEngine:
         agent_public_key_hex: str,
         expected_output: Optional[Union[Dict[str, Any], str]] = None
     ) -> Dict[str, Any]:
+        """Check whether attestation.
+        
+        Args:
+            attestation:
+            agent_public_key_hex:
+            expected_output:
+        
+        Returns:
+            dict: Result of type dict
+        
+        """
         errors = []
 
         if not attestation or attestation.get('type') != 'DocuTrustAgentAttestation2026':
@@ -158,7 +202,7 @@ class AgentProvenanceEngine:
             errors.append('Agent action attestation reports safety/policy guardrail violation.')
 
         return {
-            'valid': len(errors) == 0,
+            'valid': not errors,
             'attestationId': attestation.get('attestationId'),
             'agentDid': attestation.get('agentDid'),
             'modelFingerprint': attestation.get('modelFingerprint'),

@@ -4,6 +4,7 @@ Provides O(1) constant-size dynamic membership & revocation witnesses with modul
 """
 
 from typing import Any, Dict, List, Optional, Set
+
 from .crypto import sha256_hex
 
 
@@ -38,6 +39,15 @@ class CryptographicAccumulator:
         generator_hex: str = DEFAULT_GENERATOR_HEX,
         initial_accumulator_hex: Optional[str] = None
     ):
+        """Init.
+        
+        Args:
+            accumulator_id:
+            modulus_hex:
+            generator_hex:
+            initial_accumulator_hex:
+        
+        """
         self.id = accumulator_id
         self.N = int(modulus_hex, 16)
         self.g = int(generator_hex, 16)

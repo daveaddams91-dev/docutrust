@@ -1,9 +1,10 @@
 """Decentralized AI Agent Identity & Epistemic Federation Engine for DocuTrust v21.0.0."""
 
 from __future__ import annotations
-import time
-import math
+
 from typing import Dict, Any, List, Optional
+import time
+
 from .crypto import canonicalize_json, sha256_hex, ed25519_sign, ed25519_verify, generate_ed25519_keypair
 
 

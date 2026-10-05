@@ -1,8 +1,10 @@
 """Autonomous Agent Smart Contracts & Slashing Engine for DocuTrust v19.0.0."""
 
 from __future__ import annotations
-import time
+
 from typing import Dict, Any, List, Optional
+import time
+
 from .crypto import canonicalize_json, sha256_hex
 
 
