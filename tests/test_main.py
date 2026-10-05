@@ -10,7 +10,7 @@ class TestImport(unittest.TestCase):
     def test_module_imports(self):
         """The main module should import without errors."""
         try:
-            importlib.import_module("sdks/python/docutrust/__init__")
+            importlib.import_module("docutrust")
         except ImportError as e:
             if "gmpy2" in str(e) or "mpmath" in str(e):
                 self.skipTest(f"Optional dependency not installed: {e}")
@@ -19,7 +19,7 @@ class TestImport(unittest.TestCase):
     def test_module_has_functions(self):
         """The module should define at least one callable."""
         try:
-            mod = importlib.import_module("sdks/python/docutrust/__init__")
+            mod = importlib.import_module("docutrust")
         except ImportError as e:
             if "gmpy2" in str(e) or "mpmath" in str(e):
                 self.skipTest(f"Optional dependency not installed: {e}")
@@ -37,7 +37,7 @@ class TestArguments(unittest.TestCase):
         # but we can verify argparse is present in the source
         import ast
         import os
-        script_path = os.path.join(os.path.dirname(__file__), "..", "sdks/python/docutrust/__init__.py")
+        script_path = os.path.join(os.path.dirname(__file__), "..", "docutrust.py")
         script_path = os.path.normpath(script_path)
         if not os.path.exists(script_path):
             self.skipTest("Main script not found")
