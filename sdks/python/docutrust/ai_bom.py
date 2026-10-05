@@ -1,8 +1,13 @@
 from __future__ import annotations
+"""Module for mathematical computation and analysis."""
+
+
+from typing import Dict, Any, List, Optional, Union
 import secrets
 import time
-from typing import Dict, Any, List, Optional, Union
+
 from .crypto import canonicalize_json, sha256_hex, sign_message, verify_signature
+
 
 class AIBOMRegistryEngine:
     """
@@ -12,6 +17,15 @@ class AIBOMRegistryEngine:
 
     @classmethod
     def compute_layer_hash(cls, layer: Dict[str, Any]) -> str:
+        """Compute layer hash using optimized algorithms.
+        
+        Args:
+            layer:
+        
+        Returns:
+            The computed result
+        
+        """
         canonical = canonicalize_json({
             'layerIndex': layer.get('layerIndex', 0),
             'layerName': layer.get('layerName', ''),
@@ -23,6 +37,15 @@ class AIBOMRegistryEngine:
 
     @classmethod
     def compute_weights_merkle_root(cls, layers: List[Dict[str, Any]]) -> str:
+        """Compute weights merkle root using optimized algorithms.
+        
+        Args:
+            layers:
+        
+        Returns:
+            The computed result
+        
+        """
         if not layers:
             return sha256_hex('EMPTY_WEIGHTS')
 
@@ -43,6 +66,16 @@ class AIBOMRegistryEngine:
         manifest: Dict[str, Any],
         layer_index: int
     ) -> Dict[str, Any]:
+        """Create layer proof.
+        
+        Args:
+            manifest:
+            layer_index:
+        
+        Returns:
+            dict: Result of type dict
+        
+        """
         layers = manifest.get('layers', [])
         # Ensure indices
         indexed_layers = []
@@ -89,6 +122,16 @@ class AIBOMRegistryEngine:
         proof_obj: Dict[str, Any],
         expected_root: str
     ) -> Dict[str, Any]:
+        """Check whether layer proof.
+        
+        Args:
+            proof_obj:
+            expected_root:
+        
+        Returns:
+            dict: Result of type dict
+        
+        """
         layer = proof_obj.get('layer', {})
         proof = proof_obj.get('proof', [])
 
@@ -116,6 +159,16 @@ class AIBOMRegistryEngine:
         manifest: Dict[str, Any],
         certifier_key_pair: Dict[str, Any]
     ) -> Dict[str, Any]:
+        """Create aibom receipt.
+        
+        Args:
+            manifest:
+            certifier_key_pair:
+        
+        Returns:
+            dict: Result of type dict
+        
+        """
         layers = manifest.get('layers', [])
         weights_merkle_root = cls.compute_weights_merkle_root(layers)
 
@@ -168,6 +221,17 @@ class AIBOMRegistryEngine:
         certifier_public_key: str,
         expected_weights_root: Optional[str] = None
     ) -> Dict[str, Any]:
+        """Check whether aibom receipt.
+        
+        Args:
+            receipt:
+            certifier_public_key:
+            expected_weights_root:
+        
+        Returns:
+            dict: Result of type dict
+        
+        """
         errors = []
         if not isinstance(receipt, dict):
             return {'valid': False, 'errors': ['Invalid AI-BOM receipt']}
@@ -189,7 +253,7 @@ class AIBOMRegistryEngine:
             errors.append('Invalid certifier signature on AI-BOM receipt')
 
         return {
-            'valid': len(errors) == 0,
-            'weightsRootMatches': len(errors) == 0,
+            'valid': not errors,
+            'weightsRootMatches': not errors,
             'errors': errors
         }
