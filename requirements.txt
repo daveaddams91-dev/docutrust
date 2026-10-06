@@ -1,1 +1,4 @@
 __future__
+requests
+cryptography
+pytest

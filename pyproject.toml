@@ -26,4 +26,5 @@ classifiers = [
 Homepage = "https://github.com/rajveersinh-is-dev/docutrust"
 
 [tool.setuptools]
-py-modules = ['']
+packages = ['docutrust']
+package-dir = {'' = 'sdks/python'}
